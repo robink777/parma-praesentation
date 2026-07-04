@@ -20,7 +20,8 @@ export type IconName =
   | "expand"
   | "close"
   | "contact"
-  | "globe";
+  | "globe"
+  | "search";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   greeting: (
@@ -128,6 +129,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8" />
       <path d="M4 12h16M12 4c2.5 2.5 2.5 13 0 16M12 4c-2.5 2.5-2.5 13 0 16" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M20 20l-4.5-4.5" />
     </>
   ),
 };
