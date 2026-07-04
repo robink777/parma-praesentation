@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-reinweiss text-anthrazit antialiased;
+  }
+
+  h1 {
+    @apply font-slab font-extrabold tracking-h1 leading-[1.2];
+  }
+
+  h2 {
+    @apply font-slab font-bold tracking-h2 leading-[1.18];
+  }
+
+  h3 {
+    @apply font-slab font-bold tracking-h3 leading-[1.25];
+  }
+
+  h4 {
+    @apply font-slab font-semibold leading-[1.3];
+  }
+}
+
+@layer utilities {
+  .label {
+    @apply font-mono text-[11px] font-medium uppercase tracking-label text-walnuss/70;
+  }
+}
