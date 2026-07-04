@@ -54,14 +54,24 @@ export function ObjektAuswahl() {
   const router = useRouter();
   const [suche, setSuche] = useState("");
   const [ergebnisse, setErgebnisse] = useState<Immobilie[]>([]);
-  const [laden, setLaden] = useState(true);
+  const [laden, setLaden] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [wirdGeladen, setWirdGeladen] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Bewusst KEIN automatischer Abruf beim ersten Rendern: Ohne Eingabe soll ausschließlich
+  // die Such-Maske sichtbar sein — die Liste erscheint erst, sobald aktiv gesucht wird.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => sucheImmobilien(suche), suche ? 350 : 0);
+
+    if (!suche.trim()) {
+      setErgebnisse([]);
+      setFehler(null);
+      setLaden(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(() => sucheImmobilien(suche), 350);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
@@ -133,30 +143,32 @@ export function ObjektAuswahl() {
           />
         </div>
 
-        <div className="flex flex-col gap-xs">
-          {laden ? (
-            <div className="flex items-center justify-center gap-xs py-lg text-small text-anthrazit/60">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-asche border-t-messing" />
-              Lade Immobilien …
-            </div>
-          ) : fehler ? (
-            <div className="rounded-md border-2 border-messing/40 bg-stein p-sm text-small text-anthrazit">
-              <strong className="font-medium">Fehler:</strong> {fehler}
-            </div>
-          ) : ergebnisse.length === 0 ? (
-            <div className="py-lg text-center text-small text-anthrazit/50">
-              Keine Immobilien gefunden.
-            </div>
-          ) : (
-            ergebnisse.map((immobilie) => (
-              <EinzelnesErgebnis
-                key={immobilie.id}
-                immobilie={immobilie}
-                onAuswaehlen={handleAuswaehlen}
-              />
-            ))
-          )}
-        </div>
+        {suche.trim() && (
+          <div className="flex flex-col gap-xs">
+            {laden ? (
+              <div className="flex items-center justify-center gap-xs py-lg text-small text-anthrazit/60">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-asche border-t-messing" />
+                Lade Immobilien …
+              </div>
+            ) : fehler ? (
+              <div className="rounded-md border-2 border-messing/40 bg-stein p-sm text-small text-anthrazit">
+                <strong className="font-medium">Fehler:</strong> {fehler}
+              </div>
+            ) : ergebnisse.length === 0 ? (
+              <div className="py-lg text-center text-small text-anthrazit/50">
+                Keine Immobilien gefunden.
+              </div>
+            ) : (
+              ergebnisse.map((immobilie) => (
+                <EinzelnesErgebnis
+                  key={immobilie.id}
+                  immobilie={immobilie}
+                  onAuswaehlen={handleAuswaehlen}
+                />
+              ))
+            )}
+          </div>
+        )}
 
         {wirdGeladen && (
           <div className="mt-md flex items-center gap-xs text-small text-anthrazit/60">
