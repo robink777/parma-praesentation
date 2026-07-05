@@ -44,6 +44,16 @@ function StatusZelle({ status }: { status: LeistungsStatus }) {
   return <span className="text-anthrazit/30">—</span>;
 }
 
+// Spalten der Detail-Tabelle — bewusst als Liste mit paket.id, damit sich die Hervorhebung der
+// Spalte des gewählten Pakets (siehe gewaehltesPaket-Vergleich weiter unten) direkt aus derselben
+// Quelle speist wie die Paketkarten und die § 10-Auswahlbuttons, statt drei Stellen unabhängig
+// synchron halten zu müssen.
+const LEISTUNGS_SPALTEN: { id: LeistungspaketId; label: string }[] = [
+  { id: "basis", label: "Basis" },
+  { id: "komfort", label: "Komfort" },
+  { id: "premium", label: "Premium" },
+];
+
 export function Leistungsversprechen() {
   const [vereinbarung, setVereinbarung] = useState<LeistungsversprechenVereinbarung>({});
 
@@ -71,29 +81,50 @@ export function Leistungsversprechen() {
       </div>
 
       <h3 className="mb-sm">Unsere Pakete</h3>
+      <p className="mb-sm text-small text-anthrazit/60">Paket antippen, um es auszuwählen.</p>
       <div className="mb-lg grid grid-cols-1 gap-sm md:grid-cols-3">
-        {LEISTUNGSPAKETE.map((paket) => (
-          <Card key={paket.id} className={paket.empfohlen ? "relative border-2 border-messing" : "relative"}>
-            {paket.empfohlen && (
-              <span className="label absolute -top-3 left-md rounded-sm bg-messing px-sm py-[2px] text-reinweiss">
-                Empfohlen
-              </span>
-            )}
-            <p className="font-slab text-2xl font-bold text-anthrazit">{paket.name}</p>
-            <p className="mb-sm text-small text-anthrazit/70">{paket.beschreibung}</p>
-            <p className="mb-sm font-slab text-3xl font-bold text-walnuss">
-              {paket.provisionProzent.toLocaleString("de-DE")} %
-            </p>
-            <ul className="flex flex-col gap-xs">
-              {paket.highlights.map((h) => (
-                <li key={h} className="flex items-start gap-xs text-small text-anthrazit/80">
-                  <Icon name="check" size={16} className="mt-[2px] shrink-0 text-messing" />
-                  {h}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        ))}
+        {LEISTUNGSPAKETE.map((paket) => {
+          const aktiv = vereinbarung.gewaehltesPaket === paket.id;
+          return (
+            <button
+              key={paket.id}
+              type="button"
+              aria-pressed={aktiv}
+              onClick={() => update("gewaehltesPaket", paket.id as LeistungspaketId)}
+              className="block h-full w-full text-left"
+            >
+              <Card
+                className={`relative h-full transition-colors ${
+                  aktiv
+                    ? "border-2 border-messing bg-messing/[0.06]"
+                    : paket.empfohlen
+                      ? "border-2 border-messing"
+                      : "border-2 border-transparent hover:border-messing/50"
+                }`}
+              >
+                {(aktiv || paket.empfohlen) && (
+                  <span className="label absolute -top-3 left-md flex items-center gap-[4px] rounded-sm bg-messing px-sm py-[2px] text-reinweiss">
+                    {aktiv && <Icon name="check" size={12} />}
+                    {aktiv ? "Ausgewählt" : "Empfohlen"}
+                  </span>
+                )}
+                <p className="font-slab text-2xl font-bold text-anthrazit">{paket.name}</p>
+                <p className="mb-sm text-small text-anthrazit/70">{paket.beschreibung}</p>
+                <p className="mb-sm font-slab text-3xl font-bold text-walnuss">
+                  {paket.provisionProzent.toLocaleString("de-DE")} %
+                </p>
+                <ul className="flex flex-col gap-xs">
+                  {paket.highlights.map((h) => (
+                    <li key={h} className="flex items-start gap-xs text-small text-anthrazit/80">
+                      <Icon name="check" size={16} className="mt-[2px] shrink-0 text-messing" />
+                      {h}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </button>
+          );
+        })}
       </div>
 
       <h3 className="mb-sm">Leistungen im Detail</h3>
@@ -102,9 +133,18 @@ export function Leistungsversprechen() {
           <thead>
             <tr className="border-b border-asche/60 text-left">
               <th className="w-1/2 p-sm font-medium text-anthrazit">Leistung</th>
-              <th className="p-sm text-center font-medium text-anthrazit">Basis</th>
-              <th className="p-sm text-center font-medium text-anthrazit">Komfort</th>
-              <th className="p-sm text-center font-medium text-anthrazit">Premium</th>
+              {LEISTUNGS_SPALTEN.map((spalte) => (
+                <th
+                  key={spalte.id}
+                  className={`p-sm text-center font-medium transition-colors ${
+                    vereinbarung.gewaehltesPaket === spalte.id
+                      ? "bg-messing/10 text-walnuss"
+                      : "text-anthrazit"
+                  }`}
+                >
+                  {spalte.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -120,15 +160,16 @@ export function Leistungsversprechen() {
                 {kategorie.positionen.map((pos) => (
                   <tr key={pos.bezeichnung} className="border-b border-asche/30">
                     <td className="p-sm text-anthrazit/90">{pos.bezeichnung}</td>
-                    <td className="p-sm text-center">
-                      <StatusZelle status={pos.basis} />
-                    </td>
-                    <td className="p-sm text-center">
-                      <StatusZelle status={pos.komfort} />
-                    </td>
-                    <td className="p-sm text-center">
-                      <StatusZelle status={pos.premium} />
-                    </td>
+                    {LEISTUNGS_SPALTEN.map((spalte) => (
+                      <td
+                        key={spalte.id}
+                        className={`p-sm text-center transition-colors ${
+                          vereinbarung.gewaehltesPaket === spalte.id ? "bg-messing/10" : ""
+                        }`}
+                      >
+                        <StatusZelle status={pos[spalte.id]} />
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </Fragment>
