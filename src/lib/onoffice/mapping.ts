@@ -135,7 +135,17 @@ export const BETREUER_FIELDS = [
 export function mapBetreuerRecord(record: RawBetreuerRecord): Betreuer {
   const el = record.elements;
   return {
-    id: record.id,
+    // String()-Cast wichtig: Die onOffice-API liefert "id" bei resourcetype "address" als
+    // rohe JSON-Zahl zurück (z.B. 123), nicht als String, obwohl RawBetreuerRecord.id als
+    // string typisiert ist (TypeScript prüft das zur Laufzeit nicht). idsfromrelation
+    // (siehe ladeBetreuerAddressId in estate.ts) liefert dieselbe Adress-ID dagegen als
+    // echten String ("123"). Ohne diesen Cast verglich der Dubletten-Filter in
+    // praesentation.ts (m.id !== betreuerAddressId) also number !== string — das ist mit
+    // strikter Ungleichheit IMMER true, weshalb der Objekt-Betreuer trotz Filter zusätzlich
+    // in der "weitere Mitarbeiter"-Liste auftauchte (Live-Recherche Juli 2026: address-read
+    // für ID 119/123 lieferte { id: 119 } als number, idsfromrelation für dasselbe Objekt
+    // { elements: { "43": ["119"] } } als string).
+    id: String(record.id),
     anrede: el.Anrede,
     vorname: el.Vorname || "",
     nachname: el.Name || "",
