@@ -3,8 +3,8 @@ import { Kennzahl, Standort, TeamMitglied } from "@/types";
 // Quelle: Parma-Wissensdatei (parma_wissensbasis.md, Stand Mai 2026, Interview mit Robin Kolbe).
 export const STANDORTE: Standort[] = [
   { name: "Düren", adresse: "Monschauer Straße 64, 52355 Düren" },
-  { name: "Kreuzau", adresse: "Ladenlokal" },
-  { name: "Jülich", adresse: "Zweiter operativer Standort" },
+  { name: "Kreuzau", adresse: "Hauptstraße 80, 52372 Kreuzau" },
+  { name: "Jülich", adresse: "Gereonstraße 1, 52428 Jülich" },
 ];
 
 export const KENNZAHLEN: Kennzahl[] = [
