@@ -319,6 +319,23 @@ export interface Betreuer {
   profilbildUrl?: string;
 }
 
+// Ein an das Objekt angehängtes internes Dokument aus OnOffice (resourcetype "file", z.B.
+// Grundriss, Energieausweis, Exposé, Teilungserklärung). Nicht zu verwechseln mit Fotos/
+// Titelbild — die werden über einen eigenen Weg geladen (ladeTitelbild in onoffice/estate.ts)
+// und beim Abruf der Dokumente bewusst ausgefiltert (siehe ladeObjektDokumente).
+export interface ObjektDokument {
+  id: string;
+  titel: string;
+  dateiname?: string;
+  // OnOffice-Kategorie des Dokuments (z.B. "Foto", "Grundriss", "Energieausweis") — frei
+  // vergeben im Backend, keine feste Werteliste.
+  typ?: string;
+  groesseBytes?: number;
+  // Direkte Download-/Anzeige-URL (kommt von OnOffice via includeImageUrl, oder im Mock-Modus
+  // aus public/dokumente). Kann fehlen, falls OnOffice für diesen Datensatz keine URL liefert.
+  url?: string;
+}
+
 export interface Praesentation {
   kunde: Kunde;
   immobilie: Immobilie;
@@ -328,5 +345,10 @@ export interface Praesentation {
   // auf der Kontaktperson-Seite). Enthält nicht den Objekt-Betreuer (bereits oben separat
   // angezeigt) — Dublettenfilterung erfolgt anhand von Betreuer.id.
   weitereMitarbeiter: Betreuer[];
+  // Interne Dokumente des Objekts (siehe "Dokumente"-Reiter, Dokumente.tsx). Im Live-Betrieb
+  // bewusst NICHT auf Demo-Daten zurückgefallen, wenn die Liste leer ist — ein Objekt ohne
+  // hinterlegte Dokumente ist ein gültiger, echter Zustand und soll in einer echten
+  // Kundenpräsentation nicht durch ein erfundenes Demo-Dokument verschleiert werden.
+  dokumente: ObjektDokument[];
   quelle: "live" | "mock";
 }

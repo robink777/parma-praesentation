@@ -1,4 +1,4 @@
-import { Betreuer, Bewertung, Immobilie, Kunde } from "@/types";
+import { Betreuer, Bewertung, Immobilie, Kunde, ObjektDokument } from "@/types";
 import { MOCK_WERTERMITTLUNG } from "@/data/wertermittlung";
 import { TEAM } from "@/data/unternehmen";
 
@@ -97,9 +97,26 @@ export const MOCK_BEWERTUNG: Bewertung = {
   berechnetAutomatisch: false,
   wertermittlung: MOCK_WERTERMITTLUNG,
   // Original PDF-Export der Sprengnetter-Marktpreisermittlung, vorab hochgeladen und unter
-  // public/dokumente abgelegt. Wird 1:1 im PDF-Viewer der Objektbewertung-Sektion angezeigt.
+  // public/dokumente abgelegt. Wird direkt über den "Bewertung"-Reiter verlinkt (Bewertung.tsx).
   pdfUrl: "/dokumente/bewertung-demo-1001.pdf",
 };
+
+// Demo-Datensatz für den "Dokumente"-Reiter (nur im Mock-Modus verwendet, siehe
+// praesentation.ts — im Live-Betrieb wird bei fehlenden Dokumenten bewusst NICHT auf diese
+// Demo-Daten zurückgefallen, sondern der echte leere Zustand angezeigt). Nutzt bewusst
+// dieselbe real unter public/dokumente hinterlegte PDF wie MOCK_BEWERTUNG.pdfUrl oben, damit
+// der Reiter im Demo-Modus ein tatsächlich existierendes, klickbares Dokument zeigt statt
+// einer erfundenen Datei ohne echten Inhalt dahinter.
+export const MOCK_DOKUMENTE: ObjektDokument[] = [
+  {
+    id: "demo-doc-1",
+    titel: "Marktpreisermittlung (Sprengnetter)",
+    dateiname: "bewertung-demo-1001.pdf",
+    typ: "Gutachten",
+    groesseBytes: 636291,
+    url: "/dokumente/bewertung-demo-1001.pdf",
+  },
+];
 
 export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   {

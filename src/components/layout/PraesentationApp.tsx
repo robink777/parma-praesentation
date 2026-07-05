@@ -9,7 +9,7 @@ import { Unternehmen } from "@/components/sections/Unternehmen";
 import { Ablauf } from "@/components/sections/Ablauf";
 import { Objektdaten } from "@/components/sections/Objektdaten";
 import { Bewertung } from "@/components/sections/Bewertung";
-import { Objektbewertung } from "@/components/sections/Objektbewertung";
+import { Dokumente } from "@/components/sections/Dokumente";
 import { Vergleichswert } from "@/components/sections/Vergleichswert";
 import { Finanzierung } from "@/components/sections/Finanzierung";
 import { Leistungsversprechen } from "@/components/sections/Leistungsversprechen";
@@ -34,7 +34,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         {activeId === "ablauf" && <Ablauf />}
         {activeId === "objekt" && <Objektdaten immobilie={daten.immobilie} />}
         {activeId === "bewertung" && <Bewertung bewertung={daten.bewertung} />}
-        {activeId === "objektbewertung" && <Objektbewertung bewertung={daten.bewertung} />}
+        {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
         {activeId === "vergleich" && <Vergleichswert immobilie={daten.immobilie} />}
         {activeId === "finanzierung" && <Finanzierung immobilie={daten.immobilie} />}
         {activeId === "leistungsversprechen" && (

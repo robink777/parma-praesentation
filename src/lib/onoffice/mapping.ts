@@ -1,4 +1,4 @@
-import { Betreuer, Immobilie, Kunde } from "@/types";
+import { Betreuer, Immobilie, Kunde, ObjektDokument } from "@/types";
 
 // Feldnamen gegen den echten Feldkatalog des Kunden-Accounts geprüft (resourcetype "fields",
 // Juli 2026). Modernisierungen sind in diesem Account über ~10 einzelne Individualfelder
@@ -157,5 +157,40 @@ export function mapBetreuerRecord(record: RawBetreuerRecord): Betreuer {
     telefon: el.Telefon1 || undefined,
     email: el.Email,
     url: el.Homepage || undefined,
+  };
+}
+
+// Live gegen den echten Account geprüft (Juli 2026, customerId web77461, Objekt 43):
+// resourcetype "file" liefert die Rohdaten NICHT wie estate/address unter "elements" mit
+// eigenem Datenfeld-Katalog (kein "data"-Parameter nötig/möglich), sondern liefert direkt den
+// vollen, festen Elemente-Satz je Datei zurück — u.a. "type" (Kategorie, z.B. "Foto",
+// "Titelbild", oder frei vergebene Werte wie "Grundriss"/"Energieausweis"), "originalname"
+// (ursprünglicher Dateiname beim Hochladen) und bei gesetztem Parameter "includeImageUrl" eine
+// direkte, öffentliche Download-URL ("imageUrl") — ohne diesen Parameter bleibt imageUrl leer.
+export interface RawFileRecord {
+  id: string;
+  elements: {
+    type?: string;
+    name?: string;
+    originalname?: string;
+    filename?: string;
+    fileSize?: number;
+    title?: string;
+    freetext?: string;
+    modified?: number;
+    category?: string;
+    imageUrl?: string;
+  };
+}
+
+export function mapFileRecord(record: RawFileRecord): ObjektDokument {
+  const el = record.elements;
+  return {
+    id: String(record.id),
+    titel: el.title || el.originalname || el.name || "Dokument",
+    dateiname: el.originalname || el.filename || undefined,
+    typ: el.type || undefined,
+    groesseBytes: el.fileSize,
+    url: el.imageUrl || undefined,
   };
 }

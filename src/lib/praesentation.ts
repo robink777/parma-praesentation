@@ -9,10 +9,12 @@ import {
   ladeEstateIdByUuid,
   ladeImmobilieById,
   ladeKundeByAddressId,
+  ladeObjektDokumente,
 } from "./onoffice/estate";
 import {
   MOCK_BETREUER,
   MOCK_BEWERTUNG,
+  MOCK_DOKUMENTE,
   MOCK_IMMOBILIE,
   MOCK_KUNDE,
   MOCK_WEITERE_MITARBEITER,
@@ -40,6 +42,9 @@ export interface PraesentationsParams {
  * Zusätzlich werden alle übrigen Mitarbeiter-Adressen der Agentur geladen (objektunabhängig,
  * für den "weitere Mitarbeiter"-Slider auf der Kontaktperson-Seite) und um den Objekt-Betreuer
  * bereinigt; schlägt das fehl oder bleibt die Liste leer, wird MOCK_WEITERE_MITARBEITER verwendet.
+ * Die intern in OnOffice am Objekt hinterlegten Dokumente (Reiter "Dokumente") werden ebenfalls
+ * live geladen; anders als bei den übrigen Feldern wird eine leere Liste hier NICHT durch
+ * Demo-Dokumente ersetzt, da "keine Dokumente hinterlegt" ein gültiger echter Zustand ist.
  */
 export async function ladePraesentationsDaten(
   params: PraesentationsParams
@@ -58,11 +63,12 @@ export async function ladePraesentationsDaten(
         params.addressId || (await ladeEigentuemerAddressId(estateId).catch(() => null));
       const betreuerAddressId = await ladeBetreuerAddressId(estateId).catch(() => null);
 
-      const [immobilie, kunde, betreuer, alleMitarbeiter] = await Promise.all([
+      const [immobilie, kunde, betreuer, alleMitarbeiter, dokumente] = await Promise.all([
         ladeImmobilieById(estateId),
         addressId ? ladeKundeByAddressId(addressId) : Promise.resolve(null),
         betreuerAddressId ? ladeBetreuerByAddressId(betreuerAddressId).catch(() => null) : Promise.resolve(null),
         ladeAlleMitarbeiter().catch(() => []),
+        ladeObjektDokumente(estateId).catch(() => []),
       ]);
 
       // Objekt-Betreuer aus der "weitere Mitarbeiter"-Liste ausschließen (Dubletten-Schutz) —
@@ -78,6 +84,12 @@ export async function ladePraesentationsDaten(
           bewertung: MOCK_BEWERTUNG,
           betreuer: betreuer || MOCK_BETREUER,
           weitereMitarbeiter: weitereMitarbeiter.length > 0 ? weitereMitarbeiter : MOCK_WEITERE_MITARBEITER,
+          // Bewusst KEIN Fallback auf MOCK_DOKUMENTE bei leerer Liste (anders als z.B. bei
+          // weitereMitarbeiter oben): Ein Objekt ohne hinterlegte Dokumente ist ein gültiger,
+          // echter Zustand (live gegen den Account geprüft, Juli 2026 — nicht jedes Objekt hat
+          // Dateien) und soll in einer echten Kundenpräsentation nicht durch ein erfundenes
+          // Demo-Dokument verschleiert werden.
+          dokumente,
           quelle: "live",
         };
       }
@@ -92,6 +104,7 @@ export async function ladePraesentationsDaten(
     bewertung: MOCK_BEWERTUNG,
     betreuer: MOCK_BETREUER,
     weitereMitarbeiter: MOCK_WEITERE_MITARBEITER,
+    dokumente: MOCK_DOKUMENTE,
     quelle: "mock",
   };
 }

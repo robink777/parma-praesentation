@@ -1,4 +1,4 @@
-import { Betreuer, Immobilie, Kunde } from "@/types";
+import { Betreuer, Immobilie, Kunde, ObjektDokument } from "@/types";
 import { TEAM } from "@/data/unternehmen";
 import { callOnOfficeApi } from "./client";
 import {
@@ -8,9 +8,11 @@ import {
   mapAddressRecord,
   mapBetreuerRecord,
   mapEstateRecord,
+  mapFileRecord,
   RawAddressRecord,
   RawBetreuerRecord,
   RawEstateRecord,
+  RawFileRecord,
 } from "./mapping";
 
 // Hartes Limit der onOffice-API pro Aufruf: listlimit-Werte über 500 werden NICHT etwa auf
@@ -125,6 +127,44 @@ async function ladeTitelbild(estateId: string): Promise<string | undefined> {
   const bilder = records.flatMap((r) => r.elements || []);
   const titelbild = bilder.find((b) => b.type === "Titelbild") || bilder[0];
   return titelbild?.url;
+}
+
+// Kategorien, die im "Dokumente"-Reiter ausgeblendet werden: Fotos/Titelbild sind technisch
+// über denselben resourcetype "file" abrufbar wie "echte" Dokumente, werden im UI aber
+// bereits an anderer Stelle gezeigt (Objektbild, siehe ladeTitelbild oben) — ohne diesen
+// Filter würden hier z.B. alle 19 Objektfotos zusätzlich als "Dokument" auftauchen.
+const DOKUMENTE_AUSGESCHLOSSENE_TYPEN = ["Foto", "Titelbild"];
+
+// Lädt die am Objekt in OnOffice hinterlegten internen Dokumente (Grundriss, Energieausweis,
+// Exposé, etc.) für den "Dokumente"-Reiter.
+//
+// Undokumentierter, gegen den echten Account verifizierter API-Sonderfall (Live-Recherche
+// Juli 2026, apidoc.onoffice.de, Abschnitt "Get Estate files"): resourceid muss der LITERALE
+// String "estate" sein — NICHT die Objekt-ID selbst. Die eigentliche Objekt-ID wandert
+// stattdessen als "estateid" (Singular, String) in die parameters. Naheliegende Varianten
+// (resourceid = Objekt-ID direkt, "estateids" als Zahlen-Array analog zu ladeTitelbild oben,
+// "module"/"relatedRecordId") scheiterten alle durchgehend mit Errorcode 24 ("missing
+// configuration for resourceId"). includeImageUrl: "original" liefert zusätzlich eine direkte,
+// öffentliche Download-URL je Datei (ohne diesen Parameter bleibt sie leer).
+export async function ladeObjektDokumente(estateId: string): Promise<ObjektDokument[]> {
+  const result = await callOnOfficeApi<RawFileRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:get",
+      resourcetype: "file",
+      resourceid: "estate",
+      identifier: "",
+      cacheable: true,
+      parameters: {
+        estateid: estateId,
+        includeImageUrl: "original",
+      },
+    },
+  ]);
+
+  const records = result?.response?.results?.[0]?.data?.records || [];
+  return records
+    .filter((r) => !DOKUMENTE_AUSGESCHLOSSENE_TYPEN.includes(r.elements?.type || ""))
+    .map(mapFileRecord);
 }
 
 export async function ladeImmobilieById(id: string): Promise<Immobilie | null> {

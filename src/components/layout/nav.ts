@@ -13,7 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "ablauf", label: "Ablauf heute", icon: "calendar" },
   { id: "objekt", label: "Objektdaten", icon: "house" },
   { id: "bewertung", label: "Bewertung", icon: "scale" },
-  { id: "objektbewertung", label: "Objektbewertung", icon: "document" },
+  { id: "dokumente", label: "Dokumente", icon: "document" },
   { id: "vergleich", label: "Vergleichswert", icon: "compare" },
   { id: "finanzierung", label: "Finanzierung", icon: "calculator" },
   { id: "leistungsversprechen", label: "Leistungsversprechen", icon: "check" },
