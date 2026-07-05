@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
 import { MAKLER_KONTAKT } from "@/data/makler";
-import { Bewertung, Immobilie, Kunde, MaklervertragDaten, MaklervertragPartei } from "@/types";
+import { LEISTUNGSPAKETE } from "@/data/leistungsversprechen";
+import { Bewertung, Immobilie, Kunde, LeistungspaketId, MaklervertragDaten, MaklervertragPartei } from "@/types";
 
 // Baut die Erstbefüllung des Formulars aus den vorhandenen Präsentationsdaten (Kunde,
 // Immobilie, Bewertung), die im Live-Modus bereits aus onOffice stammen. So ist der
@@ -128,10 +129,12 @@ export function Maklervertrag({
   kunde,
   immobilie,
   bewertung,
+  gewaehltesPaket,
 }: {
   kunde: Kunde;
   immobilie: Immobilie;
   bewertung: Bewertung;
+  gewaehltesPaket?: LeistungspaketId;
 }) {
   const [daten, setDaten] = useState<MaklervertragDaten>(() => baueInitialdaten(kunde, immobilie, bewertung));
   const [mandatErteilt, setMandatErteilt] = useState(false);
@@ -139,6 +142,17 @@ export function Maklervertrag({
   function update<K extends keyof MaklervertragDaten>(key: K, value: MaklervertragDaten[K]) {
     setDaten((d) => ({ ...d, [key]: value }));
   }
+
+  const gewaehltesPaketDaten = LEISTUNGSPAKETE.find((p) => p.id === gewaehltesPaket);
+
+  // Übernimmt die im Leistungsversprechen gewählte Provision automatisch ins Vertragsfeld — der
+  // Kunde entscheidet sich dort für ein Paket, hier wird die Provisionszeile in § 7 sofort
+  // entsprechend vorausgefüllt, statt sie ein zweites Mal manuell eintragen zu müssen.
+  useEffect(() => {
+    if (!gewaehltesPaketDaten) return;
+    update("provisionProzent", gewaehltesPaketDaten.provisionProzent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gewaehltesPaketDaten?.id]);
 
   // Insgesamt bis zu 4 Eigentümer/innen: Auftraggeber 1 (fix) + max. 3 weitere.
   const MAX_WEITERE = 3;
@@ -343,6 +357,12 @@ export function Maklervertrag({
       </ParagraphCard>
 
       <ParagraphCard nummer={7} titel="Maklerprovision">
+        {gewaehltesPaketDaten && (
+          <span className="label mb-sm inline-flex w-fit items-center gap-[4px] rounded-sm bg-messing px-sm py-[2px] text-reinweiss">
+            <Icon name="check" size={12} />
+            Paket: {gewaehltesPaketDaten.name}
+          </span>
+        )}
         <p className="mb-sm flex flex-wrap items-baseline gap-xs">
           <span>Die/der Auftraggeberin/Auftraggeber verpflichtet/verpflichten sich, eine Maklerprovision in Höhe von</span>
           <Blank

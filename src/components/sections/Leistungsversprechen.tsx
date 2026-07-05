@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
 import {
@@ -9,34 +9,7 @@ import {
   LEISTUNGS_KENNZAHLEN,
   RAHMENBEDINGUNGEN,
 } from "@/data/leistungsversprechen";
-import { LeistungsStatus, LeistungsversprechenVereinbarung, LeistungspaketId } from "@/types";
-
-const INPUT_CLASS =
-  "rounded-sm border border-asche bg-reinweiss text-anthrazit outline-none transition-colors focus:border-messing focus:ring-1 focus:ring-messing";
-
-function Feld({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string | undefined;
-  onChange: (value: string) => void;
-  type?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="label mb-xs block">{label}</span>
-      <input
-        type={type}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${INPUT_CLASS} w-full px-sm py-xs`}
-      />
-    </label>
-  );
-}
+import { LeistungsStatus, LeistungspaketId } from "@/types";
 
 function StatusZelle({ status }: { status: LeistungsStatus }) {
   if (status === "ja") return <Icon name="check" size={18} className="mx-auto text-messing" />;
@@ -54,16 +27,13 @@ const LEISTUNGS_SPALTEN: { id: LeistungspaketId; label: string }[] = [
   { id: "premium", label: "Premium" },
 ];
 
-export function Leistungsversprechen() {
-  const [vereinbarung, setVereinbarung] = useState<LeistungsversprechenVereinbarung>({});
-
-  function update<K extends keyof LeistungsversprechenVereinbarung>(
-    key: K,
-    value: LeistungsversprechenVereinbarung[K]
-  ) {
-    setVereinbarung((v) => ({ ...v, [key]: value }));
-  }
-
+export function Leistungsversprechen({
+  gewaehltesPaket,
+  onWaehlePaket,
+}: {
+  gewaehltesPaket?: LeistungspaketId;
+  onWaehlePaket: (id: LeistungspaketId) => void;
+}) {
   return (
     <SectionShell label="Leistungsversprechen" title="Unser Leistungsversprechen">
       <p className="mb-lg w-full text-body text-anthrazit/80">
@@ -84,13 +54,13 @@ export function Leistungsversprechen() {
       <p className="mb-sm text-small text-anthrazit/60">Paket antippen, um es auszuwählen.</p>
       <div className="mb-lg grid grid-cols-1 gap-sm md:grid-cols-3">
         {LEISTUNGSPAKETE.map((paket) => {
-          const aktiv = vereinbarung.gewaehltesPaket === paket.id;
+          const aktiv = gewaehltesPaket === paket.id;
           return (
             <button
               key={paket.id}
               type="button"
               aria-pressed={aktiv}
-              onClick={() => update("gewaehltesPaket", paket.id as LeistungspaketId)}
+              onClick={() => onWaehlePaket(paket.id)}
               className="block h-full w-full text-left"
             >
               <Card
@@ -137,7 +107,7 @@ export function Leistungsversprechen() {
                 <th
                   key={spalte.id}
                   className={`p-sm text-center font-medium transition-colors ${
-                    vereinbarung.gewaehltesPaket === spalte.id
+                    gewaehltesPaket === spalte.id
                       ? "bg-messing/10 text-walnuss"
                       : "text-anthrazit"
                   }`}
@@ -164,7 +134,7 @@ export function Leistungsversprechen() {
                       <td
                         key={spalte.id}
                         className={`p-sm text-center transition-colors ${
-                          vereinbarung.gewaehltesPaket === spalte.id ? "bg-messing/10" : ""
+                          gewaehltesPaket === spalte.id ? "bg-messing/10" : ""
                         }`}
                       >
                         <StatusZelle status={pos[spalte.id]} />
@@ -190,54 +160,6 @@ export function Leistungsversprechen() {
         ))}
       </div>
 
-      <Card className="mb-lg">
-        <h4 className="mb-sm">§ 10 Paketwahl & Vereinbarung</h4>
-        <div className="mb-md flex flex-wrap gap-sm">
-          {LEISTUNGSPAKETE.map((paket) => {
-            const aktiv = vereinbarung.gewaehltesPaket === paket.id;
-            return (
-              <button
-                key={paket.id}
-                onClick={() => update("gewaehltesPaket", paket.id as LeistungspaketId)}
-                className={
-                  aktiv
-                    ? "rounded-sm border-2 border-messing bg-messing px-md py-xs font-medium text-reinweiss"
-                    : "rounded-sm border-2 border-asche bg-reinweiss px-md py-xs font-medium text-anthrazit transition-colors hover:border-messing"
-                }
-              >
-                {paket.name}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mb-md grid grid-cols-1 gap-sm md:grid-cols-2">
-          <Feld label="Ort" value={vereinbarung.unterschriftOrt} onChange={(v) => update("unterschriftOrt", v)} />
-          <Feld
-            label="Datum"
-            type="date"
-            value={vereinbarung.unterschriftDatum}
-            onChange={(v) => update("unterschriftDatum", v)}
-          />
-          <label className="block">
-            <span className="label mb-xs block">Auftragsnummer</span>
-            <span className="inline-flex w-full items-center">
-              <span
-                className={`${INPUT_CLASS} shrink-0 whitespace-nowrap rounded-r-none border-r-0 bg-stein px-sm py-xs text-anthrazit/60`}
-              >
-                PI-2026-
-              </span>
-              <input
-                type="text"
-                value={vereinbarung.auftragsnummer ?? ""}
-                onChange={(e) => update("auftragsnummer", e.target.value)}
-                className={`${INPUT_CLASS} w-full rounded-l-none px-sm py-xs`}
-              />
-            </span>
-          </label>
-          <Feld label="Berater/in" value={vereinbarung.beraterIn} onChange={(v) => update("beraterIn", v)} />
-        </div>
-      </Card>
     </SectionShell>
   );
 }

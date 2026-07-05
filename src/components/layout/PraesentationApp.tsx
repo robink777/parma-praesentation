@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Sidebar } from "./Sidebar";
-import { Praesentation } from "@/types";
+import { LeistungspaketId, Praesentation } from "@/types";
 import { Begruessung } from "@/components/sections/Begruessung";
 import { Kontaktperson } from "@/components/sections/Kontaktperson";
 import { Unternehmen } from "@/components/sections/Unternehmen";
@@ -17,6 +17,7 @@ import { Maklervertrag } from "@/components/sections/Maklervertrag";
 
 export function PraesentationApp({ daten }: { daten: Praesentation }) {
   const [activeId, setActiveId] = useState("begruessung");
+  const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>();
   const kundeName = [daten.kunde.vorname, daten.kunde.nachname].filter(Boolean).join(" ");
 
   return (
@@ -36,9 +37,16 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         {activeId === "objektbewertung" && <Objektbewertung bewertung={daten.bewertung} />}
         {activeId === "vergleich" && <Vergleichswert immobilie={daten.immobilie} />}
         {activeId === "finanzierung" && <Finanzierung immobilie={daten.immobilie} />}
-        {activeId === "leistungsversprechen" && <Leistungsversprechen />}
+        {activeId === "leistungsversprechen" && (
+          <Leistungsversprechen gewaehltesPaket={gewaehltesPaket} onWaehlePaket={setGewaehltesPaket} />
+        )}
         {activeId === "maklervertrag" && (
-          <Maklervertrag kunde={daten.kunde} immobilie={daten.immobilie} bewertung={daten.bewertung} />
+          <Maklervertrag
+            kunde={daten.kunde}
+            immobilie={daten.immobilie}
+            bewertung={daten.bewertung}
+            gewaehltesPaket={gewaehltesPaket}
+          />
         )}
       </main>
     </div>

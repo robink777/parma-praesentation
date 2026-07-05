@@ -296,16 +296,6 @@ export interface Rahmenbedingung {
   text: string;
 }
 
-// Editierbarer Abschnitt (§10): Paketwahl und Unterschrift werden im Beratungstermin
-// gemeinsam mit dem Kunden festgelegt — Auftragsnummer trägt das Präfix "PI-{Jahr}-".
-export interface LeistungsversprechenVereinbarung {
-  gewaehltesPaket?: LeistungspaketId;
-  unterschriftOrt?: string;
-  unterschriftDatum?: string;
-  auftragsnummer?: string;
-  beraterIn?: string;
-}
-
 // Der für das Objekt zuständige Mitarbeiter/die zuständige Mitarbeiterin (z.B. Immobilienberater/in).
 // Wird über die OnOffice-Objekt-Mitarbeiter-Relation aufgelöst (siehe onoffice/estate.ts) —
 // analog zur Eigentümer-Relation, die den Kunden für die Begrüßung liefert.
