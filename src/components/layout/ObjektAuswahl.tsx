@@ -24,6 +24,10 @@ import { formatiereBetrag } from "@/lib/berechnung";
 // Hoher Listlimit (200), damit auch bei größerem Objektbestand wirklich alle Treffer aus
 // onOffice geladen werden, statt an einer künstlich niedrigen Vorauswahl abgeschnitten zu sein.
 const LISTLIMIT = 200;
+// Beim Klick in die noch leere Suchleiste werden bewusst nur die zuletzt angelegten Objekte
+// gezeigt (statt der vollen, alphabetisch sortierten Liste) — das ist die praktisch relevantere
+// Vorauswahl direkt nach dem Öffnen, siehe sucheImmobilien()/handleFokus() unten.
+const NEUESTE_LIMIT = 10;
 
 function DropdownErgebnis({
   immobilie,
@@ -117,8 +121,12 @@ export function ObjektAuswahl() {
     setLaden(true);
     setFehler(null);
     try {
-      const params = new URLSearchParams({ limit: String(LISTLIMIT) });
-      if (query) params.set("suche", query);
+      // Leere Suche (Klick ins frische Feld oder Text wieder gelöscht) zeigt bewusst nicht die
+      // volle, alphabetisch sortierte Liste, sondern gezielt die zuletzt angelegten Objekte
+      // (siehe NEUESTE_LIMIT oben und "neueste"-Zweig in /api/onoffice/route.ts).
+      const params = query
+        ? new URLSearchParams({ limit: String(LISTLIMIT), suche: query })
+        : new URLSearchParams({ limit: String(NEUESTE_LIMIT), neueste: "1" });
 
       const res = await fetch(`/api/onoffice?${params}`);
       const data = await res.json();

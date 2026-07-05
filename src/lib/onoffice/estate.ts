@@ -27,7 +27,8 @@ const ONOFFICE_MAX_LISTLIMIT = 500;
 async function ladeImmobilienSeite(
   limit: number,
   offset: number,
-  filter?: Record<string, unknown>
+  filter?: Record<string, unknown>,
+  sortby?: Record<string, "ASC" | "DESC">
 ): Promise<Immobilie[]> {
   const result = await callOnOfficeApi<RawEstateRecord>([
     {
@@ -51,7 +52,10 @@ async function ladeImmobilienSeite(
         // füllt das Abruflimit fast ausschließlich mit diesen Nullpreis-Datensätzen, sodass
         // echte, korrekt bepreiste Objekte in der Objektauswahl-Suche praktisch nie auftauchen.
         // Alphabetisch nach Titel ist neutral und ergibt eine vorhersehbare Browse-Reihenfolge.
-        sortby: { objekttitel: "ASC" },
+        // Aufrufer können das per sortby-Parameter überschreiben (siehe z.B. der "neueste
+        // Objekte"-Abruf beim Klick auf die leere Suchleiste in route.ts, sortiert nach
+        // erstellt_am DESC statt objekttitel ASC).
+        sortby: sortby || { objekttitel: "ASC" },
         filter: filter || { vermarktungsart: [{ op: "=", val: "kauf" }] },
       },
     },
@@ -67,14 +71,15 @@ async function ladeImmobilienSeite(
 // um nicht unnötig weitere leere Anfragen zu stellen.
 export async function ladeImmobilien(
   limit = 20,
-  filter?: Record<string, unknown>
+  filter?: Record<string, unknown>,
+  sortby?: Record<string, "ASC" | "DESC">
 ): Promise<Immobilie[]> {
   const alle: Immobilie[] = [];
   let offset = 0;
 
   while (alle.length < limit) {
     const seitenlimit = Math.min(ONOFFICE_MAX_LISTLIMIT, limit - offset);
-    const seite = await ladeImmobilienSeite(seitenlimit, offset, filter);
+    const seite = await ladeImmobilienSeite(seitenlimit, offset, filter, sortby);
     alle.push(...seite);
 
     if (seite.length < seitenlimit) break; // Bestand erschöpft

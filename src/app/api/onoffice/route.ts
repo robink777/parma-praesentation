@@ -26,6 +26,10 @@ export async function GET(request: NextRequest) {
   const id = searchParams.get("id");
   const suche = searchParams.get("suche");
   const limit = parseInt(searchParams.get("limit") || "20");
+  // Wird von der Objektauswahl-Suchleiste beim Klick ins (noch leere) Suchfeld gesetzt (siehe
+  // ObjektAuswahl.tsx) — statt der vollen, alphabetisch sortierten Trefferliste sollen dann
+  // gezielt nur die zuletzt angelegten Objekte erscheinen.
+  const neueste = searchParams.get("neueste") === "1";
 
   if (ONOFFICE_MODE !== "live") {
     if (id) {
@@ -61,6 +65,21 @@ export async function GET(request: NextRequest) {
         );
       }
       return NextResponse.json(immobilie);
+    }
+
+    // Klick auf die leere Suchleiste: gezielter, kleiner Abruf der zuletzt angelegten Objekte
+    // (sortby erstellt_am DESC, gegen den echten Feldkatalog geprüft — resourcetype "fields",
+    // Juli 2026: "erstellt_am" = Anlagedatum des Datensatzes). Bewusst ein eigener, direkter
+    // Abruf mit dem gewünschten limit (statt wie unten erst 1500 zu laden und dann zu kürzen) —
+    // ladeImmobilien() paginiert ohnehin nur, wenn limit über ONOFFICE_MAX_LISTLIMIT liegt, für
+    // die hier üblichen 10 Treffer genügt ein einzelner Request.
+    if (neueste) {
+      const immobilien = await ladeImmobilien(
+        limit,
+        { vermarktungsart: [{ op: "=", val: "kauf" }] },
+        { erstellt_am: "DESC" }
+      );
+      return NextResponse.json(immobilien);
     }
 
     // Bewusst der volle Bestand (hohes Listlimit) statt eines serverseitigen onOffice-Filters
