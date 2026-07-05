@@ -46,29 +46,39 @@ function MitarbeiterCard({ mitarbeiter }: { mitarbeiter: Betreuer }) {
         )}
       </div>
 
-      <div>
-        <p className="font-medium text-anthrazit">{name}</p>
-        {mitarbeiter.rolle && <p className="mt-[2px] text-small text-anthrazit/60">{mitarbeiter.rolle}</p>}
+      <div className="w-full min-w-0">
+        <p className="break-words font-medium text-anthrazit">{name}</p>
+        {mitarbeiter.rolle && (
+          <p className="mt-[2px] break-words text-small text-anthrazit/60">{mitarbeiter.rolle}</p>
+        )}
       </div>
 
+      {/* Karte hat eine feste Breite (w-64), Telefon/E-Mail-Adressen sind aber lange,
+          leerzeichenfreie Zeichenketten ohne natürliche Umbruchstellen. In einem Flex-Container
+          mit items-center wird ein Kind sonst NICHT auf die Container-Breite gestaucht, sondern
+          bekommt (auch bei begrenztem Platz) mindestens seine "min-content"-Breite — bei einem
+          unbrechbaren Token entspricht das der vollen Textlänge, wodurch der Text über den
+          Kartenrand hinaus lief und benachbarte Karten im Slider überlagerte. min-w-0 erlaubt dem
+          Flex-Item, unter seine min-content-Breite zu schrumpfen; break-words erlaubt dann den
+          Zeilenumbruch mitten im Wort/der Adresse statt eines Overflows. */}
       {(mitarbeiter.telefon || mitarbeiter.email) && (
-        <div className="flex flex-col items-center gap-[2px]">
+        <div className="flex w-full min-w-0 flex-col items-center gap-[2px]">
           {mitarbeiter.telefon && (
             <a
               href={telHref(mitarbeiter.telefon)}
-              className="inline-flex items-center gap-xs text-small text-anthrazit/80 hover:text-messing"
+              className="flex w-full min-w-0 items-center justify-center gap-xs text-small text-anthrazit/80 hover:text-messing"
             >
-              <Icon name="phone" size={14} />
-              {mitarbeiter.telefon}
+              <Icon name="phone" size={14} className="shrink-0" />
+              <span className="min-w-0 break-words">{mitarbeiter.telefon}</span>
             </a>
           )}
           {mitarbeiter.email && (
             <a
               href={`mailto:${mitarbeiter.email}`}
-              className="inline-flex items-center gap-xs text-small text-anthrazit/80 hover:text-messing"
+              className="flex w-full min-w-0 items-center justify-center gap-xs text-small text-anthrazit/80 hover:text-messing"
             >
-              <Icon name="mail" size={14} />
-              {mitarbeiter.email}
+              <Icon name="mail" size={14} className="shrink-0" />
+              <span className="min-w-0 break-words">{mitarbeiter.email}</span>
             </a>
           )}
         </div>
@@ -160,16 +170,20 @@ export function Kontaktperson({
           )}
         </div>
 
-        <div>
-          <p className="font-slab text-2xl font-bold text-anthrazit">{name}</p>
-          {betreuer.rolle && <p className="label mt-xs">{betreuer.rolle}</p>}
-          {betreuer.firma && <p className="mt-xs text-body text-anthrazit/70">{betreuer.firma}</p>}
+        <div className="w-full min-w-0">
+          <p className="break-words font-slab text-2xl font-bold text-anthrazit">{name}</p>
+          {betreuer.rolle && <p className="label mt-xs break-words">{betreuer.rolle}</p>}
+          {betreuer.firma && <p className="mt-xs break-words text-body text-anthrazit/70">{betreuer.firma}</p>}
 
-          <div className="mt-md flex flex-col gap-xs">
+          {/* w-full + min-w-0 auf jeder Zeile: ohne min-w-0 stauchen sich lange, leerzeichenfreie
+              Werte (v.a. E-Mail/URL) in einem Flex-Layout nicht unter ihre "min-content"-Breite
+              und liefen bei schmalen Viewports über den Kartenrand hinaus (siehe gleiches Problem
+              und ausführlicher Kommentar bei MitarbeiterCard oben im "weitere Mitarbeiter"-Slider). */}
+          <div className="mt-md flex w-full min-w-0 flex-col gap-xs">
             {hatAdresse && (
-              <div className="inline-flex items-start gap-xs text-body text-anthrazit/90">
+              <div className="flex w-full min-w-0 items-start gap-xs text-body text-anthrazit/90">
                 <Icon name="location" size={18} className="mt-[2px] shrink-0" />
-                <span>
+                <span className="min-w-0 break-words">
                   {betreuer.strasse}
                   {betreuer.strasse && plzOrt && <br />}
                   {plzOrt}
@@ -179,28 +193,28 @@ export function Kontaktperson({
             {betreuer.telefon && (
               <a
                 href={telHref(betreuer.telefon)}
-                className="inline-flex items-center gap-xs text-body text-anthrazit/90 hover:text-messing"
+                className="flex w-full min-w-0 items-center gap-xs text-body text-anthrazit/90 hover:text-messing"
               >
-                <Icon name="phone" size={18} />
-                {betreuer.telefon}
+                <Icon name="phone" size={18} className="shrink-0" />
+                <span className="min-w-0 break-words">{betreuer.telefon}</span>
               </a>
             )}
             {betreuer.mobil && (
               <a
                 href={telHref(betreuer.mobil)}
-                className="inline-flex items-center gap-xs text-body text-anthrazit/90 hover:text-messing"
+                className="flex w-full min-w-0 items-center gap-xs text-body text-anthrazit/90 hover:text-messing"
               >
-                <Icon name="phone" size={18} />
-                {betreuer.mobil} (mobil)
+                <Icon name="phone" size={18} className="shrink-0" />
+                <span className="min-w-0 break-words">{betreuer.mobil} (mobil)</span>
               </a>
             )}
             {betreuer.email && (
               <a
                 href={`mailto:${betreuer.email}`}
-                className="inline-flex items-center gap-xs text-body text-anthrazit/90 hover:text-messing"
+                className="flex w-full min-w-0 items-center gap-xs text-body text-anthrazit/90 hover:text-messing"
               >
-                <Icon name="mail" size={18} />
-                {betreuer.email}
+                <Icon name="mail" size={18} className="shrink-0" />
+                <span className="min-w-0 break-words">{betreuer.email}</span>
               </a>
             )}
             {betreuer.url && (
@@ -208,10 +222,10 @@ export function Kontaktperson({
                 href={urlHref(betreuer.url)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-xs text-body text-anthrazit/90 hover:text-messing"
+                className="flex w-full min-w-0 items-center gap-xs text-body text-anthrazit/90 hover:text-messing"
               >
-                <Icon name="globe" size={18} />
-                {betreuer.url}
+                <Icon name="globe" size={18} className="shrink-0" />
+                <span className="min-w-0 break-words">{betreuer.url}</span>
               </a>
             )}
           </div>
