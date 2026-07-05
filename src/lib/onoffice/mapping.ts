@@ -166,7 +166,18 @@ export function mapBetreuerRecord(record: RawBetreuerRecord): Betreuer {
 // vollen, festen Elemente-Satz je Datei zurück — u.a. "type" (Kategorie, z.B. "Foto",
 // "Titelbild", oder frei vergebene Werte wie "Grundriss"/"Energieausweis"), "originalname"
 // (ursprünglicher Dateiname beim Hochladen) und bei gesetztem Parameter "includeImageUrl" eine
-// direkte, öffentliche Download-URL ("imageUrl") — ohne diesen Parameter bleibt imageUrl leer.
+// direkte, öffentliche Download-URL ("imageUrl").
+//
+// Wichtiger Sonderfall (Live-Recherche Juli 2026, Objekt 2415/"JH1180" — Immobilie mit echten
+// Objekt-Dokumenten statt nur Fotos): "imageUrl" bleibt bei "category": "internal" IMMER null,
+// selbst mit gesetztem includeImageUrl — nur "category": "external" (Fotos, Titelbild, Lageplan)
+// liefert dort eine echte URL. "internal" ist laut apidoc.onoffice.de genau die Kategorie der
+// "echten" Dokumente (type "Dokument": Mietverträge, Altlastenauskunft, Grundsteuermessbetrag,
+// etc.) — also ausgerechnet die Dateien, um die es im "Dokumente"-Reiter hauptsächlich geht.
+// Deren Inhalt muss stattdessen einzeln über den "fileid"-Parameter abgerufen werden (liefert
+// dann ein zusätzliches "content"-Feld, Base64-codiert — siehe ladeDokumentInhalt in estate.ts).
+// "content" ist optional, weil es nur bei Einzelabruf per fileid mitgeliefert wird, nicht bei
+// der Listenabfrage aller Dateien eines Objekts.
 export interface RawFileRecord {
   id: string;
   elements: {
@@ -180,17 +191,22 @@ export interface RawFileRecord {
     modified?: number;
     category?: string;
     imageUrl?: string;
+    content?: string;
   };
 }
 
-export function mapFileRecord(record: RawFileRecord): ObjektDokument {
+// estateId wird gebraucht, um für "internal"-Dateien (siehe Kommentar oben) auf unsere eigene
+// Proxy-Route (/api/dokument) zu verweisen, statt eine (nicht existierende) direkte onOffice-URL
+// zu verwenden — die Route ruft den Dateiinhalt serverseitig mit den API-Zugangsdaten ab.
+export function mapFileRecord(record: RawFileRecord, estateId: string): ObjektDokument {
   const el = record.elements;
+  const id = String(record.id);
   return {
-    id: String(record.id),
+    id,
     titel: el.title || el.originalname || el.name || "Dokument",
     dateiname: el.originalname || el.filename || undefined,
     typ: el.type || undefined,
     groesseBytes: el.fileSize,
-    url: el.imageUrl || undefined,
+    url: el.imageUrl || `/api/dokument?estateId=${encodeURIComponent(estateId)}&fileId=${id}`,
   };
 }

@@ -164,7 +164,49 @@ export async function ladeObjektDokumente(estateId: string): Promise<ObjektDokum
   const records = result?.response?.results?.[0]?.data?.records || [];
   return records
     .filter((r) => !DOKUMENTE_AUSGESCHLOSSENE_TYPEN.includes(r.elements?.type || ""))
-    .map(mapFileRecord);
+    .map((r) => mapFileRecord(r, estateId));
+}
+
+export interface DokumentInhalt {
+  content: Buffer;
+  dateiname: string;
+}
+
+// Lädt den tatsächlichen Dateiinhalt eines einzelnen, am Objekt hinterlegten Dokuments —
+// benötigt für Dateien mit "category": "internal" (siehe Kommentar bei RawFileRecord in
+// mapping.ts), da onOffice für diese NIE eine direkte imageUrl liefert. Der Umweg über
+// resourcetype "file" mit gesetztem "fileid"-Parameter (zusätzlich zur weiterhin
+// erforderlichen estateid, siehe Live-Recherche Juli 2026: ohne estateid liefert die API
+// Errorcode 110 "Missing estate record id") liefert bei Einzelabruf ein zusätzliches
+// "content"-Feld: den vollen Dateiinhalt Base64-codiert (gegen echten Datensatz geprüft:
+// dekodierte Länge entspricht exakt "fileSize", Byte-Anfang entspricht der PDF-Magic-Number
+// "%PDF-"). Wird von der Proxy-Route /api/dokument aufgerufen (siehe dort).
+export async function ladeDokumentInhalt(
+  estateId: string,
+  fileId: string
+): Promise<DokumentInhalt | null> {
+  const result = await callOnOfficeApi<RawFileRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:get",
+      resourcetype: "file",
+      resourceid: "estate",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        estateid: estateId,
+        fileid: Number(fileId),
+      },
+    },
+  ]);
+
+  const record = result?.response?.results?.[0]?.data?.records?.[0];
+  const el = record?.elements;
+  if (!el?.content) return null;
+
+  return {
+    content: Buffer.from(el.content, "base64"),
+    dateiname: el.originalname || el.filename || "dokument",
+  };
 }
 
 export async function ladeImmobilieById(id: string): Promise<Immobilie | null> {
