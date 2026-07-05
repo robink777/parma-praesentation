@@ -49,7 +49,11 @@ export async function callOnOfficeApi<T = unknown>(
       token: ONOFFICE_TOKEN,
       request: { actions: signedActions },
     }),
-    next: { revalidate: 300 },
+    // no-store statt next.revalidate: Jeder Request trägt einen frischen HMAC über den
+    // aktuellen Unix-Timestamp (siehe buildHmac oben) — ein von Next.js zwischengespeicherter
+    // Response-Body für einen älteren Timestamp wäre ohnehin nur für diesen einen Moment gültig
+    // gewesen und schafft nur Verwirrung beim Debuggen von Live-Datenständen.
+    cache: "no-store",
   });
 
   if (!response.ok) {

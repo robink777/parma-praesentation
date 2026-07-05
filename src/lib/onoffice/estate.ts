@@ -13,8 +13,20 @@ import {
   RawEstateRecord,
 } from "./mapping";
 
-export async function ladeImmobilien(
-  limit = 20,
+// Hartes Limit der onOffice-API pro Aufruf: listlimit-Werte über 500 werden NICHT etwa auf
+// 500 gekappt oder mit einem Fehler abgelehnt, sondern die API fällt dann still auf ihren
+// Standardwert von 20 Datensätzen zurück (gegen den Live-Account durchgetestet, Juli 2026:
+// listlimit 500 liefert 500 Treffer, listlimit 501 liefert wieder nur 20 — ohne jede
+// Fehlermeldung). Das war die eigentliche Ursache dafür, dass die Objektsuche seit jeher nur
+// eine winzige, zufällige Teilmenge des Bestands durchsuchte (u.a. Immobilien ohne Objekttitel,
+// weil objekttitel als Sortierfeld bei leerem Titel first sortiert) — unabhängig davon, wie hoch
+// RAW_LISTLIMIT in route.ts gesetzt wurde. Größere Abrufe müssen daher zwingend über mehrere
+// Aufrufe mit steigendem listoffset paginiert werden, siehe ladeImmobilienSeite/ladeImmobilien.
+const ONOFFICE_MAX_LISTLIMIT = 500;
+
+async function ladeImmobilienSeite(
+  limit: number,
+  offset: number,
   filter?: Record<string, unknown>
 ): Promise<Immobilie[]> {
   const result = await callOnOfficeApi<RawEstateRecord>([
@@ -32,7 +44,7 @@ export async function ladeImmobilien(
       parameters: {
         data: ESTATE_FIELDS,
         listlimit: limit,
-        listoffset: 0,
+        listoffset: offset,
         // Bewusst NICHT nach kaufpreis sortiert: Der Account enthält u.a. ältere/unvollständige
         // Altdatensätze mit kaufpreis = 0 (gegen den Live-Account geprüft: von 1023
         // "kauf"-Objekten haben nur 686 einen Preis > 0). Eine Sortierung nach kaufpreis ASC
@@ -47,6 +59,29 @@ export async function ladeImmobilien(
 
   const records = result?.response?.results?.[0]?.data?.records || [];
   return records.map(mapEstateRecord);
+}
+
+// limit ist die GESAMT-Obergrenze über alle Seiten hinweg (kann über ONOFFICE_MAX_LISTLIMIT
+// liegen) — die Aufteilung in ≤500er-Seiten (siehe ONOFFICE_MAX_LISTLIMIT) passiert intern.
+// Bricht früh ab, sobald eine Seite weniger als das Seitenlimit liefert (Bestand erschöpft),
+// um nicht unnötig weitere leere Anfragen zu stellen.
+export async function ladeImmobilien(
+  limit = 20,
+  filter?: Record<string, unknown>
+): Promise<Immobilie[]> {
+  const alle: Immobilie[] = [];
+  let offset = 0;
+
+  while (alle.length < limit) {
+    const seitenlimit = Math.min(ONOFFICE_MAX_LISTLIMIT, limit - offset);
+    const seite = await ladeImmobilienSeite(seitenlimit, offset, filter);
+    alle.push(...seite);
+
+    if (seite.length < seitenlimit) break; // Bestand erschöpft
+    offset += seitenlimit;
+  }
+
+  return alle;
 }
 
 interface RawEstatePictureElement {
