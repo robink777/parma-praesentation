@@ -8,6 +8,10 @@ export interface RawEstateRecord {
   id: string;
   elements: {
     objekttitel?: string;
+    // "ImmoNr" im OnOffice-Backend — gegen den echten Feldkatalog geprüft (resourcetype
+    // "fields", Juli 2026): objektnr_extern trägt die kundenseitig sichtbare Objektnummer
+    // (nicht die interne numerische Id).
+    objektnr_extern?: string;
     kaufpreis?: number | string;
     wohnflaeche?: number | string;
     grundstuecksflaeche?: number | string;
@@ -26,6 +30,7 @@ export interface RawEstateRecord {
 export const ESTATE_FIELDS = [
   "Id",
   "objekttitel",
+  "objektnr_extern",
   "kaufpreis",
   "wohnflaeche",
   "grundstuecksflaeche",
@@ -44,6 +49,7 @@ export function mapEstateRecord(record: RawEstateRecord): Immobilie {
   const el = record.elements;
   return {
     id: String(record.id),
+    immoNr: el.objektnr_extern || undefined,
     bezeichnung: el.objekttitel || `Immobilie ${record.id}`,
     kaufpreis: Number(el.kaufpreis) || 0,
     wohnflaeche: el.wohnflaeche ? Number(el.wohnflaeche) : undefined,

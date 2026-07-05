@@ -67,6 +67,7 @@ export const MOCK_WEITERE_MITARBEITER: Betreuer[] = TEAM.filter((t) => t.name !=
 
 export const MOCK_IMMOBILIE: Immobilie = {
   id: "demo-1001",
+  immoNr: "PI-1001",
   bezeichnung: "Freistehendes Einfamilienhaus, Düren-Rölsdorf",
   kaufpreis: 385000,
   wohnflaeche: 145,
@@ -103,6 +104,7 @@ export const MOCK_BEWERTUNG: Bewertung = {
 export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   {
     id: "demo-2001",
+    immoNr: "PI-2001",
     bezeichnung: "Einfamilienhaus, Düren-Rölsdorf",
     kaufpreis: 379000,
     wohnflaeche: 150,
@@ -114,6 +116,7 @@ export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   },
   {
     id: "demo-2002",
+    immoNr: "PI-2002",
     bezeichnung: "Einfamilienhaus, Düren-Mitte",
     kaufpreis: 399000,
     wohnflaeche: 138,
@@ -125,6 +128,7 @@ export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   },
   {
     id: "demo-2003",
+    immoNr: "PI-2003",
     bezeichnung: "Doppelhaushälfte, Kreuzau",
     kaufpreis: 342000,
     wohnflaeche: 132,
@@ -136,6 +140,7 @@ export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   },
   {
     id: "demo-2004",
+    immoNr: "PI-2004",
     bezeichnung: "Einfamilienhaus, Jülich",
     kaufpreis: 365000,
     wohnflaeche: 148,
@@ -147,6 +152,7 @@ export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   },
   {
     id: "demo-2005",
+    immoNr: "PI-2005",
     bezeichnung: "Einfamilienhaus, Düren-Rölsdorf",
     kaufpreis: 410000,
     wohnflaeche: 160,
@@ -158,6 +164,7 @@ export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   },
   {
     id: "demo-2006",
+    immoNr: "PI-2006",
     bezeichnung: "Reihenendhaus, Niederzier",
     kaufpreis: 298000,
     wohnflaeche: 118,
@@ -169,6 +176,7 @@ export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   },
   {
     id: "demo-2007",
+    immoNr: "PI-2007",
     bezeichnung: "Einfamilienhaus, Düren-Birkesdorf",
     kaufpreis: 355000,
     wohnflaeche: 140,
@@ -180,6 +188,7 @@ export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   },
   {
     id: "demo-2008",
+    immoNr: "PI-2008",
     bezeichnung: "Bungalow, Merzenich",
     kaufpreis: 320000,
     wohnflaeche: 110,

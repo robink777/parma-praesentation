@@ -1,5 +1,9 @@
 export interface Immobilie {
   id: string;
+  // Externe Objektnummer ("ImmoNr", OnOffice-Feld objektnr_extern — Live-Feldkatalog geprüft,
+  // Juli 2026) — die kundenseitig sichtbare Kennung des Objekts, unabhängig von der internen
+  // numerischen Id. Wird in der Objektauswahl-Suche zusätzlich zu Titel/Ort/PLZ durchsucht.
+  immoNr?: string;
   bezeichnung: string;
   kaufpreis: number;
   wohnflaeche?: number;

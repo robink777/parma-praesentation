@@ -49,6 +49,8 @@ function DropdownErgebnis({
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-anthrazit">{immobilie.bezeichnung}</p>
           <p className="mt-[2px] truncate text-small text-anthrazit/60">
+            {immobilie.immoNr && <span className="font-mono">{immobilie.immoNr}</span>}
+            {immobilie.immoNr && ortszeile && " · "}
             {ortszeile}
             {immobilie.wohnflaeche && ` · ${immobilie.wohnflaeche} m²`}
             {immobilie.anzahlZimmer && ` · ${immobilie.anzahlZimmer} Zi.`}
@@ -168,7 +170,7 @@ export function ObjektAuswahl() {
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
               onFocus={handleFokus}
-              placeholder="Immobilie suchen (Titel, Ort, PLZ) …"
+              placeholder="Immobilie suchen (Titel, ImmoNr, Ort, PLZ) …"
               className="w-full rounded-md border-2 border-asche bg-reinweiss py-sm pl-[48px] pr-sm text-body text-anthrazit outline-none transition-colors placeholder:text-anthrazit/40 focus:border-messing"
               autoFocus
             />
