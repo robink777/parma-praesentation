@@ -33,7 +33,13 @@ export async function ladeImmobilien(
         data: ESTATE_FIELDS,
         listlimit: limit,
         listoffset: 0,
-        sortby: { kaufpreis: "ASC" },
+        // Bewusst NICHT nach kaufpreis sortiert: Der Account enthält u.a. ältere/unvollständige
+        // Altdatensätze mit kaufpreis = 0 (gegen den Live-Account geprüft: von 1023
+        // "kauf"-Objekten haben nur 686 einen Preis > 0). Eine Sortierung nach kaufpreis ASC
+        // füllt das Abruflimit fast ausschließlich mit diesen Nullpreis-Datensätzen, sodass
+        // echte, korrekt bepreiste Objekte in der Objektauswahl-Suche praktisch nie auftauchen.
+        // Alphabetisch nach Titel ist neutral und ergibt eine vorhersehbare Browse-Reihenfolge.
+        sortby: { objekttitel: "ASC" },
         filter: filter || { vermarktungsart: [{ op: "=", val: "kauf" }] },
       },
     },

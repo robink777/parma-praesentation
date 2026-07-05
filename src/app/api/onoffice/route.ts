@@ -68,7 +68,10 @@ export async function GET(request: NextRequest) {
     // eine ODER-Suche über Titel/Ort/PLZ/ImmoNr ist darüber nicht abbildbar. Stattdessen wird
     // hier — wie im Mock-Zweig oben — clientseitig über alle relevanten Felder gefiltert
     // (siehe treffer()), erst danach auf das angeforderte limit gekürzt.
-    const RAW_LISTLIMIT = 500;
+    // 1500 statt vorher 500: Der Account hat aktuell 1023 Objekte mit vermarktungsart=kauf
+    // (gegen den Live-Account geprüft) — mit 500 wäre rund die Hälfte des Bestands für die
+    // Suche unsichtbar gewesen. 1500 lässt zusätzlich Luft für weiteres Wachstum.
+    const RAW_LISTLIMIT = 1500;
     const immobilien = await ladeImmobilien(RAW_LISTLIMIT, {
       vermarktungsart: [{ op: "=", val: "kauf" }],
     });

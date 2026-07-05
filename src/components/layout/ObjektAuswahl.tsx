@@ -52,8 +52,10 @@ function DropdownErgebnis({
             {immobilie.immoNr && <span className="font-mono">{immobilie.immoNr}</span>}
             {immobilie.immoNr && ortszeile && " · "}
             {ortszeile}
-            {immobilie.wohnflaeche && ` · ${immobilie.wohnflaeche} m²`}
-            {immobilie.anzahlZimmer && ` · ${immobilie.anzahlZimmer} Zi.`}
+            {/* !! statt direktem && — sonst rendert React bei wohnflaeche/anzahlZimmer === 0
+                die Zahl "0" als sichtbaren Text, statt (wie bei fehlendem Wert) nichts anzuzeigen. */}
+            {!!immobilie.wohnflaeche && ` · ${immobilie.wohnflaeche} m²`}
+            {!!immobilie.anzahlZimmer && ` · ${immobilie.anzahlZimmer} Zi.`}
           </p>
         </div>
         <p className="shrink-0 text-small font-semibold text-anthrazit">
