@@ -227,9 +227,15 @@ export async function ladeEigentuemerAddressId(estateId: string): Promise<string
 
 // Ermittelt die Adress-ID des zuständigen Mitarbeiters/der zuständigen Mitarbeiterin
 // ("Betreuer") eines Objekts — analog zu ladeEigentuemerAddressId, nur mit dem
-// Relations-Typ "employee" statt "owner". Relations-Typ-String noch NICHT gegen die echte
-// Instanz verifiziert (anders als der Eigentümer-Relationstyp oben) — bei Live-Schaltung
-// gegen den echten Feldkatalog/die echte API-Antwort prüfen und ggf. anpassen.
+// Relations-Typ "contactPerson" statt "owner". Der zuvor hier verwendete Relations-Typ
+// "employee" existiert in diesem Account NICHT (idsfromrelation lieferte dafür immer
+// Errorcode 132 "No or unknown relation given") — dadurch schlug die Auflösung für JEDES
+// Objekt fehl und die Seite "Ihre Kontaktperson" zeigte durchgehend den MOCK_BETREUER-
+// Platzhalter ("Robin Kolbe") statt des tatsächlich zugeordneten Objekt-Betreuers.
+// "contactPerson" ist laut offizieller onOffice-API-Doku (apidoc.onoffice.de, Abschnitt
+// "Get Relations") der Relations-Typ für "Ansprechpartner (nur Makler)" und wurde gegen den
+// echten Account verifiziert (Juli 2026): liefert für verschiedene Objekte tatsächlich
+// unterschiedliche Adress-IDs (u.a. Daniel Parma, Robin Kolbe je nach Objekt-Zuordnung).
 export async function ladeBetreuerAddressId(estateId: string): Promise<string | null> {
   const result = await callOnOfficeApi<RawRelationRecord>([
     {
@@ -239,7 +245,7 @@ export async function ladeBetreuerAddressId(estateId: string): Promise<string | 
       identifier: "",
       cacheable: true,
       parameters: {
-        relationtype: "urn:onoffice-de-ns:smart:2.5:relationTypes:estate:address:employee",
+        relationtype: "urn:onoffice-de-ns:smart:2.5:relationTypes:estate:address:contactPerson",
         parentids: [Number(estateId)],
       },
     },
