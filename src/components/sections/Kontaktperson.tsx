@@ -152,7 +152,7 @@ export function Kontaktperson({
   const hatAdresse = Boolean(betreuer.strasse || plzOrt);
 
   return (
-    <SectionShell label="Ihre Kontaktperson" title="Ihr Ansprechpartner bei Parma">
+    <SectionShell label="Ihr Ansprechpartner" title="Ihr Ansprechpartner bei Parma">
       <Card className="flex flex-col items-start gap-lg md:flex-row md:items-center">
         <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full bg-sand">
           {betreuer.profilbildUrl ? (
