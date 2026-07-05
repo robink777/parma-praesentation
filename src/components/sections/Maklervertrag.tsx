@@ -138,6 +138,8 @@ export function Maklervertrag({
 }) {
   const [daten, setDaten] = useState<MaklervertragDaten>(() => baueInitialdaten(kunde, immobilie, bewertung));
   const [mandatErteilt, setMandatErteilt] = useState(false);
+  const [pdfWirdErstellt, setPdfWirdErstellt] = useState(false);
+  const [pdfFehler, setPdfFehler] = useState<string | null>(null);
 
   function update<K extends keyof MaklervertragDaten>(key: K, value: MaklervertragDaten[K]) {
     setDaten((d) => ({ ...d, [key]: value }));
@@ -173,6 +175,44 @@ export function Maklervertrag({
       ...d,
       weitereAuftraggeber: d.weitereAuftraggeber.filter((_, i) => i !== index),
     }));
+  }
+
+  // Erstellt bei "Mandat erteilen" automatisch das PDF (Leistungsversprechen mit gewähltem
+  // Paket + vollständiger Maklervertrag mit allen Kunden- und Objektdaten) über die
+  // serverseitige Rendering-Route und stößt direkt den Download an — ohne Zwischenschritt für
+  // den Berater/die Beraterin im Kundentermin.
+  async function mandatErteilen() {
+    setPdfFehler(null);
+    setPdfWirdErstellt(true);
+    try {
+      const res = await fetch("/api/mandat-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kunde, immobilie, bewertung, daten, gewaehltesPaket }),
+      });
+
+      if (!res.ok) {
+        const fehlerdaten = await res.json().catch(() => null);
+        throw new Error(fehlerdaten?.error || "PDF konnte nicht erstellt werden");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const nachname = kunde.nachname?.replace(/[^a-zA-Z0-9äöüÄÖÜß-]+/g, "_") || "Kunde";
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Mandat_${nachname}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      setMandatErteilt(true);
+    } catch (error) {
+      setPdfFehler(error instanceof Error ? error.message : "PDF konnte nicht erstellt werden");
+    } finally {
+      setPdfWirdErstellt(false);
+    }
   }
 
   return (
@@ -481,15 +521,22 @@ export function Maklervertrag({
       {mandatErteilt ? (
         <p className="flex items-center gap-sm text-body font-medium text-anthrazit">
           <Icon name="check" size={20} className="text-messing" />
-          Mandat erteilt — der Maklervertrag ist zur Weiterbearbeitung vorgemerkt.
+          Mandat erteilt — das PDF wurde erstellt und heruntergeladen.
         </p>
       ) : (
-        <button
-          onClick={() => setMandatErteilt(true)}
-          className="rounded-md bg-messing px-lg py-sm font-medium text-reinweiss"
-        >
-          Mandat erteilen
-        </button>
+        <>
+          <button
+            onClick={mandatErteilen}
+            disabled={pdfWirdErstellt}
+            className="flex items-center gap-sm rounded-md bg-messing px-lg py-sm font-medium text-reinweiss disabled:opacity-60"
+          >
+            {pdfWirdErstellt && (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-reinweiss/40 border-t-reinweiss" />
+            )}
+            {pdfWirdErstellt ? "PDF wird erstellt …" : "Mandat erteilen"}
+          </button>
+          {pdfFehler && <p className="mt-sm text-small text-anthrazit/80">Fehler: {pdfFehler}</p>}
+        </>
       )}
     </SectionShell>
   );
