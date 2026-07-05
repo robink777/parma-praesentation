@@ -240,12 +240,6 @@ export type Bundesland =
   | "Schleswig-Holstein"
   | "Thüringen";
 
-export interface Ablaufpunkt {
-  uhrzeit: string;
-  titel: string;
-  beschreibung?: string;
-}
-
 export interface TeamMitglied {
   name: string;
   rolle: string;

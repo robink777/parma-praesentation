@@ -10,7 +10,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "begruessung", label: "Begrüßung", icon: "greeting" },
   { id: "kontaktperson", label: "Ihr Ansprechpartner", icon: "contact" },
   { id: "unternehmen", label: "Über uns", icon: "building" },
-  { id: "ablauf", label: "Ablauf heute", icon: "calendar" },
   { id: "objekt", label: "Objektdaten", icon: "house" },
   { id: "bewertung", label: "Bewertung", icon: "scale" },
   { id: "dokumente", label: "Dokumente", icon: "document" },

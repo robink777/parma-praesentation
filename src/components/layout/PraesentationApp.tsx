@@ -6,7 +6,6 @@ import { LeistungspaketId, Praesentation } from "@/types";
 import { Begruessung } from "@/components/sections/Begruessung";
 import { Kontaktperson } from "@/components/sections/Kontaktperson";
 import { Unternehmen } from "@/components/sections/Unternehmen";
-import { Ablauf } from "@/components/sections/Ablauf";
 import { Objektdaten } from "@/components/sections/Objektdaten";
 import { Bewertung } from "@/components/sections/Bewertung";
 import { Dokumente } from "@/components/sections/Dokumente";
@@ -31,7 +30,6 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
           <Kontaktperson betreuer={daten.betreuer} weitereMitarbeiter={daten.weitereMitarbeiter} />
         )}
         {activeId === "unternehmen" && <Unternehmen />}
-        {activeId === "ablauf" && <Ablauf />}
         {activeId === "objekt" && <Objektdaten immobilie={daten.immobilie} />}
         {activeId === "bewertung" && <Bewertung bewertung={daten.bewertung} />}
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
