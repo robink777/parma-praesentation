@@ -87,6 +87,18 @@ export function ObjektAuswahl() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Öffnet das Dropdown und lädt einmalig die Startliste direkt beim Mounten — bewusst NICHT
+  // über das onFocus-Event des Inputs, da das Feld per autoFocus-Attribut bereits vom Browser
+  // fokussiert wird, während/bevor React nach der Hydration seinen synthetischen Fokus-Handler
+  // registriert. Der resultierende native "focus" verpufft dadurch ungesehen, das Dropdown
+  // blieb beim ersten Laden der Seite dauerhaft zu, obwohl das Feld sichtbar fokussiert war.
+  // Ein separater Mount-Effect ist von dieser Race-Condition unabhängig. onFocus bleibt für den
+  // Fall erhalten, dass Nutzer/innen das Feld verlassen und danach erneut anklicken.
+  useEffect(() => {
+    handleFokus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Debounced Nachladen bei Eingabe — nur, solange das Dropdown bereits offen ist (verhindert
   // einen doppelten Abruf direkt nach dem initialen Laden beim Fokussieren, siehe handleFokus).
   useEffect(() => {
