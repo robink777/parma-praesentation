@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ladeImmobilien, ladeImmobilieById } from "@/lib/onoffice/estate";
+import { ladeImmobilien, ladeImmobilieById, ladeTitelbilder } from "@/lib/onoffice/estate";
 import { ONOFFICE_MODE } from "@/lib/onoffice/config";
 import { MOCK_IMMOBILIE, MOCK_VERGLEICHSPOOL } from "@/lib/onoffice/mock";
 import { Immobilie } from "@/types";
@@ -19,6 +19,20 @@ function treffer(immobilie: Immobilie, suchbegriff: string): boolean {
     .join(" ")
     .toLowerCase()
     .includes(suchbegriff);
+}
+
+// Reichert eine (bereits auf das angeforderte limit gekürzte) Trefferliste um Titelbilder an —
+// ladeImmobilien()/mapEstateRecord() laden bildUrl bewusst NICHT mit (Bilder sind ein eigener
+// Resourcetype, siehe ladeTitelbilder in estate.ts), da das für den vollen Roh-Bestand (bis zu
+// 1500 Objekte, siehe RAW_LISTLIMIT unten) unnötig viele API-Aufrufe verursachen würde. Erst NACH
+// dem Kürzen auf das tatsächlich zurückgegebene limit anzureichern hält den Zusatzaufwand auf
+// einen einzigen Batch-Request über höchstens `limit` Objekte beschränkt — u.a. für die
+// Referenzobjekt-Suche im Vergleichswert-Reiter, deren Kacheln sonst nur den Bild-Platzhalter
+// zeigten (siehe PropertyImage-Fallback).
+async function mitTitelbildern(immobilien: Immobilie[]): Promise<Immobilie[]> {
+  if (immobilien.length === 0) return immobilien;
+  const bilder = await ladeTitelbilder(immobilien.map((i) => i.id));
+  return immobilien.map((i) => (bilder[i.id] ? { ...i, bildUrl: bilder[i.id] } : i));
 }
 
 export async function GET(request: NextRequest) {
@@ -95,7 +109,7 @@ export async function GET(request: NextRequest) {
         filter,
         nurVerkaufte ? { verkauft_am: "DESC" } : { erstellt_am: "DESC" }
       );
-      return NextResponse.json(immobilien);
+      return NextResponse.json(await mitTitelbildern(immobilien));
     }
 
     // Bewusst der volle Bestand (hohes Listlimit) statt eines serverseitigen onOffice-Filters
@@ -114,7 +128,7 @@ export async function GET(request: NextRequest) {
     const suchbegriff = suche?.toLowerCase().trim();
     const gefiltert = suchbegriff ? immobilien.filter((i) => treffer(i, suchbegriff)) : immobilien;
 
-    return NextResponse.json(gefiltert.slice(0, limit));
+    return NextResponse.json(await mitTitelbildern(gefiltert.slice(0, limit)));
   } catch (error) {
     console.error("onOffice API Fehler:", error);
     return NextResponse.json(

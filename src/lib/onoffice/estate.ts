@@ -107,6 +107,20 @@ interface RawEstatePictureRecord {
 // Die Antwort verschachtelt die einzelnen Bilder unter records[].elements (Array),
 // nicht direkt auf dem Record (gegen echte API-Antwort geprüft, Juli 2026).
 async function ladeTitelbild(estateId: string): Promise<string | undefined> {
+  const bilder = await ladeTitelbilder([estateId]);
+  return bilder[estateId];
+}
+
+// Batch-Variante von ladeTitelbild: Lädt die Titelbilder mehrerer Objekte in EINEM API-Aufruf
+// (estateids akzeptiert ein Array, siehe ladeTitelbild oben), statt pro Objekt einzeln
+// nachzuladen. Wird für Listen-/Suchergebnisse benötigt (Referenzobjekt-Suche im
+// Vergleichswert-Reiter, Objektauswahl-Suche, siehe route.ts) — dort sonst ein N-facher
+// API-Roundtrip für N Treffer nötig wäre. Gibt eine Map estateId -> bildUrl zurück; Objekte
+// ohne hinterlegtes Foto fehlen einfach in der Map (Aufrufer behandelt das wie bisher als
+// "kein Bild", siehe PropertyImage-Fallback).
+export async function ladeTitelbilder(estateIds: string[]): Promise<Record<string, string>> {
+  if (estateIds.length === 0) return {};
+
   const result = await callOnOfficeApi<RawEstatePictureRecord>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:get",
@@ -115,7 +129,7 @@ async function ladeTitelbild(estateId: string): Promise<string | undefined> {
       identifier: "",
       cacheable: true,
       parameters: {
-        estateids: [Number(estateId)],
+        estateids: estateIds.map(Number),
         categories: ["Titelbild", "Foto"],
         size: "original",
         language: "DEU",
@@ -125,8 +139,14 @@ async function ladeTitelbild(estateId: string): Promise<string | undefined> {
 
   const records = result?.response?.results?.[0]?.data?.records || [];
   const bilder = records.flatMap((r) => r.elements || []);
-  const titelbild = bilder.find((b) => b.type === "Titelbild") || bilder[0];
-  return titelbild?.url;
+
+  const map: Record<string, string> = {};
+  for (const estateId of estateIds) {
+    const bilderFuerObjekt = bilder.filter((b) => String(b.estateid) === estateId);
+    const titelbild = bilderFuerObjekt.find((b) => b.type === "Titelbild") || bilderFuerObjekt[0];
+    if (titelbild) map[estateId] = titelbild.url;
+  }
+  return map;
 }
 
 // Kategorien, die im "Dokumente"-Reiter ausgeblendet werden: Fotos/Titelbild sind technisch
