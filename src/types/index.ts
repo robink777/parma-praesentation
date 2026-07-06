@@ -22,6 +22,12 @@ export interface Immobilie {
   objektbeschreibung?: string;
   lat?: number;
   lng?: number;
+  // Verkaufsdatum ("Verkauft/Vermietet am", OnOffice-Feld verkauft_am — Live-Feldkatalog
+  // geprüft, Juli 2026). Nur für die manuelle Referenzobjekt-Suche im Vergleichswert-Reiter
+  // relevant (siehe Vergleichswert.tsx) — bei anderen Immobilie-Abrufen bleibt das Feld leer,
+  // da es dort nicht angezeigt wird, aber trotzdem für alle Estate-Abrufe mitgeladen wird (ein
+  // zusätzliches, ungenutztes Feld schadet nicht, siehe ESTATE_FIELDS in mapping.ts).
+  verkauftAm?: string;
 }
 
 export interface Kunde {
@@ -176,23 +182,6 @@ export interface WertermittlungsDaten {
   ergebnis: WertermittlungErgebnis;
   erlaeuterungen: { titel: string; text: string }[];
   haftungsausschluss: string;
-}
-
-export interface MatchDetails {
-  lage: number;
-  wohnflaeche: number;
-  baujahr: number;
-  modernisierung: number;
-}
-
-export interface Vergleichsobjekt extends Immobilie {
-  matchScore: number;
-  matchDetails: MatchDetails;
-}
-
-export interface VergleichsergebnisMeta {
-  angewandterSchwellwert: number;
-  gefundeneAnzahl: number;
 }
 
 export interface FinanzierungsDaten {

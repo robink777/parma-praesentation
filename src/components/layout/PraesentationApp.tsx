@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Sidebar } from "./Sidebar";
-import { LeistungspaketId, Praesentation } from "@/types";
+import { Immobilie, LeistungspaketId, Praesentation } from "@/types";
 import { Begruessung } from "@/components/sections/Begruessung";
 import { Kontaktperson } from "@/components/sections/Kontaktperson";
 import { Unternehmen } from "@/components/sections/Unternehmen";
@@ -17,7 +17,15 @@ import { Maklervertrag } from "@/components/sections/Maklervertrag";
 export function PraesentationApp({ daten }: { daten: Praesentation }) {
   const [activeId, setActiveId] = useState("begruessung");
   const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>();
+  // Manuell ausgewählte Referenzobjekte im Vergleichswert-Reiter (siehe Vergleichswert.tsx) —
+  // hier (statt lokal im Reiter selbst) gehalten, damit die Auswahl beim Wechsel zwischen
+  // Reitern erhalten bleibt, analog zu gewaehltesPaket oben.
+  const [referenzobjekte, setReferenzobjekte] = useState<(Immobilie | null)[]>([null, null, null]);
   const kundeName = [daten.kunde.vorname, daten.kunde.nachname].filter(Boolean).join(" ");
+
+  function referenzobjektAendern(index: number, objekt: Immobilie | null) {
+    setReferenzobjekte((prev) => prev.map((o, i) => (i === index ? objekt : o)));
+  }
 
   return (
     <div className="flex h-screen w-screen">
@@ -33,7 +41,9 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         {activeId === "objekt" && <Objektdaten immobilie={daten.immobilie} />}
         {activeId === "bewertung" && <Bewertung bewertung={daten.bewertung} />}
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
-        {activeId === "vergleich" && <Vergleichswert immobilie={daten.immobilie} />}
+        {activeId === "vergleich" && (
+          <Vergleichswert referenzobjekte={referenzobjekte} onReferenzobjektAendern={referenzobjektAendern} />
+        )}
         {activeId === "finanzierung" && <Finanzierung immobilie={daten.immobilie} />}
         {activeId === "leistungsversprechen" && (
           <Leistungsversprechen gewaehltesPaket={gewaehltesPaket} onWaehlePaket={setGewaehltesPaket} />

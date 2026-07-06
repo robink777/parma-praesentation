@@ -24,6 +24,11 @@ export interface RawEstateRecord {
     zustand?: string;
     energyClass?: string;
     objektbeschreibung?: string;
+    // "Verkauft/Vermietet am" — gegen den echten Feldkatalog geprüft (resourcetype "fields",
+    // Juli 2026). Wird nur für die manuelle Referenzobjekt-Suche im Vergleichswert-Reiter
+    // benötigt (siehe Vergleichswert.tsx), der Einfachheit halber aber für alle Estate-Abrufe
+    // mitgeladen statt eines separaten Feldsatzes nur für diesen einen Anwendungsfall.
+    verkauft_am?: string;
   };
 }
 
@@ -43,6 +48,7 @@ export const ESTATE_FIELDS = [
   "zustand",
   "energyClass",
   "objektbeschreibung",
+  "verkauft_am",
 ];
 
 export function mapEstateRecord(record: RawEstateRecord): Immobilie {
@@ -63,6 +69,7 @@ export function mapEstateRecord(record: RawEstateRecord): Immobilie {
     zustand: el.zustand,
     energieklasse: el.energyClass,
     objektbeschreibung: el.objektbeschreibung,
+    verkauftAm: el.verkauft_am || undefined,
   };
 }
 
