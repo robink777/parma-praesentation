@@ -99,6 +99,12 @@ export const MOCK_BEWERTUNG: Bewertung = {
   // Original PDF-Export der Sprengnetter-Marktpreisermittlung, vorab hochgeladen und unter
   // public/dokumente abgelegt. Wird direkt über den "Bewertung"-Reiter verlinkt (Bewertung.tsx).
   pdfUrl: "/dokumente/bewertung-demo-1001.pdf",
+  // Demo-Werte für die im Bewertung-Reiter seit Juli 2026 angezeigten PriceHubble-Felder —
+  // grob passend zum Kaufpreis aus MOCK_IMMOBILIE (385.000 €), damit der Demo-Modus eine
+  // plausible Marktwertspanne zeigt statt echter, live geladener Zahlen.
+  marktwertPH: 392000,
+  marktwertMinPH: 368000,
+  marktwertMaxPH: 415000,
 };
 
 // Demo-Datensatz für den "Dokumente"-Reiter (nur im Mock-Modus verwendet, siehe

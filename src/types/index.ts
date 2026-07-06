@@ -83,7 +83,18 @@ export interface Bewertung {
   // angezeigt. Übergangslösung: Aktuell wird die Word-Datei manuell eingelesen und die
   // Werte hier eingetragen — perspektivisch soll dieser Schritt automatisiert werden
   // (z.B. direkter Import aus Sprengnetter/OnOffice statt manueller Übertragung).
+  // Bleiben Teil des Typs (u.a. für Maklervertrag.tsx und den Mandat-PDF-Export weiterhin
+  // genutzt), werden aber im Bewertung-Reiter selbst seit der Umstellung auf die
+  // PriceHubble-Felder (siehe unten) nicht mehr angezeigt (Juli 2026, auf Kundenwunsch
+  // erstmal ausgeblendet, nicht gelöscht).
   wertermittlung?: WertermittlungsDaten;
+  // Automatische Marktwertschätzung von PriceHubble, live aus den OnOffice-Estate-Feldern
+  // MPPricehubblePrice/-Min/-Max geladen (siehe ladePriceHubbleWerte in onoffice/estate.ts).
+  // Anders als die übrigen Felder oben (aktuell manuell aus Sprengnetter gepflegt) ist das
+  // hier die einzige tatsächlich live aus OnOffice geladene Bewertungsgröße.
+  marktwertPH?: number;
+  marktwertMinPH?: number;
+  marktwertMaxPH?: number;
 }
 
 export interface WertermittlungKeyValue {

@@ -10,6 +10,7 @@ import {
   ladeImmobilieById,
   ladeKundeByAddressId,
   ladeObjektDokumente,
+  ladePriceHubbleWerte,
 } from "./onoffice/estate";
 import {
   MOCK_BETREUER,
@@ -29,8 +30,11 @@ export interface PraesentationsParams {
  * Lädt die Daten für eine Präsentation, ausgelöst über den Link aus OnOffice
  * (Query-Parameter estateId / addressId). Solange ONOFFICE_MODE=mock (Default, siehe
  * onoffice/config.ts) oder der Live-Abruf fehlschlägt, werden Demo-Daten verwendet.
- * Die Bewertung (Sach-/Ertrags-/Vergleichswert) liegt aktuell als PDF vor und wird nicht
+ * Die übrige Bewertung (Sach-/Ertrags-/Vergleichswert) liegt aktuell als PDF vor und wird nicht
  * automatisch aus OnOffice berechnet — das folgt, sobald die nötigen Felder dort gepflegt sind.
+ * Einzige Ausnahme: Die drei PriceHubble-Marktwertfelder (siehe ladePriceHubbleWerte) werden
+ * bereits live aus OnOffice geladen und im Bewertung-Reiter angezeigt (seit Juli 2026, auf
+ * Kundenwunsch — die übrigen Bewertungsfelder wurden dafür im Reiter ausgeblendet).
  *
  * estateId kann entweder die interne numerische OnOffice-ID sein (z.B. für manuelle
  * Test-Links) oder die öffentliche Objekt-UUID (der künftige Normalfall: Link direkt aus
@@ -63,12 +67,13 @@ export async function ladePraesentationsDaten(
         params.addressId || (await ladeEigentuemerAddressId(estateId).catch(() => null));
       const betreuerAddressId = await ladeBetreuerAddressId(estateId).catch(() => null);
 
-      const [immobilie, kunde, betreuer, alleMitarbeiter, dokumente] = await Promise.all([
+      const [immobilie, kunde, betreuer, alleMitarbeiter, dokumente, priceHubbleWerte] = await Promise.all([
         ladeImmobilieById(estateId),
         addressId ? ladeKundeByAddressId(addressId) : Promise.resolve(null),
         betreuerAddressId ? ladeBetreuerByAddressId(betreuerAddressId).catch(() => null) : Promise.resolve(null),
         ladeAlleMitarbeiter().catch(() => []),
         ladeObjektDokumente(estateId).catch(() => []),
+        ladePriceHubbleWerte(estateId).catch(() => null),
       ]);
 
       // Objekt-Betreuer aus der "weitere Mitarbeiter"-Liste ausschließen (Dubletten-Schutz) —
@@ -81,7 +86,12 @@ export async function ladePraesentationsDaten(
         return {
           kunde: kunde || { vorname: "", nachname: "" },
           immobilie,
-          bewertung: MOCK_BEWERTUNG,
+          // Die übrigen Bewertungsfelder (sachwert/ertragswert/etc.) bleiben MOCK_BEWERTUNG
+          // (aktuell weiterhin manuell aus Sprengnetter gepflegt, siehe Bewertung-Typ) — nur
+          // die drei PriceHubble-Felder werden live überschrieben, sofern der Abruf
+          // erfolgreich war (priceHubbleWerte ist null, wenn ladePriceHubbleWerte
+          // fehlgeschlagen ist oder das Objekt keinen Datensatz zurückgibt).
+          bewertung: { ...MOCK_BEWERTUNG, ...priceHubbleWerte },
           betreuer: betreuer || MOCK_BETREUER,
           weitereMitarbeiter: weitereMitarbeiter.length > 0 ? weitereMitarbeiter : MOCK_WEITERE_MITARBEITER,
           // Bewusst KEIN Fallback auf MOCK_DOKUMENTE bei leerer Liste (anders als z.B. bei

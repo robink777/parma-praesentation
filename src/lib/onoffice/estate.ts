@@ -209,6 +209,53 @@ export async function ladeDokumentInhalt(
   };
 }
 
+export interface PriceHubbleWerte {
+  marktwertPH?: number;
+  marktwertMinPH?: number;
+  marktwertMaxPH?: number;
+}
+
+interface RawPriceHubbleRecord {
+  id: string;
+  elements: {
+    MPPricehubblePrice?: number | string;
+    MPPricehubbleMax?: number | string;
+    MPPricehubbleMin?: number | string;
+  };
+}
+
+// Lädt die automatische PriceHubble-Marktwertschätzung eines Objekts. Live gegen den echten
+// Feldkatalog geprüft (resourcetype "fields", modules "estate", Juli 2026): Die drei Felder
+// sind eigenständige Estate-Datenfelder (nicht Teil von ESTATE_FIELDS in mapping.ts, da die
+// Bewertung im Code als eigenständiges Konzept behandelt wird, siehe Bewertung-Typ) —
+// gepflegt über eine PriceHubble-Anbindung in OnOffice, nicht manuell. Es existiert daneben
+// noch ein viertes Feld "MPPricehubbleConfidence" (Konfidenznote Gering/Mittel/Hoch), das auf
+// Kundenwunsch bewusst NICHT abgerufen/angezeigt wird — nur die drei Wertfelder.
+export async function ladePriceHubbleWerte(estateId: string): Promise<PriceHubbleWerte | null> {
+  const result = await callOnOfficeApi<RawPriceHubbleRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: estateId,
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["MPPricehubblePrice", "MPPricehubbleMax", "MPPricehubbleMin"],
+      },
+    },
+  ]);
+
+  const record = result?.response?.results?.[0]?.data?.records?.[0];
+  const el = record?.elements;
+  if (!el) return null;
+
+  return {
+    marktwertPH: el.MPPricehubblePrice !== undefined ? Number(el.MPPricehubblePrice) : undefined,
+    marktwertMinPH: el.MPPricehubbleMin !== undefined ? Number(el.MPPricehubbleMin) : undefined,
+    marktwertMaxPH: el.MPPricehubbleMax !== undefined ? Number(el.MPPricehubbleMax) : undefined,
+  };
+}
+
 export async function ladeImmobilieById(id: string): Promise<Immobilie | null> {
   const [result, bildUrl] = await Promise.all([
     callOnOfficeApi<RawEstateRecord>([
