@@ -83,6 +83,11 @@ export const MOCK_IMMOBILIE: Immobilie = {
   modernisierungen: ["Bad 2016 saniert", "Fenster 2019 erneuert", "Heizung 2021 modernisiert"],
   objektbeschreibung:
     "Fünf Zimmer, 145 m², ruhige Wohnlage am Ortsrand. Boden gepflegt, Bad 2016 saniert.",
+  // Demo-Wert für den seit Juli 2026 im "DeepImmo"-Reiter angezeigten Link (siehe DeepImmo.tsx)
+  // — im Live-Betrieb aktuell bei keinem Objekt hinterlegt (Individualfeld ind_3450_Feld_ObjTech540,
+  // erst kürzlich vom Kunden angelegt), hier aber mit dem vom Kunden selbst genannten
+  // Beispiel-Link befüllt, damit sich der befüllte Zustand im Demo-Modus testen lässt.
+  deepImmoLink: "https://realestateos.deepimmo.com/property/mg0-1uw/overview",
 };
 
 // Werte 1:1 aus der Sprengnetter-Marktpreisermittlung (Word-Export) übernommen — siehe

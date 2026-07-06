@@ -7,6 +7,7 @@ import { Begruessung } from "@/components/sections/Begruessung";
 import { Kontaktperson } from "@/components/sections/Kontaktperson";
 import { Unternehmen } from "@/components/sections/Unternehmen";
 import { Objektdaten } from "@/components/sections/Objektdaten";
+import { DeepImmo } from "@/components/sections/DeepImmo";
 import { Bewertung } from "@/components/sections/Bewertung";
 import { Dokumente } from "@/components/sections/Dokumente";
 import { Vergleichswert } from "@/components/sections/Vergleichswert";
@@ -39,6 +40,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         )}
         {activeId === "unternehmen" && <Unternehmen />}
         {activeId === "objekt" && <Objektdaten immobilie={daten.immobilie} />}
+        {activeId === "deepimmo" && <DeepImmo immobilie={daten.immobilie} />}
         {activeId === "bewertung" && <Bewertung bewertung={daten.bewertung} />}
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
         {activeId === "vergleich" && (

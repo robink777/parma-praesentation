@@ -23,7 +23,8 @@ export type IconName =
   | "globe"
   | "search"
   | "menu"
-  | "download";
+  | "download"
+  | "externalLink";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   greeting: (
@@ -145,6 +146,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M12 4v10" />
       <path d="M8 10l4 4 4-4" />
       <path d="M5 18h14" />
+    </>
+  ),
+  externalLink: (
+    <>
+      <path d="M10 5H5v14h14v-5" />
+      <path d="M13 3h8v8" />
+      <path d="M21 3l-9 9" />
     </>
   ),
 };

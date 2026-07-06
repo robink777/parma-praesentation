@@ -28,6 +28,12 @@ export interface Immobilie {
   // da es dort nicht angezeigt wird, aber trotzdem für alle Estate-Abrufe mitgeladen wird (ein
   // zusätzliches, ungenutztes Feld schadet nicht, siehe ESTATE_FIELDS in mapping.ts).
   verkauftAm?: string;
+  // Objektspezifischer Link zur DeepImmo-Plattform (OnOffice-Individualfeld
+  // "DeepImmo-Link" unter "Technische Daten", Feldkatalog-Id ind_3450_Feld_ObjTech540 —
+  // vom Kunden im Juli 2026 selbst angelegt, siehe DeepImmo.tsx). Wird pro Objekt manuell in
+  // OnOffice gepflegt und bleibt bis dahin leer — die UI zeigt in diesem Fall einen
+  // Leerzustand statt eines Links.
+  deepImmoLink?: string;
 }
 
 export interface Kunde {

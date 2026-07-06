@@ -11,6 +11,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "kontaktperson", label: "Ihr Ansprechpartner", icon: "contact" },
   { id: "unternehmen", label: "Über uns", icon: "building" },
   { id: "objekt", label: "Objektdaten", icon: "house" },
+  { id: "deepimmo", label: "DeepImmo", icon: "externalLink" },
   { id: "bewertung", label: "Bewertung", icon: "scale" },
   { id: "dokumente", label: "Dokumente", icon: "document" },
   { id: "vergleich", label: "Vergleichswert", icon: "compare" },

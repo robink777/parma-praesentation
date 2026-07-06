@@ -29,6 +29,11 @@ export interface RawEstateRecord {
     // benötigt (siehe Vergleichswert.tsx), der Einfachheit halber aber für alle Estate-Abrufe
     // mitgeladen statt eines separaten Feldsatzes nur für diesen einen Anwendungsfall.
     verkauft_am?: string;
+    // "DeepImmo-Link" — Individualfeld unter "Technische Daten", vom Kunden im Juli 2026 selbst
+    // in OnOffice angelegt (resourcetype "fields" geprüft: ind_3450_Feld_ObjTech540, Freitext).
+    // Wird objektspezifisch manuell gepflegt und ist deshalb bei den meisten Objekten (Stand
+    // Juli 2026) noch leer — siehe DeepImmo.tsx für den Leerzustand.
+    ind_3450_Feld_ObjTech540?: string;
   };
 }
 
@@ -49,6 +54,7 @@ export const ESTATE_FIELDS = [
   "energyClass",
   "objektbeschreibung",
   "verkauft_am",
+  "ind_3450_Feld_ObjTech540",
 ];
 
 export function mapEstateRecord(record: RawEstateRecord): Immobilie {
@@ -70,6 +76,7 @@ export function mapEstateRecord(record: RawEstateRecord): Immobilie {
     energieklasse: el.energyClass,
     objektbeschreibung: el.objektbeschreibung,
     verkauftAm: el.verkauft_am || undefined,
+    deepImmoLink: el.ind_3450_Feld_ObjTech540 || undefined,
   };
 }
 
