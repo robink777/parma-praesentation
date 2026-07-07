@@ -124,14 +124,20 @@ export interface RawBetreuerRecord {
 // Feldnamen gegen die echte OnOffice-Account-Konfiguration geprüft (Live-Recherche Juli 2026,
 // customerId web77461, address-Modul): "Zusatz1" = Firma, "jobPosition" = Position im
 // Unternehmen, "Homepage" = Website-URL (nicht "Firma"/"Position"/"Url", wie zuvor
-// angenommen). Zwei frühere Annahmen haben sich als falsch herausgestellt und wurden entfernt:
-// Es existiert in diesem Account WEDER ein eigenständiges "Mobil"-Feld noch ein "Bild"-Feld
-// (Profilfoto) im address-Modul — beide Werte bleiben bei Live-Daten daher immer undefined
-// (die UI zeigt in diesem Fall bewusst nur Telefon1 und einen Initialen-Avatar statt eines
-// Fotos, siehe Kontaktperson.tsx). Zusätzlich ist "jobPosition" für jeden bisher geprüften
-// Mitarbeiter-Datensatz leer (nicht gepflegt) — die Rolle kommt für die "weitere
-// Mitarbeiter"-Liste stattdessen aus der Parma-Wissensdatei (siehe TEAM in
-// data/unternehmen.ts, verknüpft in estate.ts/ladeAlleMitarbeiter).
+// angenommen). Es existiert in diesem Account KEIN eigenständiges "Mobil"-Feld im
+// address-Modul — der Wert bleibt bei Live-Daten daher immer undefined. Zusätzlich ist
+// "jobPosition" für jeden bisher geprüften Mitarbeiter-Datensatz leer (nicht gepflegt) — die
+// Rolle kommt für die "weitere Mitarbeiter"-Liste stattdessen aus der Parma-Wissensdatei
+// (siehe TEAM in data/unternehmen.ts, verknüpft in estate.ts/ladeAlleMitarbeiter).
+//
+// Profilfoto ("Bild"-Feld im address-Modul existiert weiterhin nicht — das war die richtige
+// Erkenntnis einer früheren Recherche): Profilbilder kommen NICHT aus diesem Datensatz/Modul,
+// sondern werden separat über den eigenständigen OnOffice-Resourcetype "userphoto" nachgeladen
+// (Nutzer-Fotoverwaltung, nicht Adressdaten) und per E-Mail-Abgleich mit diesem
+// Betreuer-Datensatz verknüpft — siehe ladeUserFotoByEmail in estate.ts für die vollständige
+// Herleitung. Setzt voraus, dass der API-Nutzer das Recht "Benutzerdaten über API auslesen"
+// hat (vom Kunden im Juli 2026 aktiviert; ohne dieses Recht lieferte der Zugriff auf "user"/
+// "userphoto" durchgehend Errorcode 170 "No read permission for this user", live bestätigt).
 export const BETREUER_FIELDS = [
   "Anrede",
   "Vorname",

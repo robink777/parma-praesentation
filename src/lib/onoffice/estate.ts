@@ -405,7 +405,132 @@ export async function ladeBetreuerAddressId(estateId: string): Promise<string | 
   return ids && ids.length > 0 ? ids[0] : null;
 }
 
-export async function ladeBetreuerByAddressId(addressId: string): Promise<Betreuer | null> {
+interface RawUserRecord {
+  id: string;
+}
+
+interface RawUserPhotoRecord {
+  id: string;
+  elements: {
+    photo?: string;
+  };
+}
+
+// Lädt das Profilfoto ("Passfoto") eines Mitarbeiters — live gegen den echten Account
+// verifiziert (Juli 2026, customerId web77461), NACHDEM der Kunde der API das Recht
+// "Benutzerdaten über API auslesen" gewährt hat (vorher lieferte jeder Zugriff auf "user"
+// und "userphoto" durchgehend Errorcode 170 "No read permission for this user" — bestätigt
+// per Vergleichstest: "address" funktionierte mit denselben Zugangsdaten währenddessen
+// anstandslos, das Problem war also gezielt diese Berechtigung, keine falschen
+// Zugangsdaten/API-Störung).
+//
+// Es gibt KEIN Datenfeld im "user"-Modul, das direkt auf die Adress-ID verweist (kompletter
+// Feldkatalog live per resourcetype "fields" geprüft: Name, Rechte, online_seit, offline_seit,
+// email, Vorname, Nachname, Aktiv_bis, Kuerzel, Sprache, Anrede, Titel, Firma, Land, PLZ, Ort,
+// Strasse, Hausnummer, Telefon, Mobil, Fax, Url, Nr, meetingUrl, userCreationDate,
+// userDeactivatedDate, mailMode — kein "adrId" o.ä., anders als eine ältere, nur aus der
+// öffentlichen API-Doku abgeleitete Vermutung nahelegte). Die Verknüpfung läuft daher über die
+// geschäftliche E-Mail-Adresse: Sie ist im address-Datensatz (Betreuer.email, siehe
+// mapBetreuerRecord) UND im user-Datensatz gepflegt und live als eindeutiger Schlüssel
+// bestätigt (resourcetype "user" mit filter auf "email" lieferte für
+// "r.kolbe@parmaimmobilien.com" genau einen Treffer: Nr 23).
+//
+// Zweistufiger Abruf, weil "userphoto" die Nutzer-Nr (nicht die Adress-ID) als resourceid
+// braucht: 1) "user" nach E-Mail(s) filtern → liefert die Nr je E-Mail (= record.id, live
+// geprüft: identisch mit dem Feld "Nr" im elements-Objekt). 2) "userphoto" mit ALLEN Nrs auf
+// einmal aufrufen (photosAsLinks: true → direkte Bild-URL statt Base64, "Nr"-Filter akzeptiert
+// laut Live-Test ein Array über "op: in" und liefert dann mehrere Records in einem Aufruf
+// zurück — z.B. für [21, 23, 25, 119] kamen 3 Treffer zurück, der vierte hat einfach kein
+// Foto und fehlt in der Antwort). Beide Schritte sind daher bewusst BATCH-fähig (Liste von
+// E-Mails rein, Map E-Mail → Foto-URL raus) statt pro Person einzeln aufgerufen zu werden.
+//
+// Grund für den Umbau auf Batch (Juli 2026, nach dem ersten Live-Test in der laufenden
+// Kontaktperson-Seite): Bei EINZELABRUF pro Person (ladeAlleMitarbeiter ruft die Adressdaten
+// für alle ~9 Mitarbeiter parallel per Promise.all ab) hätte jede Person zusätzlich ihre
+// EIGENEN zwei Foto-Requests ausgelöst — macht in Summe ~30 gleichzeitige HMAC-signierte
+// Requests pro Seitenaufruf (Adressdaten + user + userphoto je Person). Live beobachtet: Das
+// führte zu einem intermittierenden Fehler (der Hauptbetreuer zeigte bei manchen, nicht allen,
+// Seitenaufrufen trotz vorhandenem Foto den Initialen-Avatar "RK" statt des echten Fotos —
+// reproduzierbar durch mehrfaches Neuladen derselben URL). callOnOfficeApi wirft bei einem
+// API-Fehler eine Exception, die von ladeBetreuerByAddressId einzeln abgefangen wird (siehe
+// dort) und dann einfach "kein Foto" statt eines sichtbaren Fehlers ergibt — die
+// Serverantwort selbst war dabei nachweislich korrekt (per curl/​Server-Fetch bestätigt), nur
+// unter der hohen Parallel-Last einzelner Requests offenbar nicht immer zuverlässig. Die
+// Batch-Variante reduziert die Foto-Anfragen für die gesamte Mitarbeiterliste auf zwei
+// Requests insgesamt (statt zwei pro Person) und behebt die Flakiness dadurch strukturell,
+// nicht nur per Retry.
+export async function ladeUserFotosByEmails(
+  emails: string[]
+): Promise<Record<string, string>> {
+  const eindeutigeEmails = [...new Set(emails)];
+  if (eindeutigeEmails.length === 0) return {};
+
+  const userResult = await callOnOfficeApi<RawUserRecord & { elements: { email?: string } }>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "user",
+      resourceid: "",
+      identifier: "",
+      cacheable: true,
+      parameters: {
+        data: ["Nr", "email"],
+        filter: { email: [{ op: "in", val: eindeutigeEmails }] },
+        listlimit: eindeutigeEmails.length,
+      },
+    },
+  ]);
+
+  const userRecords = userResult?.response?.results?.[0]?.data?.records || [];
+  if (userRecords.length === 0) return {};
+
+  // E-Mail ist im Feldkatalog nicht eindeutig groß-/kleinschreibungsnormiert bekannt — Vergleich
+  // daher bewusst über lowercase, um Groß-/Kleinschreibungsunterschiede zwischen Adress- und
+  // User-Datensatz (die theoretisch getrennt gepflegt werden) nicht als "kein Treffer" zu werten.
+  const emailByNr = new Map<number, string>();
+  for (const r of userRecords) {
+    const nr = Number(r.id);
+    const mail = r.elements?.email;
+    if (mail) emailByNr.set(nr, mail.toLowerCase());
+  }
+  const nrs = [...emailByNr.keys()];
+  if (nrs.length === 0) return {};
+
+  const photoResult = await callOnOfficeApi<RawUserPhotoRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "userphoto",
+      resourceid: "",
+      identifier: "",
+      cacheable: true,
+      parameters: {
+        photosAsLinks: true,
+        filter: { Nr: [{ op: "in", val: nrs }] },
+      },
+    },
+  ]);
+
+  const photoRecords = photoResult?.response?.results?.[0]?.data?.records || [];
+  const result: Record<string, string> = {};
+  for (const r of photoRecords) {
+    const mail = emailByNr.get(Number(r.id));
+    if (mail && r.elements?.photo) result[mail] = r.elements.photo;
+  }
+  return result;
+}
+
+// Einzelabruf-Variante für Aufrufer, die nur EINE Person laden (Objekt-Betreuer, siehe
+// ladeBetreuerByAddressId unten) — intern nur ein dünner Wrapper um die Batch-Funktion oben
+// mit einer Liste aus einer einzigen E-Mail.
+export async function ladeUserFotoByEmail(email: string): Promise<string | undefined> {
+  const fotos = await ladeUserFotosByEmails([email]);
+  return fotos[email.toLowerCase()];
+}
+
+// Lädt ausschließlich die Adress-/Kontaktdaten (OHNE Profilfoto) — extrahiert aus
+// ladeBetreuerByAddressId, damit ladeAlleMitarbeiter unten die Adressdaten aller Mitarbeiter
+// zunächst OHNE eigene Foto-Einzelabrufe laden und die Fotos anschließend in einem einzigen
+// Batch nachladen kann (siehe ladeUserFotosByEmails weiter oben für den Grund).
+async function ladeBetreuerAdressdaten(addressId: string): Promise<Betreuer | null> {
   const result = await callOnOfficeApi<RawBetreuerRecord>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
@@ -419,6 +544,23 @@ export async function ladeBetreuerByAddressId(addressId: string): Promise<Betreu
 
   const record = result?.response?.results?.[0]?.data?.records?.[0];
   return record ? mapBetreuerRecord(record) : null;
+}
+
+// Lädt EINEN Objekt-Betreuer inkl. Profilfoto (Einzelabruf-Fall, siehe ladeBetreuerByEstateId
+// unten). ACHTUNG: Wird die Hauptbetreuer-Karte GEMEINSAM mit der Mitarbeiterliste geladen (der
+// Normalfall auf der Präsentationsseite, siehe praesentation.ts), NICHT diese Funktion parallel
+// zu ladeAlleMitarbeiter aufrufen — siehe ladeBetreuerUndAlleMitarbeiter weiter unten und deren
+// Kommentar für den Grund (doppelter, gleichzeitiger user/userphoto-Request führte zu
+// intermittierend fehlendem Hauptbetreuer-Foto). Diese Einzelabruf-Variante bleibt für Aufrufer
+// erhalten, die WIRKLICH nur den Betreuer ohne die übrige Mitarbeiterliste benötigen.
+export async function ladeBetreuerByAddressId(addressId: string): Promise<Betreuer | null> {
+  const betreuer = await ladeBetreuerAdressdaten(addressId);
+  if (!betreuer) return null;
+
+  if (betreuer.email) {
+    betreuer.profilbildUrl = await ladeUserFotoByEmail(betreuer.email).catch(() => undefined);
+  }
+  return betreuer;
 }
 
 // Lädt den Objekt-Betreuer in einem Schritt: Relation auflösen, dann Adressdaten (inkl.
@@ -444,13 +586,19 @@ export async function ladeBetreuerByEstateId(estateId: string): Promise<Betreuer
 // privaten (Wohnanschrift, private Mobilnummer/E-Mail, vermutlich aus einem früheren Kunden-/
 // Interessentenkontakt). Hier ist ausschließlich die geschäftliche Adress-ID hinterlegt, damit
 // niemals private Wohnadressen oder private Kontaktdaten auf der öffentlichen
-// Präsentationsseite erscheinen. Für Celin Borgwaldt und Tim Hartwich existiert in OnOffice
-// gar keine verknüpfte Adresse — sie erscheinen im Slider daher nur mit Name/Rolle aus der
-// Wissensdatei, ohne Kontaktdaten. Christian Rother, Tabea Erz, Nilgün Akbay, Santino Giese
-// und Dawid Parma sind zwar als Benutzer in OnOffice angelegt, stehen aber (Stand Juli 2026)
-// nicht in der öffentlichen Team-Übersicht (TEAM) — sie werden hier bewusst nicht ergänzt,
-// zumal für Christian Rother in OnOffice ausschließlich ein privater Adressdatensatz
-// (Heimatanschrift, private E-Mail) vorliegt.
+// Präsentationsseite erscheinen.
+//
+// Stand Juli 2026, erneut live gegen den Account abgeglichen (resourcetype "user"/"address"):
+// Celin Borgwaldt wurde zum 30.06.2026 in OnOffice deaktiviert (Benutzerkonto nicht mehr aktiv)
+// und auf Nutzerwunsch komplett aus TEAM entfernt (siehe data/unternehmen.ts) — ihre frühere
+// Adress-ID ist daher hier absichtlich nicht mehr hinterlegt. Für Tim Hartwich existiert
+// entgegen einer früheren Prüfung inzwischen eine geschäftliche Adresse (ID 31313, kein
+// Profilfoto hinterlegt) — ergänzt. Dawid Parma wurde neu in TEAM aufgenommen (aktiver
+// OnOffice-Benutzer, Adress-ID 44851, ebenfalls kein Profilfoto hinterlegt). Christian Rother,
+// Tabea Erz, Nilgün Akbay und Santino Giese sind zwar als Benutzer in OnOffice angelegt, stehen
+// aber weiterhin nicht in der öffentlichen Team-Übersicht (TEAM) — Tabea Erz und Nilgün Akbay
+// sind zudem seit 2024 deaktivierte Alt-Accounts, für Christian Rother liegt in OnOffice
+// ausschließlich ein privater Adressdatensatz (Heimatanschrift, private E-Mail) vor.
 const MITARBEITER_LIVE_ADRESS_IDS: Record<string, string> = {
   "Daniel Parma": "119",
   "Robin Kolbe": "123",
@@ -461,6 +609,8 @@ const MITARBEITER_LIVE_ADRESS_IDS: Record<string, string> = {
   "Axel Wehmeier": "28831",
   "Sarah Barth": "31077",
   "Stanimira Georgieva": "32669",
+  "Tim Hartwich": "31313",
+  "Dawid Parma": "44851",
 };
 
 // Lädt alle Mitarbeiter der Agentur für den "weitere Mitarbeiter"-Slider auf der
@@ -471,7 +621,11 @@ const MITARBEITER_LIVE_ADRESS_IDS: Record<string, string> = {
 // aus OnOffice: "jobPosition" ist im Account für jede bisher geprüfte Person leer. Enthält auch
 // den Objekt-Betreuer (z.B. Robin Kolbe) — die Dublettenfilterung "Objekt-Betreuer ausschließen"
 // erfolgt beim Aufrufer anhand von Betreuer.id (siehe praesentation.ts), nicht hier.
-export async function ladeAlleMitarbeiter(): Promise<Betreuer[]> {
+//
+// Lädt nur die Adressdaten (OHNE Foto) — Hilfsfunktion für ladeBetreuerUndAlleMitarbeiter unten,
+// die den Foto-Abruf für Team UND Hauptbetreuer bewusst in einem einzigen gemeinsamen Batch
+// zusammenführt (siehe dortiger Kommentar für den Grund).
+async function ladeTeamAdressdaten(): Promise<Betreuer[]> {
   return Promise.all(
     TEAM.map(async (t) => {
       const teile = t.name.split(" ");
@@ -484,7 +638,7 @@ export async function ladeAlleMitarbeiter(): Promise<Betreuer[]> {
       const adressId = MITARBEITER_LIVE_ADRESS_IDS[t.name];
       if (!adressId) return basis;
 
-      const live = await ladeBetreuerByAddressId(adressId).catch(() => null);
+      const live = await ladeBetreuerAdressdaten(adressId).catch(() => null);
       if (!live) return basis;
 
       return {
@@ -500,4 +654,74 @@ export async function ladeAlleMitarbeiter(): Promise<Betreuer[]> {
       };
     })
   );
+}
+
+// Fotos werden bewusst in ZWEI Phasen geladen statt pro Person einzeln: Erst alle Adressdaten
+// parallel (wie zuvor), dann EIN gemeinsamer Foto-Batch-Abruf für alle dabei gefundenen
+// E-Mail-Adressen (siehe ladeUserFotosByEmails). Grund: Bei einem eigenen Foto-Einzelabruf pro
+// Person (~9 Personen × 2 Requests) trat unter der dadurch entstehenden Anfragen-Last
+// intermittierend ein Fehler auf (vereinzelt fehlendes Foto trotz vorhandenem Datensatz, siehe
+// Kommentar bei ladeUserFotosByEmails) — die gebündelte Variante braucht für die gesamte Liste
+// nur zwei zusätzliche Requests statt bis zu 18.
+export async function ladeAlleMitarbeiter(): Promise<Betreuer[]> {
+  const mitAdressdaten = await ladeTeamAdressdaten();
+
+  const emails = mitAdressdaten.map((m) => m.email).filter((e): e is string => !!e);
+  const fotosByEmail = await ladeUserFotosByEmails(emails).catch(() => ({}) as Record<string, string>);
+
+  return mitAdressdaten.map((m) =>
+    m.email && fotosByEmail[m.email.toLowerCase()]
+      ? { ...m, profilbildUrl: fotosByEmail[m.email.toLowerCase()] }
+      : m
+  );
+}
+
+// Kombinierter Abruf für Hauptbetreuer ("Ansprechpartner") + komplette Mitarbeiterliste in
+// EINEM Rutsch — ersetzt in praesentation.ts die bisherigen zwei UNABHÄNGIGEN, aber wegen
+// Promise.all GLEICHZEITIG laufenden Aufrufe (ladeBetreuerByAddressId für den Hauptkontakt,
+// ladeAlleMitarbeiter für die übrige Liste). Beide lösten INTERN jeweils einen eigenen
+// "user"+"userphoto"-Request aus, liefen also parallel gegen dieselben Resourcetypes.
+//
+// Live beobachtet (Juli 2026, Kundenmeldung "Bild des Ansprechpartners lädt nicht"): Genau
+// diese Art von Überlappung war bereits einmal Ursache der bei ladeUserFotosByEmails
+// dokumentierten Flakiness ("der Hauptbetreuer zeigte bei manchen, nicht allen, Seitenaufrufen
+// trotz vorhandenem Foto den Initialen-Avatar statt des echten Fotos") — der damalige Umbau auf
+// Batch reduzierte zwar ladeAlleMitarbeiters EIGENE Foto-Requests auf zwei, ließ aber
+// ladeBetreuerByAddressIds separaten Einzelabruf (eigener "user"+"userphoto"-Request pro
+// Seitenaufruf für die eine Betreuer-E-Mail) unangetastet — beide Batches liefen dadurch
+// weiterhin gleichzeitig. Diese Funktion vereint beide E-Mail-Listen VOR dem Foto-Abruf zu
+// einem einzigen ladeUserFotosByEmails-Aufruf, sodass pro Seitenaufruf nur noch genau EIN
+// "user"+"userphoto"-Requestpaar an OnOffice geht — strukturelle Behebung statt Retry.
+export async function ladeBetreuerUndAlleMitarbeiter(
+  betreuerAddressId: string | null
+): Promise<{ betreuer: Betreuer | null; alleMitarbeiter: Betreuer[] }> {
+  const [betreuerBasis, teamBasis] = await Promise.all([
+    betreuerAddressId
+      ? ladeBetreuerAdressdaten(betreuerAddressId).catch(() => null)
+      : Promise.resolve(null),
+    ladeTeamAdressdaten(),
+  ]);
+
+  const emails = [
+    ...(betreuerBasis?.email ? [betreuerBasis.email] : []),
+    ...teamBasis.map((m) => m.email).filter((e): e is string => !!e),
+  ];
+  const fotosByEmail = await ladeUserFotosByEmails(emails).catch(() => ({}) as Record<string, string>);
+
+  const betreuer = betreuerBasis
+    ? {
+        ...betreuerBasis,
+        profilbildUrl: betreuerBasis.email
+          ? fotosByEmail[betreuerBasis.email.toLowerCase()]
+          : undefined,
+      }
+    : null;
+
+  const alleMitarbeiter = teamBasis.map((m) =>
+    m.email && fotosByEmail[m.email.toLowerCase()]
+      ? { ...m, profilbildUrl: fotosByEmail[m.email.toLowerCase()] }
+      : m
+  );
+
+  return { betreuer, alleMitarbeiter };
 }

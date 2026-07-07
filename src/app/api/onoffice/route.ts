@@ -13,8 +13,14 @@ const MOCK_OBJEKTE = [MOCK_IMMOBILIE, ...MOCK_VERGLEICHSPOOL];
 // (objektnr_extern, siehe mapping.ts), damit Berater/innen ein Objekt auch anhand der ihnen
 // bekannten Objektnummer statt nur über Titel/Ort finden können. Gilt identisch für Live- und
 // Mock-Daten, damit sich die Suche in beiden Modi gleich verhält.
+//
+// "strasse" war hier ursprünglich nicht enthalten — dadurch fand die Suche ein Objekt nicht,
+// wenn jemand ausschließlich den Straßennamen eintippte (z.B. "Rölsdorfer Feld" statt eines
+// Teils des Objekttitels/Orts/PLZ/ImmoNr), obwohl der Straßenname im Datensatz vorhanden ist
+// (siehe Immobilie.strasse, aus dem OnOffice-Feld "strasse", mapping.ts). Ergänzt, damit die
+// Suche auch reine Adress-/Straßeneingaben findet.
 function treffer(immobilie: Immobilie, suchbegriff: string): boolean {
-  return [immobilie.bezeichnung, immobilie.ort, immobilie.plz, immobilie.immoNr]
+  return [immobilie.bezeichnung, immobilie.ort, immobilie.plz, immobilie.strasse, immobilie.immoNr]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()

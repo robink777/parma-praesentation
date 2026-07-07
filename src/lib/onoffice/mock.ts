@@ -32,10 +32,11 @@ export const MOCK_BETREUER: Betreuer = {
 // Telefon/E-Mail live gegen den echten OnOffice-Account geprüft (Juli 2026, siehe
 // ladeAlleMitarbeiter in estate.ts für dieselbe Zuordnung im Live-Betrieb) — bewusst nur die
 // geschäftliche Adresse/Rufnummer (Firmensitz Monschauer Straße 64), keine privaten
-// Zweitdatensätze. Für Celin Borgwaldt und Tim Hartwich existiert in OnOffice keine
-// verknüpfte Adresse, für Daniel Parma und Sarah Barth ist auf dem geschäftlichen Datensatz
-// keine Telefonnummer hinterlegt — für sie bleibt telefon/email entsprechend unvollständig,
-// statt Daten zu erfinden.
+// Zweitdatensätze. Für Tim Hartwich existiert auf dem geschäftlichen Datensatz keine
+// Telefonnummer, für Daniel Parma, Sarah Barth und Dawid Parma ebenso wenig — für sie bleibt
+// telefon/email entsprechend unvollständig, statt Daten zu erfinden. Celin Borgwaldt wurde
+// (Stand Juli 2026, laut OnOffice zum 30.06.2026 deaktiviert) aus TEAM entfernt und taucht
+// hier daher nicht mehr auf.
 const WEITERE_MITARBEITER_KONTAKT: Record<string, { telefon?: string; email?: string }> = {
   "Daniel Parma": { email: "d.parma@parmaimmobilien.com" },
   "Kira Woldt": { telefon: "0151 61033905", email: "k.woldt@parmaimmobilien.com" },
@@ -45,6 +46,7 @@ const WEITERE_MITARBEITER_KONTAKT: Record<string, { telefon?: string; email?: st
   "Stanimira Georgieva": { telefon: "02421 9748688", email: "s.georgieva@parmaimmobilien.com" },
   "Katharina Becker": { telefon: "02421 9748688", email: "k.becker@parmaimmobilien.com" },
   "Axel Wehmeier": { telefon: "0151 61837063", email: "a.wehmeier@parmaimmobilien.com" },
+  "Dawid Parma": { email: "da.parma@parmaimmobilien.com" },
 };
 
 // "Weitere Mitarbeiter"-Slider auf der Kontaktperson-Seite: nutzt dieselbe Team-Quelle wie die
@@ -64,6 +66,12 @@ export const MOCK_WEITERE_MITARBEITER: Betreuer[] = TEAM.filter((t) => t.name !=
     };
   }
 );
+
+// Ungefilterte Team-Liste (alle elf Personen inkl. Robin Kolbe) für den "Über uns"-Reiter
+// (siehe Unternehmen.tsx und Praesentation.alleMitarbeiter) — dort soll anders als im
+// "weitere Mitarbeiter"-Slider auf der Kontaktperson-Seite bewusst niemand aus der
+// Team-Übersicht herausgefiltert werden.
+export const MOCK_ALLE_MITARBEITER: Betreuer[] = [MOCK_BETREUER, ...MOCK_WEITERE_MITARBEITER];
 
 export const MOCK_IMMOBILIE: Immobilie = {
   id: "demo-1001",

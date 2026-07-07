@@ -2,9 +2,8 @@ import { Praesentation } from "@/types";
 import { ONOFFICE_MODE } from "./onoffice/config";
 import {
   istUuid,
-  ladeAlleMitarbeiter,
   ladeBetreuerAddressId,
-  ladeBetreuerByAddressId,
+  ladeBetreuerUndAlleMitarbeiter,
   ladeEigentuemerAddressId,
   ladeEstateIdByUuid,
   ladeImmobilieById,
@@ -13,6 +12,7 @@ import {
   ladePriceHubbleWerte,
 } from "./onoffice/estate";
 import {
+  MOCK_ALLE_MITARBEITER,
   MOCK_BETREUER,
   MOCK_BEWERTUNG,
   MOCK_DOKUMENTE,
@@ -46,6 +46,9 @@ export interface PraesentationsParams {
  * Zusätzlich werden alle übrigen Mitarbeiter-Adressen der Agentur geladen (objektunabhängig,
  * für den "weitere Mitarbeiter"-Slider auf der Kontaktperson-Seite) und um den Objekt-Betreuer
  * bereinigt; schlägt das fehl oder bleibt die Liste leer, wird MOCK_WEITERE_MITARBEITER verwendet.
+ * Die ungefilterte Variante (inkl. Objekt-Betreuer) steht zusätzlich als alleMitarbeiter für den
+ * Team-Bereich im "Über uns"-Reiter zur Verfügung (siehe Unternehmen.tsx), dort samt echter
+ * Profilfotos statt des bisherigen generischen Icons.
  * Die intern in OnOffice am Objekt hinterlegten Dokumente (Reiter "Dokumente") werden ebenfalls
  * live geladen; anders als bei den übrigen Feldern wird eine leere Liste hier NICHT durch
  * Demo-Dokumente ersetzt, da "keine Dokumente hinterlegt" ein gültiger echter Zustand ist.
@@ -67,14 +70,22 @@ export async function ladePraesentationsDaten(
         params.addressId || (await ladeEigentuemerAddressId(estateId).catch(() => null));
       const betreuerAddressId = await ladeBetreuerAddressId(estateId).catch(() => null);
 
-      const [immobilie, kunde, betreuer, alleMitarbeiter, dokumente, priceHubbleWerte] = await Promise.all([
+      const [immobilie, kunde, betreuerUndMitarbeiter, dokumente, priceHubbleWerte] = await Promise.all([
         ladeImmobilieById(estateId),
         addressId ? ladeKundeByAddressId(addressId) : Promise.resolve(null),
-        betreuerAddressId ? ladeBetreuerByAddressId(betreuerAddressId).catch(() => null) : Promise.resolve(null),
-        ladeAlleMitarbeiter().catch(() => []),
+        // Betreuer (Hauptkontakt) und komplette Mitarbeiterliste bewusst in EINEM gemeinsamen
+        // Aufruf statt zwei parallelen (siehe ladeBetreuerUndAlleMitarbeiter in estate.ts) —
+        // zwei unabhängige, aber durch dieses Promise.all gleichzeitig laufende Foto-Batches
+        // waren die Ursache dafür, dass das Profilbild des Hauptbetreuers intermittierend nicht
+        // lud.
+        ladeBetreuerUndAlleMitarbeiter(betreuerAddressId).catch(() => ({
+          betreuer: null,
+          alleMitarbeiter: [],
+        })),
         ladeObjektDokumente(estateId).catch(() => []),
         ladePriceHubbleWerte(estateId).catch(() => null),
       ]);
+      const { betreuer, alleMitarbeiter } = betreuerUndMitarbeiter;
 
       // Objekt-Betreuer aus der "weitere Mitarbeiter"-Liste ausschließen (Dubletten-Schutz) —
       // er wird bereits separat oben als Hauptkontakt angezeigt.
@@ -94,6 +105,9 @@ export async function ladePraesentationsDaten(
           bewertung: { ...MOCK_BEWERTUNG, ...priceHubbleWerte },
           betreuer: betreuer || MOCK_BETREUER,
           weitereMitarbeiter: weitereMitarbeiter.length > 0 ? weitereMitarbeiter : MOCK_WEITERE_MITARBEITER,
+          // Ungefiltert (inkl. Objekt-Betreuer) für den Team-Bereich im "Über uns"-Reiter, siehe
+          // Praesentation.alleMitarbeiter und Unternehmen.tsx.
+          alleMitarbeiter: alleMitarbeiter.length > 0 ? alleMitarbeiter : MOCK_ALLE_MITARBEITER,
           // Bewusst KEIN Fallback auf MOCK_DOKUMENTE bei leerer Liste (anders als z.B. bei
           // weitereMitarbeiter oben): Ein Objekt ohne hinterlegte Dokumente ist ein gültiger,
           // echter Zustand (live gegen den Account geprüft, Juli 2026 — nicht jedes Objekt hat
@@ -114,6 +128,7 @@ export async function ladePraesentationsDaten(
     bewertung: MOCK_BEWERTUNG,
     betreuer: MOCK_BETREUER,
     weitereMitarbeiter: MOCK_WEITERE_MITARBEITER,
+    alleMitarbeiter: MOCK_ALLE_MITARBEITER,
     dokumente: MOCK_DOKUMENTE,
     quelle: "mock",
   };

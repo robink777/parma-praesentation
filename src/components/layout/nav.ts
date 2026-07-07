@@ -12,10 +12,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "unternehmen", label: "Über uns", icon: "building" },
   { id: "objekt", label: "Objektdaten", icon: "house" },
   { id: "deepimmo", label: "DeepImmo", icon: "externalLink" },
-  { id: "bewertung", label: "Bewertung", icon: "scale" },
   { id: "dokumente", label: "Dokumente", icon: "document" },
   { id: "vergleich", label: "Vergleichswert", icon: "compare" },
-  { id: "finanzierung", label: "Finanzierung", icon: "calculator" },
   { id: "leistungsversprechen", label: "Leistungsversprechen", icon: "check" },
   { id: "maklervertrag", label: "Maklervertrag", icon: "document" },
 ];

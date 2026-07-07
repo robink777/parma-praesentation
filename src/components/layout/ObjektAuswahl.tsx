@@ -192,7 +192,7 @@ export function ObjektAuswahl() {
               value={suche}
               onChange={(e) => setSuche(e.target.value)}
               onFocus={handleFokus}
-              placeholder="Immobilie suchen (Titel, ImmoNr, Ort, PLZ) …"
+              placeholder="Immobilie suchen (Titel, ImmoNr, Ort, PLZ, Straße) …"
               className="w-full rounded-md border-2 border-asche bg-reinweiss py-sm pl-[48px] pr-sm text-body text-anthrazit outline-none transition-colors placeholder:text-anthrazit/40 focus:border-messing"
               autoFocus
             />

@@ -190,62 +190,6 @@ export interface WertermittlungsDaten {
   haftungsausschluss: string;
 }
 
-export interface FinanzierungsDaten {
-  kaufpreis: number;
-  eigenkapital: number;
-  zinssatz: number;
-  laufzeitJahre: number;
-  tilgungProzent: number;
-  bundesland: string;
-  mitMakler: boolean;
-  maklerProzent: number;
-}
-
-export interface Nebenkosten {
-  grunderwerbsteuer: number;
-  notarkosten: number;
-  grundbucheintrag: number;
-  maklercourtage: number;
-  gesamt: number;
-}
-
-export interface FinanzierungsErgebnis {
-  darlehensbetrag: number;
-  monatlicheRate: number;
-  jaehrlicheRate: number;
-  gesamtkosten: number;
-  gesamtzinsen: number;
-  nebenkosten: Nebenkosten;
-  eigenkapitalanteilProzent: number;
-  tilgungsplan: TilgungsplanZeile[];
-}
-
-export interface TilgungsplanZeile {
-  jahr: number;
-  restschuld: number;
-  tilgung: number;
-  zinsen: number;
-  rate: number;
-}
-
-export type Bundesland =
-  | "Baden-Württemberg"
-  | "Bayern"
-  | "Berlin"
-  | "Brandenburg"
-  | "Bremen"
-  | "Hamburg"
-  | "Hessen"
-  | "Mecklenburg-Vorpommern"
-  | "Niedersachsen"
-  | "Nordrhein-Westfalen"
-  | "Rheinland-Pfalz"
-  | "Saarland"
-  | "Sachsen"
-  | "Sachsen-Anhalt"
-  | "Schleswig-Holstein"
-  | "Thüringen";
-
 export interface TeamMitglied {
   name: string;
   rolle: string;
@@ -345,6 +289,12 @@ export interface Praesentation {
   // auf der Kontaktperson-Seite). Enthält nicht den Objekt-Betreuer (bereits oben separat
   // angezeigt) — Dublettenfilterung erfolgt anhand von Betreuer.id.
   weitereMitarbeiter: Betreuer[];
+  // Ungefilterte Liste ALLER Mitarbeiter der Agentur (inkl. Objekt-Betreuer), objektunabhängig —
+  // wird für den Team-Bereich im "Über uns"-Reiter benötigt (siehe Unternehmen.tsx), der anders
+  // als der "weitere Mitarbeiter"-Slider auf der Kontaktperson-Seite bewusst alle elf Personen
+  // zeigen soll. Dient dort ausschließlich dazu, echte Profilfotos (profilbildUrl) per
+  // Namensabgleich an die statische TEAM-Liste (data/unternehmen.ts) anzureichern.
+  alleMitarbeiter: Betreuer[];
   // Interne Dokumente des Objekts (siehe "Dokumente"-Reiter, Dokumente.tsx). Im Live-Betrieb
   // bewusst NICHT auf Demo-Daten zurückgefallen, wenn die Liste leer ist — ein Objekt ohne
   // hinterlegte Dokumente ist ein gültiger, echter Zustand und soll in einer echten

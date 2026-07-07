@@ -8,10 +8,8 @@ import { Kontaktperson } from "@/components/sections/Kontaktperson";
 import { Unternehmen } from "@/components/sections/Unternehmen";
 import { Objektdaten } from "@/components/sections/Objektdaten";
 import { DeepImmo } from "@/components/sections/DeepImmo";
-import { Bewertung } from "@/components/sections/Bewertung";
 import { Dokumente } from "@/components/sections/Dokumente";
 import { Vergleichswert } from "@/components/sections/Vergleichswert";
-import { Finanzierung } from "@/components/sections/Finanzierung";
 import { Leistungsversprechen } from "@/components/sections/Leistungsversprechen";
 import { Maklervertrag } from "@/components/sections/Maklervertrag";
 
@@ -38,15 +36,13 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         {activeId === "kontaktperson" && (
           <Kontaktperson betreuer={daten.betreuer} weitereMitarbeiter={daten.weitereMitarbeiter} />
         )}
-        {activeId === "unternehmen" && <Unternehmen />}
+        {activeId === "unternehmen" && <Unternehmen alleMitarbeiter={daten.alleMitarbeiter} />}
         {activeId === "objekt" && <Objektdaten immobilie={daten.immobilie} />}
         {activeId === "deepimmo" && <DeepImmo immobilie={daten.immobilie} />}
-        {activeId === "bewertung" && <Bewertung bewertung={daten.bewertung} />}
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
         {activeId === "vergleich" && (
           <Vergleichswert referenzobjekte={referenzobjekte} onReferenzobjektAendern={referenzobjektAendern} />
         )}
-        {activeId === "finanzierung" && <Finanzierung immobilie={daten.immobilie} />}
         {activeId === "leistungsversprechen" && (
           <Leistungsversprechen gewaehltesPaket={gewaehltesPaket} onWaehlePaket={setGewaehltesPaket} />
         )}
