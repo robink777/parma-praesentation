@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
 import { PropertyImage } from "@/components/PropertyImage";
+import { ParmaLoader } from "@/components/ParmaLoader";
 import { Immobilie } from "@/types";
 import { formatiereBetrag } from "@/lib/berechnung";
 
@@ -214,29 +215,48 @@ function ReferenzobjektSlot({
   );
 }
 
-// Manuelle Referenzobjekt-Auswahl statt automatischer Ähnlichkeits-Suche: Der Berater/die
-// Beraterin wählt live im Kundengespräch bis zu drei tatsächlich verkaufte Vergleichsobjekte
-// aus dem echten OnOffice-Bestand aus (Suchmaske gefiltert auf status2=verkauft, siehe
-// /api/onoffice/route.ts) — die vorherige automatische Ähnlichkeits-Bewertung gegen einen
+// Referenzobjekt-Auswahl: Der Berater/die Beraterin wählt bis zu drei tatsächlich verkaufte
+// Vergleichsobjekte aus dem echten OnOffice-Bestand aus (Suchmaske gefiltert auf status2=verkauft,
+// siehe /api/onoffice/route.ts). Eine frühere automatische Ähnlichkeits-Bewertung gegen einen
 // festen Demo-Objektpool lieferte keine zum jeweiligen Kundenobjekt passenden Treffer und wurde
-// deshalb komplett ersetzt (Juli 2026). Die Auswahl liegt (wie gewaehltesPaket) in
-// PraesentationApp.tsx, damit sie beim Wechsel zwischen Reitern erhalten bleibt.
+// deshalb komplett ersetzt (Juli 2026) — die Auswahl war seitdem rein manuell.
+// Seit Juli 2026 gibt es zusätzlich wieder eine automatische VORAUSWAHL (siehe
+// lib/vergleichswert.ts, waehleVorauswahl, aufgerufen aus PraesentationApp.tsx): Sie arbeitet
+// diesmal gegen den echten verkauften Bestand statt eines Demo-Pools und nutzt eine explizit
+// vorgegebene, kaskadierende Filterlogik (PLZ exakt → Wohnfläche/Baujahr/Kaufpreis mit Toleranz)
+// statt eines pauschalen Ähnlichkeits-Scores. Sie befüllt nur den leeren Ausgangszustand — die
+// hier implementierte manuelle Suche bleibt unverändert vollständig erhalten, jede Auswahl (ob
+// automatisch vorbefüllt oder manuell gewählt) ist jederzeit anpassbar und austauschbar. Die
+// Auswahl liegt (wie gewaehltesPaket) in PraesentationApp.tsx, damit sie beim Wechsel zwischen
+// Reitern erhalten bleibt.
 export function Vergleichswert({
   referenzobjekte,
   onReferenzobjektAendern,
+  vorauswahlLaedt,
 }: {
   referenzobjekte: (Immobilie | null)[];
   onReferenzobjektAendern: (index: number, objekt: Immobilie | null) => void;
+  // Läuft der automatische Vorauswahl-Abruf (siehe PraesentationApp.tsx) noch? Solange das der
+  // Fall ist UND noch kein Objekt gewählt ist, wird unten ein kleiner Ladezustand (ParmaLoader,
+  // kompakte Größe) statt der leeren Suchmasken gezeigt — vorher gab es hier gar keine visuelle
+  // Rückmeldung, dass im Hintergrund noch etwas lädt.
+  vorauswahlLaedt: boolean;
 }) {
   const ausgewaehlt = referenzobjekte.filter((o): o is Immobilie => o !== null);
   const mittelwerte = ausgewaehlt.length > 0 ? berechneMittelwerte(ausgewaehlt) : null;
   const ausgewaehlteIds = ausgewaehlt.map((o) => o.id);
+  // Sobald der Nutzer manuell etwas auswählt (auch während der Vorauswahl-Abruf noch läuft),
+  // sofort die normale Slot-Ansicht zeigen statt weiter den Ladeplatzhalter — die manuelle
+  // Auswahl soll nie hinter dem Ladezustand verschwinden.
+  const zeigeLadeplatzhalter = vorauswahlLaedt && ausgewaehlt.length === 0;
 
   return (
     <SectionShell label="Marktvergleich" title="Vergleichbare, verkaufte Objekte">
       <p className="mb-lg max-w-[65ch] text-body text-anthrazit/80">
-        Wählen Sie bis zu drei bereits verkaufte Objekte aus dem Bestand als Referenz — die
-        Suchmaske zeigt ausschließlich abgeschlossene Verkäufe, keine aktuell angebotenen Objekte.
+        Wir haben bereits bis zu drei passende, tatsächlich verkaufte Objekte vorausgewählt (nach
+        PLZ, Wohnfläche, Baujahr und Kaufpreis) — Sie können die Auswahl jederzeit anpassen oder
+        gegen ein anderes Objekt aus dem Bestand austauschen. Die Suchmaske zeigt ausschließlich
+        abgeschlossene Verkäufe, keine aktuell angebotenen Objekte.
       </p>
 
       {mittelwerte && (
@@ -269,17 +289,23 @@ export function Vergleichswert({
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-sm md:grid-cols-3">
-        {[0, 1, 2].map((index) => (
-          <ReferenzobjektSlot
-            key={index}
-            objekt={referenzobjekte[index]}
-            ausgeschlosseneIds={ausgewaehlteIds}
-            onAuswaehlen={(objekt) => onReferenzobjektAendern(index, objekt)}
-            onEntfernen={() => onReferenzobjektAendern(index, null)}
-          />
-        ))}
-      </div>
+      {zeigeLadeplatzhalter ? (
+        <Card className="flex min-h-[220px] flex-col items-center justify-center gap-sm border-2 border-dashed border-asche bg-transparent">
+          <ParmaLoader label="Vergleichsobjekte werden geladen" size={72} />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-sm md:grid-cols-3">
+          {[0, 1, 2].map((index) => (
+            <ReferenzobjektSlot
+              key={index}
+              objekt={referenzobjekte[index]}
+              ausgeschlosseneIds={ausgewaehlteIds}
+              onAuswaehlen={(objekt) => onReferenzobjektAendern(index, objekt)}
+              onEntfernen={() => onReferenzobjektAendern(index, null)}
+            />
+          ))}
+        </div>
+      )}
     </SectionShell>
   );
 }

@@ -1,4 +1,4 @@
-import { Betreuer, Bewertung, Immobilie, Kunde, ObjektDokument } from "@/types";
+import { Betreuer, Bewertung, Immobilie, Interessent, Kunde, ObjektDokument } from "@/types";
 import { MOCK_WERTERMITTLUNG } from "@/data/wertermittlung";
 import { TEAM } from "@/data/unternehmen";
 
@@ -84,10 +84,14 @@ export const MOCK_IMMOBILIE: Immobilie = {
   ort: "Düren",
   plz: "52355",
   strasse: "Am Rölsdorfer Feld 12",
+  hausnummer: "12",
   objektart: "Einfamilienhaus",
+  objekttyp: "Einfamilienhaus",
   baujahr: 1998,
   zustand: "gepflegt",
   energieklasse: "C",
+  heizungsart: ["Zentralheizung"],
+  befeuerung: ["Gas"],
   modernisierungen: ["Bad 2016 saniert", "Fenster 2019 erneuert", "Heizung 2021 modernisiert"],
   objektbeschreibung:
     "Fünf Zimmer, 145 m², ruhige Wohnlage am Ortsrand. Boden gepflegt, Bad 2016 saniert.",
@@ -136,6 +140,20 @@ export const MOCK_DOKUMENTE: ObjektDokument[] = [
     url: "/dokumente/bewertung-demo-1001.pdf",
   },
 ];
+
+// Demo-Datensatz für den "Automatisch zugeordnete Interessenten"-Block im Objektdaten-Reiter
+// (siehe Objektdaten.tsx, ladeAutomatischeInteressenten in estate.ts) — fiktive, aber plausible
+// Kundennummern/Wohnorte/Kontaktarten/Übereinstimmungswerte, damit der Demo-Modus den Block
+// nicht leer zeigt. Bereits absteigend sortiert und auf 80–100% begrenzt, wie im Live-Betrieb.
+export const MOCK_AUTOMATISCHE_INTERESSENTEN: { liste: Interessent[]; gesamtAnzahl: number } = {
+  liste: [
+    { id: "demo-int-1", uebereinstimmung: 100, kdNr: 18452, ort: "Düren", kontaktart: ["Interessent Kauf Wohnen"] },
+    { id: "demo-int-2", uebereinstimmung: 93, kdNr: 19023, ort: "Kreuzau", kontaktart: ["Kapitalanleger"] },
+    { id: "demo-int-3", uebereinstimmung: 87, kdNr: 20114, ort: "Jülich", kontaktart: ["Interessent Kauf Wohnen"] },
+    { id: "demo-int-4", uebereinstimmung: 82, kdNr: 20387, ort: "Düren", kontaktart: ["Interessent"] },
+  ],
+  gesamtAnzahl: 11,
+};
 
 export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
   {
@@ -235,3 +253,12 @@ export const MOCK_VERGLEICHSPOOL: Immobilie[] = [
     modernisierungen: ["Heizung 2017 modernisiert"],
   },
 ];
+
+// Demo-Werte für die live abgerufenen Unternehmenskennzahlen im "Über uns"-Reiter (siehe
+// Praesentation.unternehmenKennzahlen, Unternehmen.tsx) — bewusst fiktive, runde Zahlen statt der
+// echten Live-Werte (234 verkaufte Objekte / KdNr 22286, Stand Juli 2026), damit im Demo-Modus
+// klar erkennbar bleibt, dass es sich nicht um echte Kontostände handelt.
+export const MOCK_UNTERNEHMEN_KENNZAHLEN = {
+  verkaufteObjekte: 200,
+  kundenNummer: 20000,
+};

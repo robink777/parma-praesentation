@@ -12,12 +12,33 @@ export interface Immobilie {
   ort?: string;
   plz?: string;
   strasse?: string;
+  // Hausnummer als eigenes OnOffice-Feld (getrennt von strasse) — Live-Feldkatalog geprüft,
+  // Juli 2026. Wird für die Adress-Anzeige unter Objektdaten benötigt (siehe Objektdaten.tsx,
+  // formatAdresse), die statt des Objekttitels nun die vollständige Anschrift als Seitentitel
+  // zeigt.
+  hausnummer?: string;
   bildUrl?: string;
   bilder?: string[];
   objektart?: string;
+  // Feingranularerer Objekttyp (z.B. "Einfamilienhaus", "Doppelhaushälfte", "Eigentumswohnung")
+  // — ergänzend zu objektart (grobe Kategorie wie "Haus"/"Wohnung"). OnOffice-Feld "objekttyp",
+  // Singleselect mit ~130 möglichen Werten (Live-Feldkatalog geprüft, Juli 2026) — die
+  // Klartext-Zuordnung roher Schlüssel (z.B. "hausbau_einfamilienhaus") zu Anzeigetext erfolgt
+  // in mapping.ts (OBJEKTTYP_LABELS).
+  objekttyp?: string;
   baujahr?: number;
   zustand?: string;
   energieklasse?: string;
+  // Heizungsart(en) des Objekts — OnOffice-Feld "heizungsart", Multiselect (Live-Feldkatalog
+  // geprüft, Juli 2026). Anders als das Multiselect-Feld ArtDaten im address-Modul liefert die
+  // onOffice-API dieses Feld bereits als JSON-Array roher Schlüssel (z.B. ["zentral"]), nicht
+  // als pipe-getrennten String — siehe mapEstateRecord in mapping.ts. Klartext-Zuordnung über
+  // HEIZUNGSART_LABELS.
+  heizungsart?: string[];
+  // Befeuerungsart(en) (z.B. Gas, Öl, Erdwärme) — OnOffice-Feld "befeuerung", Multiselect,
+  // gleiches Datenformat wie heizungsart (JSON-Array roher Schlüssel). Klartext-Zuordnung über
+  // BEFEUERUNG_LABELS.
+  befeuerung?: string[];
   modernisierungen?: string[];
   objektbeschreibung?: string;
   lat?: number;
@@ -34,6 +55,26 @@ export interface Immobilie {
   // OnOffice gepflegt und bleibt bis dahin leer — die UI zeigt in diesem Fall einen
   // Leerzustand statt eines Links.
   deepImmoLink?: string;
+}
+
+// Ein automatisch über das OnOffice-Immo-Matching einem Objekt zugeordneter Interessent
+// (siehe ladeAutomatischeInteressenten in onoffice/estate.ts). Bewusst NUR diese vier Felder
+// (Übereinstimmung, Kundennummer, Wohnort, Kontaktart) — auf ausdrücklichen Nutzerwunsch
+// (Juli 2026) KEIN Name/E-Mail/Telefon, da es sich um Drittdaten (fremde Interessenten, keine
+// Vertragspartei der aktuellen Präsentation) handelt, die nicht in voller Detailtiefe vor dem
+// Kunden/Verkäufer offengelegt werden sollen.
+export interface Interessent {
+  id: string;
+  // Prozentuale Übereinstimmung des Interessenten-Suchprofils mit dem Objekt — dieselbe
+  // Kennzahl, die OnOffice im Backend unter Objekt → Interessenten → "Automatisch zugeordnet"
+  // als "Übereinstimmung" anzeigt (siehe ladeAutomatischeInteressenten, resourcetype
+  // "qualifiedsuitors" — OnOffice übernimmt die Berechnung vollständig, es wird KEIN eigener
+  // Abgleichs-/Gewichtungsalgorithmus im Code nachgebaut, auf ausdrücklichen Nutzerwunsch
+  // Juli 2026).
+  uebereinstimmung: number;
+  kdNr?: number;
+  ort?: string;
+  kontaktart?: string[];
 }
 
 export interface Kunde {
@@ -196,11 +237,81 @@ export interface TeamMitglied {
   standort?: string;
 }
 
+// Auslastungskennzahlen einer Person aus der TEAM-Liste (data/unternehmen.ts) für die
+// Mitarbeiterstatistik im Admin-Bereich (siehe app/admin/page.tsx,
+// components/admin/Mitarbeiterstatistik.tsx) — Entscheidungsgrundlage dafür, wer ein Objekt nach
+// der Akquise (Bewertungspräsentation) übernimmt. Fünf Parameter, siehe Chat-Vorgabe:
+//   1. aktiveObjekte        — Objekte mit Status 1 = Aktiv, absoluter Snapshot (kein Zeitfenster).
+//   2. objekteInAufarbeitung — Objekte mit Status 1 = Inaktiv UND Status 2 = Vorbereitung,
+//                              ebenfalls absoluter Snapshot.
+//   3/4. termine*/besichtigungen* — jeweils zwei Werte (letzte 30 Tage UND laufendes
+//        Kalenderjahr), da Termine/Besichtigungen Ereignisse über einen Zeitraum sind, kein
+//        Snapshot.
+//   5. kundenAktiv          — Kunden mit Adressstatus = Aktiv (Status2Adr), Snapshot; die genaue
+//                             30-Tage-/Jahres-Interpretation dieses Parameters ist noch offen
+//                             (siehe Chat) und wird erst beim Bauen dieses Parameters geklärt.
+// Alle Felder `number | null` statt `number` — null bedeutet "noch nicht geladen/kein Live-Abruf
+// erfolgt" (siehe Platzhalter-Darstellung in Mitarbeiterstatistik.tsx), analog zum bestehenden
+// Muster bei unternehmenKennzahlen (siehe Praesentation weiter unten). Diese Kennzahlen selbst
+// werden erst in den nächsten Schritten einzeln implementiert (siehe Chat, "eins nach dem
+// anderen") — der Typ hier steckt bereits die volle, abgestimmte Form ab, damit die
+// Tabellen-Skeleton-Komponente von Anfang an die richtige Form hat.
+export interface MitarbeiterKennzahlen {
+  aktiveObjekte: number | null;
+  objekteInAufarbeitung: number | null;
+  termine30Tage: number | null;
+  termineJahr: number | null;
+  besichtigungen30Tage: number | null;
+  besichtigungenJahr: number | null;
+  kundenAktiv: number | null;
+}
+
+// Einzelnes Objekt in der aufklappbaren Objektliste je Mitarbeiter (Admin-Bereich, siehe
+// Mitarbeiterstatistik.tsx / api/admin/mitarbeiter-objekte) — bewusst ein schlanker Auszug statt
+// des vollen Immobilie-Typs (siehe onoffice/mapping.ts), da hier ggf. mehrere Dutzend Objekte auf
+// einmal geladen und angezeigt werden. Zeigt laut Chat-Vorgabe je Objekt: Titelbild, Objektnummer,
+// Preis, Vermarktungsdauer. "titel" wird NICHT als eigene Spalte angezeigt, bleibt aber als
+// Alt-Text fürs Titelbild und für Screenreader-Labels erhalten (kostet keinen zusätzlichen Abruf,
+// da objekttitel ohnehin mitgeladen wird).
+export interface MitarbeiterObjekt {
+  id: string;
+  titel: string;
+  objektnr: string;
+  preis: number;
+  // Tage seit Auftragsbeginn (Feld "auftragvon", siehe estate.ts) — null, wenn kein
+  // Auftragsdatum hinterlegt ist (OnOffice liefert dafür "0000-00-00" statt eines echten Datums).
+  vermarktungsdauerTage: number | null;
+  // URL des Titelbilds (siehe ladeTitelbilder in estate.ts) — null, wenn kein Bild hinterlegt ist.
+  titelbildUrl: string | null;
+}
+
+// Unternehmensweite Summen über ALLE Mitarbeiter hinweg (nicht je Person), für die vier
+// Infoboxen über der Mitarbeitertabelle (siehe Mitarbeiterstatistik.tsx, Chat-Vorgabe). Bewusst
+// ein eigener, schlanker Typ statt einer Erweiterung von MitarbeiterKennzahlen — hier geht es um
+// EINE einzige Gesamtsumme für den ganzen Bestand, nicht um Werte je Mitarbeiter. Ø-Vermarktungsdauer
+// und Objektvolumen werden über BEIDE Gruppen (aktive Vermarktung UND Aufarbeitung) zusammen
+// berechnet (siehe ladeObjektGesamtKennzahlen in onoffice/mitarbeiterstatistik.ts) — anders als
+// die getrennt ausgewiesenen Zähler aufarbeitungGesamt/aktivGesamt, die bewusst pro Gruppe bleiben,
+// analog zu den bereits getrennten Spalten "Aktive Objekte"/"Aufarbeitung" in der Tabelle.
+export interface ObjektGesamtKennzahlen {
+  aufarbeitungGesamt: number | null;
+  aktivGesamt: number | null;
+  // null, wenn kein Objekt im gesamten Bestand ein auswertbares Auftragsdatum hat.
+  durchschnittVermarktungsdauerTage: number | null;
+  objektvolumenGesamt: number | null;
+}
+
 export interface Standort {
   name: string;
   adresse?: string;
   telefon?: string;
   email?: string;
+  // Nur beim Hauptstandort gesetzt (Juli 2026, Nutzerwunsch) — steuert in Unternehmen.tsx die
+  // groß hervorgehobene Darstellung mit Bilder-Galerie statt der kompakten Karte.
+  hauptstandort?: boolean;
+  // Lokale Fotos unter public/standorte/ (nur beim Hauptstandort befüllt, siehe oben) — Pfade
+  // sind root-relativ für next/image, z.B. "/standorte/dueren-1.jpg".
+  bilder?: string[];
 }
 
 export interface Kennzahl {
@@ -285,6 +396,11 @@ export interface Praesentation {
   immobilie: Immobilie;
   bewertung: Bewertung;
   betreuer: Betreuer;
+  // Der "Setter" des Objekts (individuelles OnOffice-Feld unter "Grunddaten → Technische
+  // Angaben", siehe onoffice/estate.ts, ladeSetterAddressId) — anders als betreuer OHNE
+  // Mock-Fallback: null ist ein gültiger, echter Zustand (kein Setter für dieses Objekt
+  // hinterlegt), Kontaktperson.tsx blendet den zugehörigen Block dann komplett aus.
+  setter: Betreuer | null;
   // Weitere Kolleg:innen der Agentur, unabhängig vom Objekt (siehe "Weitere Mitarbeiter"-Slider
   // auf der Kontaktperson-Seite). Enthält nicht den Objekt-Betreuer (bereits oben separat
   // angezeigt) — Dublettenfilterung erfolgt anhand von Betreuer.id.
@@ -300,5 +416,24 @@ export interface Praesentation {
   // hinterlegte Dokumente ist ein gültiger, echter Zustand und soll in einer echten
   // Kundenpräsentation nicht durch ein erfundenes Demo-Dokument verschleiert werden.
   dokumente: ObjektDokument[];
+  // Live aus OnOffice ermittelte Unternehmenskennzahlen für den "Über uns"-Reiter (siehe
+  // Unternehmen.tsx, zaehleVerkaufteObjekte/ladeLetzteKundennummer in onoffice/estate.ts).
+  // null, wenn der jeweilige Live-Abruf fehlgeschlagen ist — Unternehmen.tsx zeigt dann einen
+  // Platzhalter statt einer erfundenen Zahl. "Portalanfragen" ist NICHT Teil dieses Objekts:
+  // Die onOffice-API liefert für resourcetype "statistic" in diesem Account durchgehend den
+  // Fehler "missing configuration for resourceType" (live geprüft, Juli 2026, mehrere
+  // Parameter-Varianten durchprobiert) — das Statistik-Modul ist für diesen Account nicht per
+  // API freigeschaltet. Der Wert bleibt daher als manuell zu pflegende Konstante in
+  // data/unternehmen.ts (PORTALANFRAGEN_JAHR), analog zu den Google-Rezensionen.
+  unternehmenKennzahlen: { verkaufteObjekte: number | null; kundenNummer: number | null } | null;
+  // Automatisch zugeordnete Interessenten (OnOffice-Immo-Matching) für den Objektdaten-Reiter
+  // (siehe Objektdaten.tsx). Bereits auf Übereinstimmung 80–100% gefiltert und absteigend
+  // sortiert (siehe ladeAutomatischeInteressenten) — Interessenten unter 80% sind hier gar
+  // nicht erst enthalten (auf ausdrücklichen Nutzerwunsch Juli 2026). "gesamtAnzahl" ist die
+  // Trefferzahl INNERHALB dieses 80–100%-Bereichs (kann trotzdem in die Hunderte gehen) —
+  // "liste" ist bereits auf ein Anzeige-Limit gekappt. null, wenn der Live-Abruf fehlgeschlagen
+  // ist oder im Mock-Modus bewusst kein Demo-Block gewünscht ist; Objektdaten.tsx blendet den
+  // Block dann aus.
+  automatischeInteressenten: { liste: Interessent[]; gesamtAnzahl: number } | null;
   quelle: "live" | "mock";
 }

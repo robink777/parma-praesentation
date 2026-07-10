@@ -78,9 +78,15 @@ export function ObjektAuswahl() {
   const [offen, setOffen] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [wirdGeladen, setWirdGeladen] = useState<string | null>(null);
+  // Aktuell ausgewähltes Objekt (Klick auf ein Dropdown-Ergebnis, siehe handleAuswaehlen) —
+  // erst wenn dieser State gesetzt ist, wird "Präsentation erstellen" klickbar (siehe Button
+  // unten und Chat-Vorgabe: Auswahl und Erstellung sind zwei getrennte Schritte). Wird wieder auf
+  // null zurückgesetzt, sobald der Suchtext manuell verändert wird (siehe onChange am Input).
+  const [ausgewaehlt, setAusgewaehlt] = useState<Immobilie | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geladenRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Klick außerhalb des Suchfelds/Dropdowns schließt das Panel wieder.
   useEffect(() => {
@@ -91,18 +97,6 @@ export function ObjektAuswahl() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Öffnet das Dropdown und lädt einmalig die Startliste direkt beim Mounten — bewusst NICHT
-  // über das onFocus-Event des Inputs, da das Feld per autoFocus-Attribut bereits vom Browser
-  // fokussiert wird, während/bevor React nach der Hydration seinen synthetischen Fokus-Handler
-  // registriert. Der resultierende native "focus" verpufft dadurch ungesehen, das Dropdown
-  // blieb beim ersten Laden der Seite dauerhaft zu, obwohl das Feld sichtbar fokussiert war.
-  // Ein separater Mount-Effect ist von dieser Race-Condition unabhängig. onFocus bleibt für den
-  // Fall erhalten, dass Nutzer/innen das Feld verlassen und danach erneut anklicken.
-  useEffect(() => {
-    handleFokus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounced Nachladen bei Eingabe — nur, solange das Dropdown bereits offen ist (verhindert
@@ -154,11 +148,23 @@ export function ObjektAuswahl() {
     }
   }
 
+  // "Präsentation erstellen"-Button: navigiert erst dann tatsächlich zur Präsentation, wenn
+  // zuvor ein Objekt ausgewählt wurde (siehe ausgewaehlt-State und handleAuswaehlen unten) —
+  // Auswahl und Erstellung sind bewusst zwei getrennte Schritte (siehe Chat-Vorgabe). Ohne
+  // Auswahl ist der Button disabled (siehe JSX unten) und dieser Handler feuert gar nicht erst.
+  function handlePraesentationErstellen() {
+    if (!ausgewaehlt) return;
+    setWirdGeladen(ausgewaehlt.id);
+    router.push(`/?estateId=${encodeURIComponent(ausgewaehlt.id)}`);
+  }
+
+  // Klick auf ein Dropdown-Ergebnis wählt das Objekt nur aus (Suchfeld zeigt seinen Namen,
+  // Dropdown schließt, "Präsentation erstellen" wird klickbar) — die eigentliche Navigation
+  // passiert erst durch den zusätzlichen Klick auf den Button (handlePraesentationErstellen).
   function handleAuswaehlen(immobilie: Immobilie) {
     setOffen(false);
     setSuche(immobilie.bezeichnung);
-    setWirdGeladen(immobilie.id);
-    router.push(`/?estateId=${encodeURIComponent(immobilie.id)}`);
+    setAusgewaehlt(immobilie);
   }
 
   return (
@@ -188,13 +194,20 @@ export function ObjektAuswahl() {
               <Icon name="search" size={20} />
             </div>
             <input
+              ref={inputRef}
               type="text"
               value={suche}
-              onChange={(e) => setSuche(e.target.value)}
+              // Manuelle Texteingabe verwirft eine zuvor per Dropdown getroffene Auswahl wieder
+              // (siehe ausgewaehlt-State oben) — wer den Text ändert, sucht erkennbar ein anderes
+              // Objekt, "Präsentation erstellen" wird also wieder inaktiv, bis erneut ausgewählt
+              // wird.
+              onChange={(e) => {
+                setSuche(e.target.value);
+                setAusgewaehlt(null);
+              }}
               onFocus={handleFokus}
               placeholder="Immobilie suchen (Titel, ImmoNr, Ort, PLZ, Straße) …"
               className="w-full rounded-md border-2 border-asche bg-reinweiss py-sm pl-[48px] pr-sm text-body text-anthrazit outline-none transition-colors placeholder:text-anthrazit/40 focus:border-messing"
-              autoFocus
             />
           </div>
 
@@ -234,6 +247,38 @@ export function ObjektAuswahl() {
             Präsentation wird geladen …
           </div>
         )}
+
+        {/* Zwei Einstiegspunkte unter der Suchleiste: "Präsentation erstellen" ist erst
+            klickbar, nachdem oben ein Objekt ausgewählt wurde (siehe ausgewaehlt-State,
+            handleAuswaehlen, handlePraesentationErstellen) — ohne Auswahl disabled und auf
+            40% Deckkraft gedimmt als optisches Feedback, bei Auswahl volle 100% Deckkraft.
+            "Admin-Bereich" führt zu /admin, das zusätzlich zur bestehenden App-weiten Anmeldung
+            noch ein zweites, separates Passwort verlangt (siehe lib/auth.ts-Pendant für den
+            Admin-Bereich) — daher optisch zurückhaltender (Outline statt Messing-Fläche) und
+            mit Schloss-Icon markiert. */}
+        <div className="mt-md flex flex-col gap-sm sm:flex-row">
+          <button
+            type="button"
+            onClick={handlePraesentationErstellen}
+            disabled={!ausgewaehlt}
+            className={`flex flex-1 items-center justify-center gap-xs rounded-md bg-messing px-lg py-sm font-medium text-reinweiss transition-opacity ${
+              ausgewaehlt
+                ? "opacity-100 hover:opacity-90"
+                : "cursor-not-allowed opacity-40 hover:opacity-40"
+            }`}
+          >
+            <Icon name="document" size={20} />
+            Präsentation erstellen
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/admin")}
+            className="flex flex-1 items-center justify-center gap-xs rounded-sm border-2 border-asche bg-reinweiss px-lg py-sm font-medium text-anthrazit transition-colors hover:border-messing"
+          >
+            <Icon name="lock" size={20} />
+            Admin-Bereich
+          </button>
+        </div>
       </div>
     </div>
   );

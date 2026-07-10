@@ -2,22 +2,28 @@ import { Praesentation } from "@/types";
 import { ONOFFICE_MODE } from "./onoffice/config";
 import {
   istUuid,
+  ladeAutomatischeInteressenten,
   ladeBetreuerAddressId,
   ladeBetreuerUndAlleMitarbeiter,
   ladeEigentuemerAddressId,
   ladeEstateIdByUuid,
   ladeImmobilieById,
   ladeKundeByAddressId,
+  ladeLetzteKundennummer,
   ladeObjektDokumente,
   ladePriceHubbleWerte,
+  ladeSetterAddressId,
+  zaehleVerkaufteObjekte,
 } from "./onoffice/estate";
 import {
   MOCK_ALLE_MITARBEITER,
+  MOCK_AUTOMATISCHE_INTERESSENTEN,
   MOCK_BETREUER,
   MOCK_BEWERTUNG,
   MOCK_DOKUMENTE,
   MOCK_IMMOBILIE,
   MOCK_KUNDE,
+  MOCK_UNTERNEHMEN_KENNZAHLEN,
   MOCK_WEITERE_MITARBEITER,
 } from "./onoffice/mock";
 
@@ -68,24 +74,47 @@ export async function ladePraesentationsDaten(
 
       const addressId =
         params.addressId || (await ladeEigentuemerAddressId(estateId).catch(() => null));
-      const betreuerAddressId = await ladeBetreuerAddressId(estateId).catch(() => null);
-
-      const [immobilie, kunde, betreuerUndMitarbeiter, dokumente, priceHubbleWerte] = await Promise.all([
-        ladeImmobilieById(estateId),
-        addressId ? ladeKundeByAddressId(addressId) : Promise.resolve(null),
-        // Betreuer (Hauptkontakt) und komplette Mitarbeiterliste bewusst in EINEM gemeinsamen
-        // Aufruf statt zwei parallelen (siehe ladeBetreuerUndAlleMitarbeiter in estate.ts) —
-        // zwei unabhängige, aber durch dieses Promise.all gleichzeitig laufende Foto-Batches
-        // waren die Ursache dafür, dass das Profilbild des Hauptbetreuers intermittierend nicht
-        // lud.
-        ladeBetreuerUndAlleMitarbeiter(betreuerAddressId).catch(() => ({
-          betreuer: null,
-          alleMitarbeiter: [],
-        })),
-        ladeObjektDokumente(estateId).catch(() => []),
-        ladePriceHubbleWerte(estateId).catch(() => null),
+      const [betreuerAddressId, setterAddressId] = await Promise.all([
+        ladeBetreuerAddressId(estateId).catch(() => null),
+        ladeSetterAddressId(estateId).catch(() => null),
       ]);
-      const { betreuer, alleMitarbeiter } = betreuerUndMitarbeiter;
+
+      const [
+        immobilie,
+        kunde,
+        betreuerUndMitarbeiter,
+        dokumente,
+        priceHubbleWerte,
+        verkaufteObjekte,
+        kundenNummer,
+        automatischeInteressenten,
+      ] = await Promise.all([
+          ladeImmobilieById(estateId),
+          addressId ? ladeKundeByAddressId(addressId) : Promise.resolve(null),
+          // Betreuer (Hauptkontakt), Setter und komplette Mitarbeiterliste bewusst in EINEM
+          // gemeinsamen Aufruf statt mehrerer paralleler (siehe ladeBetreuerUndAlleMitarbeiter in
+          // estate.ts) — mehrere unabhängige, aber durch dieses Promise.all gleichzeitig laufende
+          // Foto-Batches waren die Ursache dafür, dass das Profilbild des Hauptbetreuers
+          // intermittierend nicht lud.
+          ladeBetreuerUndAlleMitarbeiter(betreuerAddressId, setterAddressId).catch(() => ({
+            betreuer: null,
+            setter: null,
+            alleMitarbeiter: [],
+          })),
+          ladeObjektDokumente(estateId).catch(() => []),
+          ladePriceHubbleWerte(estateId).catch(() => null),
+          // Unternehmenskennzahlen für den "Über uns"-Reiter (siehe Unternehmen.tsx) — bewusst
+          // objektunabhängig hier mit abgerufen (wie alleMitarbeiter oben), da eine eigene
+          // Ladefunktion pro Reiter aktuell nicht existiert und die Präsentation ohnehin bereits
+          // Live-Daten lädt.
+          zaehleVerkaufteObjekte().catch(() => null),
+          ladeLetzteKundennummer().catch(() => null),
+          // Automatisch zugeordnete Interessenten (Objektdaten-Reiter, siehe Objektdaten.tsx) —
+          // null bei Fehlschlag, damit der Block dort komplett ausgeblendet werden kann statt
+          // einen falschen "keine Interessenten"-Zustand zu zeigen.
+          ladeAutomatischeInteressenten(estateId).catch(() => null),
+        ]);
+      const { betreuer, setter, alleMitarbeiter } = betreuerUndMitarbeiter;
 
       // Objekt-Betreuer aus der "weitere Mitarbeiter"-Liste ausschließen (Dubletten-Schutz) —
       // er wird bereits separat oben als Hauptkontakt angezeigt.
@@ -104,6 +133,11 @@ export async function ladePraesentationsDaten(
           // fehlgeschlagen ist oder das Objekt keinen Datensatz zurückgibt).
           bewertung: { ...MOCK_BEWERTUNG, ...priceHubbleWerte },
           betreuer: betreuer || MOCK_BETREUER,
+          // Bewusst KEIN Fallback auf einen Mock-Setter bei null (anders als beim Betreuer
+          // oben): Kein Setter hinterlegt ist ein gültiger, echter Zustand (siehe
+          // ladeSetterAddressId) — Kontaktperson.tsx blendet den Block dafür komplett aus,
+          // statt eine erfundene Person zu zeigen.
+          setter,
           weitereMitarbeiter: weitereMitarbeiter.length > 0 ? weitereMitarbeiter : MOCK_WEITERE_MITARBEITER,
           // Ungefiltert (inkl. Objekt-Betreuer) für den Team-Bereich im "Über uns"-Reiter, siehe
           // Praesentation.alleMitarbeiter und Unternehmen.tsx.
@@ -114,6 +148,11 @@ export async function ladePraesentationsDaten(
           // Dateien) und soll in einer echten Kundenpräsentation nicht durch ein erfundenes
           // Demo-Dokument verschleiert werden.
           dokumente,
+          // Siehe Praesentation.unternehmenKennzahlen (types/index.ts): einzelne Werte bleiben
+          // null, wenn der jeweilige Live-Abruf fehlgeschlagen ist (.catch(() => null) oben) —
+          // Unternehmen.tsx zeigt dann einen Platzhalter statt einer erfundenen Zahl.
+          unternehmenKennzahlen: { verkaufteObjekte, kundenNummer },
+          automatischeInteressenten,
           quelle: "live",
         };
       }
@@ -127,9 +166,14 @@ export async function ladePraesentationsDaten(
     immobilie: MOCK_IMMOBILIE,
     bewertung: MOCK_BEWERTUNG,
     betreuer: MOCK_BETREUER,
+    // Kein Mock-Setter (siehe Kommentar oben im Live-Zweig) — zeigt im Demo-Modus zugleich den
+    // "kein Setter hinterlegt"-Zustand, also dass Kontaktperson.tsx den Block korrekt ausblendet.
+    setter: null,
     weitereMitarbeiter: MOCK_WEITERE_MITARBEITER,
     alleMitarbeiter: MOCK_ALLE_MITARBEITER,
     dokumente: MOCK_DOKUMENTE,
+    unternehmenKennzahlen: MOCK_UNTERNEHMEN_KENNZAHLEN,
+    automatischeInteressenten: MOCK_AUTOMATISCHE_INTERESSENTEN,
     quelle: "mock",
   };
 }

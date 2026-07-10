@@ -29,3 +29,91 @@
     @apply font-mono text-[11px] font-medium uppercase tracking-label text-walnuss/70;
   }
 }
+
+/* ----------------------------------------------------------------------------------------
+ * Parma Loader — branded loading animation (siehe components/ParmaLoader.tsx und das
+ * Design-Handoff design_handoff_ladescreen/README.md). Als eigene Klassen statt Tailwind-
+ * Utilities, weil die Technik hier nicht rein utility-abbildbar ist:
+ * `perspective` auf dem Icon-Container + `rotateX()` (nicht `rotate()`!) im Keyframe lässt den
+ * Ring beim "Zuschließen" um die eigene horizontale Schaftachse kippen (mit Verkürzung), statt
+ * flach in der Bildebene zu rotieren — das ist die eigentliche Pointe der Animation und darf
+ * nicht vereinfacht werden. `transform-box: fill-box` + der Origin auf 34.5% 49.9% verankert
+ * Rotation/Verschiebung im visuellen Zentrum des Rings selbst (nicht im viewBox-Ursprung), da
+ * Ring und "P"-Körper getrennte Elemente im selben viewBox sind.
+ * ---------------------------------------------------------------------------------------- */
+.parma-loader-icon {
+  overflow: visible; /* der Schlüssel animiert außerhalb der eigenen bbox des Icons */
+  perspective: 500px; /* aktiviert die 3D-"Dreh"-Rotation des Rings */
+}
+
+.pl-key {
+  transform-box: fill-box;
+  transform-origin: 34.5% 49.9%; /* Pivot = Zentrum des Rings selbst */
+  animation: pl-fly 4.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  transform-style: preserve-3d;
+}
+
+@keyframes pl-fly {
+  /* außerhalb der Fläche, wartend links */
+  0% {
+    transform: translateX(-60px) rotate(-10deg);
+    opacity: 0;
+  }
+  8% {
+    transform: translateX(-60px) rotate(-10deg);
+    opacity: 1;
+  }
+  /* einfahren zur angedockten Logo-Position */
+  26% {
+    transform: translateX(0) rotate(0deg);
+  }
+  /* angedockt halten */
+  36% {
+    transform: translateX(0) rotate(0deg);
+  }
+  /* zuschließen — Rotation um die eigene horizontale Schaftachse */
+  46% {
+    transform: translateX(0) rotateX(65deg);
+  }
+  /* verschlossen halten */
+  58% {
+    transform: translateX(0) rotateX(65deg);
+  }
+  /* zurückdrehen zum Aufschließen */
+  68% {
+    transform: translateX(0) rotateX(0deg);
+  }
+  /* angedockt halten */
+  76% {
+    transform: translateX(0) rotate(0deg);
+  }
+  /* wieder ausfahren */
+  94% {
+    transform: translateX(-60px) rotate(-10deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-60px) rotate(-10deg);
+    opacity: 0;
+  }
+}
+
+.pl-dot {
+  animation: pl-dots 1.4s ease-in-out infinite;
+  opacity: 0;
+}
+.pl-dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.pl-dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@keyframes pl-dots {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}

@@ -1,4 +1,4 @@
-import { Betreuer, Immobilie, Kunde, ObjektDokument } from "@/types";
+import { Betreuer, Immobilie, Interessent, Kunde, ObjektDokument } from "@/types";
 
 // Feldnamen gegen den echten Feldkatalog des Kunden-Accounts geprüft (resourcetype "fields",
 // Juli 2026). Modernisierungen sind in diesem Account über ~10 einzelne Individualfelder
@@ -20,9 +20,19 @@ export interface RawEstateRecord {
     plz?: string;
     strasse?: string;
     objektart?: string;
+    // Feingranularerer Objekttyp (Singleselect, ~130 mögliche Werte) — Live-Feldkatalog geprüft,
+    // Juli 2026. Klartext-Zuordnung des rohen Schlüssels über OBJEKTTYP_LABELS unten.
+    objekttyp?: string;
+    // Getrennt von strasse — Live-Feldkatalog geprüft, Juli 2026.
+    hausnummer?: string;
     baujahr?: number | string;
     zustand?: string;
     energyClass?: string;
+    // Multiselect-Felder: Kommen als JSON-Array roher Schlüssel zurück (z.B. ["zentral"]),
+    // NICHT als pipe-getrennter String wie ArtDaten im address-Modul (siehe RawAddressRecord/
+    // RawInteressentRecord unten) — live gegen den Account geprüft, Juli 2026 (Estate 1763).
+    heizungsart?: string[];
+    befeuerung?: string[];
     objektbeschreibung?: string;
     // "Verkauft/Vermietet am" — gegen den echten Feldkatalog geprüft (resourcetype "fields",
     // Juli 2026). Wird nur für die manuelle Referenzobjekt-Suche im Vergleichswert-Reiter
@@ -48,14 +58,122 @@ export const ESTATE_FIELDS = [
   "ort",
   "plz",
   "strasse",
+  "hausnummer",
   "objektart",
+  "objekttyp",
   "baujahr",
   "zustand",
   "energyClass",
+  "heizungsart",
+  "befeuerung",
   "objektbeschreibung",
   "verkauft_am",
   "ind_3450_Feld_ObjTech540",
 ];
+
+// Klartext-Zuordnung für das Singleselect-Feld "objekttyp" — vollständige Werteliste (~130
+// Einträge) gegen den echten Feldkatalog geprüft (resourcetype "fields", Juli 2026). Nur eine
+// Auswahl der für Wohnimmobilien (den bei Parma weit überwiegenden Regelfall) relevanten
+// Schlüssel ist hier hinterlegt; unbekannte/nicht gelistete Schlüssel fallen in
+// mapEstateRecord auf den rohen Wert zurück, statt zu einem leeren Feld zu führen.
+export const OBJEKTTYP_LABELS: Record<string, string> = {
+  hausbau_einfamilienhaus: "Einfamilienhaus",
+  einfamilienhaus: "Einfamilienhaus",
+  einfamilienhausMitEinliegerwohnung: "Einfamilienhaus mit Einliegerwohnung",
+  hausbau_zweifamilienhaus: "Zweifamilienhaus",
+  zweifamilienhaus: "Zweifamilienhaus",
+  hausbau_mehrfamilienhaus: "Mehrfamilienhaus",
+  mehrfamilienhaus: "Mehrfamilienhaus",
+  hausbau_reihenhaus: "Reihenhaus",
+  reihenhaus: "Reihenhaus",
+  reihenend: "Reihenendhaus",
+  reihenmittel: "Reihenmittelhaus",
+  reiheneck: "Reiheneckhaus",
+  doppelhaus: "Doppelhaus",
+  doppelhaushaelfte: "Doppelhaushälfte",
+  hausbau_bungalow: "Bungalow",
+  bungalow: "Bungalow",
+  hausbau_villa: "Villa",
+  villa: "Villa",
+  hausbau_landhaus: "Landhaus",
+  landhaus: "Landhaus",
+  stadthaus: "Stadthaus",
+  bauernhaus: "Bauernhaus",
+  resthof: "Resthof",
+  schloss: "Schloss",
+  ferienhaus: "Ferienhaus",
+  holzhaus: "Holzhaus",
+  blockhaus: "Blockhaus",
+  fachwerkhaus: "Fachwerkhaus",
+  eigentumswohnung: "Eigentumswohnung",
+  dachgeschoss: "Dachgeschosswohnung",
+  maisonette: "Maisonette-Wohnung",
+  penthouse: "Penthouse-Wohnung",
+  etage: "Etagenwohnung",
+  erdgeschoss: "Erdgeschosswohnung",
+  hochparterre: "Hochparterre-Wohnung",
+  souterrain: "Souterrain-Wohnung",
+  loft: "Loft",
+  zimmer: "Zimmer",
+  wohnanlage: "Wohnanlage",
+  wohnanlagen: "Wohnanlagen",
+  wohn_und_geschaeftshaus: "Wohn- und Geschäftshaus",
+  gewerbe: "Gewerbe",
+  gewerbeeinheit: "Gewerbeeinheit",
+  buerogebaeude: "Bürogebäude",
+  buerohaus: "Bürohaus",
+  bueroflaeche: "Bürofläche",
+  praxis: "Praxis",
+  praxisflaeche: "Praxisfläche",
+  ladenlokal: "Ladenlokal",
+  einzelhandelsladen: "Einzelhandelsladen",
+  grundstueck: "Grundstück",
+  land_forstwirtschaft: "Land-/Forstwirtschaft",
+  sonstige: "Sonstige",
+  sonstige_landwirtschaftsimmobilien: "Sonstige Landwirtschaftliche Immobilie",
+  besondereImmobilie: "Besondere Immobilie",
+};
+
+// Klartext-Zuordnung für das Multiselect-Feld "heizungsart" — vollständige Werteliste (~15
+// Einträge) gegen den echten Feldkatalog geprüft (resourcetype "fields", Juli 2026).
+export const HEIZUNGSART_LABELS: Record<string, string> = {
+  keineAngabe: "keine Angabe",
+  etage: "Etagenheizung",
+  ofen: "Ofenheizung",
+  zentral: "Zentralheizung",
+  zentral_oel: "Zentralheizung (Öl)",
+  fussboden: "Fußbodenheizung",
+  fern: "Fernwärme",
+  indMulti1950Select5874: "Elektroheizung",
+  electricHeating: "Elektro-Heizung",
+  nachtspeicherheizung: "Nachtspeicherheizung",
+  block: "Blockheizkraftwerk",
+  waermepumpe: "Wärmepumpe",
+  gas: "Gasheizung",
+  woodPelletHeating: "Holz-Pelletheizung",
+  solarHeating: "Solar-Heizung",
+};
+
+// Klartext-Zuordnung für das Multiselect-Feld "befeuerung" — vollständige Werteliste (~9
+// Einträge) gegen den echten Feldkatalog geprüft (resourcetype "fields", Juli 2026).
+export const BEFEUERUNG_LABELS: Record<string, string> = {
+  alternativ: "Alternativ",
+  elektro: "Elektro",
+  indMulti1950Select5872: "Elektroheizung",
+  erdwaerme: "Erdwärme",
+  gas: "Gas",
+  luftwp: "Luft/Wasser-Wärmepumpe",
+  oel: "Öl",
+  pellet: "Pellet",
+  solar: "Solar",
+};
+
+// Übersetzt eine Liste roher Multiselect-Schlüssel (heizungsart/befeuerung) in Klartext-Labels.
+// Unbekannte Schlüssel (z.B. neue, noch nicht in obigen Tabellen erfasste OnOffice-Werte)
+// fallen auf den rohen Schlüssel zurück, statt stillschweigend zu verschwinden.
+function labelListe(werte: string[] | undefined, labels: Record<string, string>): string[] {
+  return (werte || []).map((w) => labels[w] || w);
+}
 
 export function mapEstateRecord(record: RawEstateRecord): Immobilie {
   const el = record.elements;
@@ -70,10 +188,14 @@ export function mapEstateRecord(record: RawEstateRecord): Immobilie {
     ort: el.ort,
     plz: el.plz,
     strasse: el.strasse,
+    hausnummer: el.hausnummer || undefined,
     objektart: el.objektart,
+    objekttyp: el.objekttyp ? OBJEKTTYP_LABELS[el.objekttyp] || el.objekttyp : undefined,
     baujahr: el.baujahr ? Number(el.baujahr) : undefined,
     zustand: el.zustand,
     energieklasse: el.energyClass,
+    heizungsart: el.heizungsart && el.heizungsart.length > 0 ? labelListe(el.heizungsart, HEIZUNGSART_LABELS) : undefined,
+    befeuerung: el.befeuerung && el.befeuerung.length > 0 ? labelListe(el.befeuerung, BEFEUERUNG_LABELS) : undefined,
     objektbeschreibung: el.objektbeschreibung,
     verkauftAm: el.verkauft_am || undefined,
     deepImmoLink: el.ind_3450_Feld_ObjTech540 || undefined,
@@ -101,6 +223,104 @@ export function mapAddressRecord(record: RawAddressRecord): Kunde {
     nachname: el.Name || "",
     email: el.Email,
     telefon: el.Telefon1,
+  };
+}
+
+// Klartext-Zuordnung für das Multiselect-Feld "ArtDaten" (Kontaktart) im address-Modul —
+// vollständige Werteliste (~48 Einträge) gegen den echten Feldkatalog geprüft (resourcetype
+// "fields", Juli 2026). Enthält sowohl sprechende Schlüssel (z.B. "Investor") als auch
+// kryptische, automatisch generierte Tokens (z.B. "indMulti3148Select6534") — beide werden hier
+// auf denselben menschenlesbaren Anzeigetext gemappt. Unbekannte, nicht gelistete Schlüssel
+// fallen in mapInteressentRecord auf den rohen Schlüssel zurück.
+export const KONTAKTART_LABELS: Record<string, string> = {
+  Systembenutzer: "Systembenutzer",
+  "Eigentümer": "Eigentümer",
+  Interessent: "Interessent",
+  Kooperationspartner: "Dienstleister / Handwerker",
+  Makler: "Makler",
+  Tippgeber: "Tippgeber",
+  indMulti1952Select5876: "Akquisekunde",
+  Mieter: "Mieter",
+  benutzerWPWebsite: "Benutzer WP-Website",
+  "Interessent Miete": "Interessent Miete Wohnen",
+  "Interessent Kauf": "Interessent Kauf Wohnen",
+  Investor: "Kapitalanleger",
+  "Verkäufer": "Verkäufer Parma",
+  "Käufer": "Käufer Parma",
+  indMulti3148Select6536: "Interessent Miete Gewerbe",
+  indMulti3148Select6534: "Interessent Kauf Gewerbe",
+  Vermieter: "Vermieter Parma",
+  indMulti3148Select6542: "Eigentümer ohne bekannte Verkaufsabsicht",
+  indMulti3148Select6538: "Eigentümer in Akquise",
+  indMulti3404Select6618: "Behörde",
+  indMulti3404Select6616: "Banken",
+  indMulti3404Select6614: "Consultants",
+  indMulti2842Select6284: "Hausverwaltung",
+  indMulti3404Select6612: "Marketing",
+  indMulti3404Select6610: "IT",
+  indMulti3404Select6608: "Insolvenzverwalter",
+  indMulti3404Select6606: "Rechtsanwalt",
+  Notar: "Notar",
+  Steuerberater: "Steuerberater",
+  Versicherer: "Versicherungen",
+  Architekt: "Architekt",
+  indMulti3404Select6642: "Bauzeichner",
+  indMulti3404Select6640: "Dachdecker",
+  indMulti3404Select6638: "Maler",
+  indMulti3404Select6636: "Maurer / Zimmerer",
+  indMulti3404Select6634: "Schornsteinfeger",
+  indMulti3404Select6632: "Elektro",
+  indMulti3404Select6630: "Heizung / Sanitär",
+  indMulti3404Select6628: "Hausmeister",
+  indMulti3404Select6626: "Garten & Landschaftsbau",
+  indMulti3404Select6624: "Entrümpler / Umzug",
+  "Bauträger": "Bauträger",
+  indMulti1944Select5848: "Finanzierer",
+  indMulti3340Select6602: "Vertragspartner",
+  indMulti2800Select6278: "BottImmo",
+  indMulti2976Select6358: "Veranstaltungsteilnehmer",
+  indMulti3148Select6540: "Eigentümer laut IS24",
+  indMulti3440Select6674: "Käufer Kapitalanleger",
+};
+
+export interface RawInteressentRecord {
+  id: string;
+  elements: {
+    KdNr?: number | string;
+    Ort?: string;
+    // Nur intern für die Umkreis-Filterung in ladeAutomatischeInteressenten benötigt (siehe
+    // estate.ts) — wird bewusst NICHT auf den Interessent-Typ/in die UI durchgereicht (Juli 2026:
+    // Kunde wünscht ausschließlich Ort, keine vollständige Adresse fremder Interessenten).
+    Plz?: string;
+    // Multiselect im address-Modul: kommt als pipe-getrennter String roher Schlüssel zurück
+    // (z.B. "|Interessent Kauf||Investor|"), NICHT als JSON-Array wie heizungsart/befeuerung
+    // im estate-Modul — live gegen den Account geprüft, Juli 2026. null/"" bei leerem Feld.
+    ArtDaten?: string | null;
+  };
+}
+
+export const INTERESSENT_FIELDS = ["KdNr", "Ort", "Plz", "ArtDaten"];
+
+// Parst das pipe-getrennte ArtDaten-Format ("|Wert1||Wert2|") in ein Array roher Schlüssel.
+// null/leerer String (kein Kontaktart-Wert gepflegt) ergibt ein leeres Array.
+function parseArtDaten(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw.split("|").map((s) => s.trim()).filter(Boolean);
+}
+
+// "uebereinstimmung" ist hier bewusst NICHT Teil der Adressdaten (kommt aus einem separaten
+// Abruf, siehe resourcetype "qualifiedsuitors" in ladeAutomatischeInteressenten/estate.ts) —
+// Platzhalter 0, wird vom Aufrufer direkt nach dem Mapping mit dem echten Prozentwert
+// überschrieben.
+export function mapInteressentRecord(record: RawInteressentRecord): Interessent {
+  const el = record.elements;
+  const kontaktart = parseArtDaten(el.ArtDaten).map((k) => KONTAKTART_LABELS[k] || k);
+  return {
+    id: String(record.id),
+    uebereinstimmung: 0,
+    kdNr: el.KdNr !== undefined && el.KdNr !== null && el.KdNr !== "" ? Number(el.KdNr) : undefined,
+    ort: el.Ort || undefined,
+    kontaktart: kontaktart.length > 0 ? kontaktart : undefined,
   };
 }
 

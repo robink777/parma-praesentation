@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Immobilie, LeistungspaketId, Praesentation } from "@/types";
 import { Begruessung } from "@/components/sections/Begruessung";
@@ -12,19 +12,88 @@ import { Dokumente } from "@/components/sections/Dokumente";
 import { Vergleichswert } from "@/components/sections/Vergleichswert";
 import { Leistungsversprechen } from "@/components/sections/Leistungsversprechen";
 import { Maklervertrag } from "@/components/sections/Maklervertrag";
+import { waehleVorauswahl } from "@/lib/vergleichswert";
 
 export function PraesentationApp({ daten }: { daten: Praesentation }) {
   const [activeId, setActiveId] = useState("begruessung");
   const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>();
-  // Manuell ausgewählte Referenzobjekte im Vergleichswert-Reiter (siehe Vergleichswert.tsx) —
-  // hier (statt lokal im Reiter selbst) gehalten, damit die Auswahl beim Wechsel zwischen
-  // Reitern erhalten bleibt, analog zu gewaehltesPaket oben.
+  // Referenzobjekte im Vergleichswert-Reiter (siehe Vergleichswert.tsx) — hier (statt lokal im
+  // Reiter selbst) gehalten, damit die Auswahl beim Wechsel zwischen Reitern erhalten bleibt,
+  // analog zu gewaehltesPaket oben. Wird beim ersten Laden automatisch vorbefüllt (siehe
+  // useEffect unten), bleibt danach aber genau wie vorher vollständig manuell anpassbar/austauschbar.
   const [referenzobjekte, setReferenzobjekte] = useState<(Immobilie | null)[]>([null, null, null]);
+  // Zeigt an, ob der Vorauswahl-Abruf unten noch läuft — damit der Vergleichswert-Reiter
+  // währenddessen einen (kleinen) Ladezustand statt einfach nichts anzeigt, siehe
+  // Vergleichswert.tsx (zeigtLadeplatzhalter). Start-Wert true, da der Abruf sofort beim Mounten
+  // dieser Komponente losläuft (useEffect unten).
+  const [vorauswahlLaedt, setVorauswahlLaedt] = useState(true);
   const kundeName = [daten.kunde.vorname, daten.kunde.nachname].filter(Boolean).join(" ");
 
   function referenzobjektAendern(index: number, objekt: Immobilie | null) {
     setReferenzobjekte((prev) => prev.map((o, i) => (i === index ? objekt : o)));
   }
+
+  // Automatische Vorauswahl der Vergleichsobjekte (siehe lib/vergleichswert.ts,
+  // waehleVorauswahl): läuft beim Laden der Präsentation — bewusst hier in PraesentationApp statt
+  // in Vergleichswert.tsx, da der Vergleichswert-Reiter beim Wechsel zwischen Reitern
+  // unmountet/wieder gemountet wird und der Effekt sonst bei jedem erneuten Öffnen des Reiters
+  // erneut liefe. Holt den Pool tatsächlich verkaufter Objekte über denselben Endpunkt wie die
+  // manuelle Suche (siehe /api/onoffice/route.ts, verkauft=1) und wendet die vom Nutzer
+  // vorgegebene, kaskadierende Filterlogik (PLZ → Wohnfläche → Baujahr → Kaufpreis) an.
+  // Überschreibt NUR den Ausgangszustand (alle drei Slots noch leer, siehe setReferenzobjekte
+  // unten) — jede spätere manuelle Auswahl/Entfernung bleibt danach unangetastet, die Vorauswahl
+  // ist also lediglich ein komfortabler Startwert, kein sich aufdrängendes Automatik-Feature.
+  //
+  // BEWUSST KEIN zusätzlicher "nur einmal ausführen"-Ref (z.B. useRef(false) mit Guard am
+  // Effekt-Anfang): React/Next mountet Komponenten im Dev-Modus (React Strict Mode, im App Router
+  // seit Next 13.4 standardmäßig aktiv) einmal probeweise, räumt sofort wieder auf und mountet
+  // dann "echt" neu — genau um Effekte ohne sauberes Cleanup aufzudecken. Ein persistenter Ref
+  // überlebt diesen Zyklus, das lokale `abgebrochen`-Flag der jeweiligen Effekt-Instanz aber auch
+  // (es wird beim Probe-Unmount auf true gesetzt) — die Kombination führte dazu, dass der Probe-
+  // Durchlauf seinen eigenen Abruf per `abgebrochen` verwarf UND der darauffolgende echte
+  // Durchlauf wegen des bereits gesetzten Refs komplett übersprungen wurde: Im Dev-Modus (nicht
+  // aber im Produktions-Build/Vercel, wo Strict Mode nicht doppelt mountet) lief die Vorauswahl
+  // dadurch nie durch (siehe Praxis-Test mit "Hamweg 15" auf localhost). Ohne den Ref läuft der
+  // Effekt im Dev-Modus zweimal unabhängig voneinander — der erste (Probe-)Durchlauf bricht sich
+  // selbst per `abgebrochen` ab, der zweite (echte) läuft normal durch. Der
+  // `prev.every(...)`-Check unten verhindert ohnehin ein doppeltes Anwenden des Vorschlags, falls
+  // beide Durchläufe tatsächlich abschließen sollten.
+  useEffect(() => {
+    let abgebrochen = false;
+
+    async function ladeVorauswahl() {
+      try {
+        const res = await fetch("/api/onoffice?limit=250&verkauft=1");
+        if (!res.ok) return;
+        const kandidaten = await res.json();
+        if (abgebrochen || !Array.isArray(kandidaten)) return;
+
+        const vorschlag = waehleVorauswahl(daten.immobilie, kandidaten, 3);
+        if (vorschlag.length === 0) return;
+
+        setReferenzobjekte((prev) =>
+          prev.every((o) => o === null)
+            ? [vorschlag[0] ?? null, vorschlag[1] ?? null, vorschlag[2] ?? null]
+            : prev
+        );
+      } catch {
+        // Stiller Fehlschlag: Die Vorauswahl ist ein Komfort-Feature — schlägt der Abruf fehl,
+        // bleibt die manuelle Suche im Vergleichswert-Reiter unverändert vollständig nutzbar.
+      } finally {
+        // Nur den NICHT abgebrochenen Durchlauf den Ladezustand beenden lassen — im Dev-Modus
+        // (React Strict Mode Doppel-Mount, siehe Kommentar oben) würde der abgebrochene
+        // Probe-Durchlauf sonst den Ladezustand bereits beenden, während der echte Abruf noch
+        // läuft (kurzes, nur lokal auf localhost sichtbares Flackern).
+        if (!abgebrochen) setVorauswahlLaedt(false);
+      }
+    }
+
+    ladeVorauswahl();
+    return () => {
+      abgebrochen = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex h-screen w-screen">
@@ -34,14 +103,28 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
           <Begruessung kunde={daten.kunde} />
         )}
         {activeId === "kontaktperson" && (
-          <Kontaktperson betreuer={daten.betreuer} weitereMitarbeiter={daten.weitereMitarbeiter} />
+          <Kontaktperson betreuer={daten.betreuer} setter={daten.setter} />
         )}
-        {activeId === "unternehmen" && <Unternehmen alleMitarbeiter={daten.alleMitarbeiter} />}
-        {activeId === "objekt" && <Objektdaten immobilie={daten.immobilie} />}
+        {activeId === "unternehmen" && (
+          <Unternehmen
+            alleMitarbeiter={daten.alleMitarbeiter}
+            kennzahlen={daten.unternehmenKennzahlen}
+          />
+        )}
+        {activeId === "objekt" && (
+          <Objektdaten
+            immobilie={daten.immobilie}
+            automatischeInteressenten={daten.automatischeInteressenten}
+          />
+        )}
         {activeId === "deepimmo" && <DeepImmo immobilie={daten.immobilie} />}
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
         {activeId === "vergleich" && (
-          <Vergleichswert referenzobjekte={referenzobjekte} onReferenzobjektAendern={referenzobjektAendern} />
+          <Vergleichswert
+            referenzobjekte={referenzobjekte}
+            onReferenzobjektAendern={referenzobjektAendern}
+            vorauswahlLaedt={vorauswahlLaedt}
+          />
         )}
         {activeId === "leistungsversprechen" && (
           <Leistungsversprechen gewaehltesPaket={gewaehltesPaket} onWaehlePaket={setGewaehltesPaket} />

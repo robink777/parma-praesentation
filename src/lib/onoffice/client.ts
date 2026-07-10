@@ -21,7 +21,10 @@ export interface OnOfficeAction {
 }
 
 interface OnOfficeApiResult<T> {
-  data?: { records?: T[] };
+  // meta.cntabsolute ist die Gesamtanzahl der zum Filter passenden Datensätze (unabhängig vom
+  // listlimit) — wird für reine Zähl-Abfragen genutzt (siehe zaehleVerkaufteObjekte,
+  // ladeLetzteKundennummer in estate.ts), ohne dafür alle Datensätze laden zu müssen.
+  data?: { records?: T[]; meta?: { cntabsolute?: number | null } };
   status?: { code: number; errorcode: number; message: string };
 }
 
@@ -30,41 +33,92 @@ export interface OnOfficeResponse<T> {
   status?: { code: number; errorcode: number; message: string };
 }
 
+// Anzahl Versuche insgesamt (1 Erstversuch + 2 Wiederholungen) und Wartezeit dazwischen. Beim
+// Testen zeigte sich wiederholt ein "ConnectTimeoutError" (10s-Timeout beim Verbindungsaufbau zu
+// api.onoffice.de) — ein rein transientes Netzwerkproblem, keine inhaltliche API-Fehlermeldung.
+// Da callOnOfficeApi die zentrale, einzige Stelle ist, über die JEDE OnOffice-Abfrage läuft
+// (Objektauswahl, Mitarbeiterstatistik, Präsentationen, ...), reicht ohne Wiederholung ein
+// einziger kurzzeitiger Verbindungsaussetzer, um eine ganze Seite mit einem Fehler abstürzen zu
+// lassen. Mit Retry + kurzer Wartezeit übersteht ein Aufruf einen vorübergehenden Netzwerkhänger,
+// ohne dass sich am Verhalten bei echten (inhaltlichen) API-Fehlern etwas ändert.
+const MAX_VERSUCHE = 3;
+const WARTEZEIT_MS = 500;
+
+function istTransienterFehler(error: unknown): boolean {
+  // fetch() wirft bei Netzwerkproblemen (Verbindungsaufbau/-abbruch, DNS, Timeout) einen
+  // TypeError ("fetch failed") mit der eigentlichen Ursache in error.cause (undici-Fehlercodes
+  // wie UND_ERR_CONNECT_TIMEOUT/UND_ERR_SOCKET) — das ist der Fall, der hier wiederholt werden
+  // soll. Inhaltliche Fehler (HTTP-Statuscode, onOffice status.code >= 400) werden bewusst NICHT
+  // wiederholt, da ein erneuter Versuch am Ergebnis nichts ändern würde.
+  return error instanceof TypeError && error.message === "fetch failed";
+}
+
+function warte(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function callOnOfficeApi<T = unknown>(
   actions: Omit<OnOfficeAction, "timestamp" | "hmac" | "hmac_version">[]
 ): Promise<OnOfficeResponse<T>> {
-  const timestamp = Math.floor(Date.now() / 1000);
+  let letzterFehler: unknown;
 
-  const signedActions: OnOfficeAction[] = actions.map((action) => ({
-    ...action,
-    timestamp,
-    hmac: buildHmac(timestamp, action.resourcetype, action.actionid),
-    hmac_version: "2",
-  }));
+  for (let versuch = 1; versuch <= MAX_VERSUCHE; versuch++) {
+    try {
+      // Der Timestamp (und damit der HMAC, siehe buildHmac) wird bei jedem Versuch neu erzeugt —
+      // ein HMAC über einen mehrere Sekunden alten Timestamp könnte je nach Serverkonfiguration
+      // abgelehnt werden.
+      const timestamp = Math.floor(Date.now() / 1000);
 
-  const response = await fetch(ONOFFICE_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      token: ONOFFICE_TOKEN,
-      request: { actions: signedActions },
-    }),
-    // no-store statt next.revalidate: Jeder Request trägt einen frischen HMAC über den
-    // aktuellen Unix-Timestamp (siehe buildHmac oben) — ein von Next.js zwischengespeicherter
-    // Response-Body für einen älteren Timestamp wäre ohnehin nur für diesen einen Moment gültig
-    // gewesen und schafft nur Verwirrung beim Debuggen von Live-Datenständen.
-    cache: "no-store",
-  });
+      const signedActions: OnOfficeAction[] = actions.map((action) => ({
+        ...action,
+        timestamp,
+        hmac: buildHmac(timestamp, action.resourcetype, action.actionid),
+        hmac_version: "2",
+      }));
 
-  if (!response.ok) {
-    throw new Error(`onOffice API Fehler: ${response.status} ${response.statusText}`);
+      const response = await fetch(ONOFFICE_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: ONOFFICE_TOKEN,
+          request: { actions: signedActions },
+        }),
+        // no-store statt next.revalidate: Jeder Request trägt einen frischen HMAC über den
+        // aktuellen Unix-Timestamp (siehe buildHmac oben) — ein von Next.js zwischengespeicherter
+        // Response-Body für einen älteren Timestamp wäre ohnehin nur für diesen einen Moment gültig
+        // gewesen und schafft nur Verwirrung beim Debuggen von Live-Datenständen.
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(`onOffice API Fehler: ${response.status} ${response.statusText}`);
+      }
+
+      const json = (await response.json()) as OnOfficeResponse<T>;
+
+      if (json.status && json.status.code >= 400) {
+        throw new Error(
+          `onOffice API Fehler: ${json.status.message} (Code ${json.status.errorcode})`
+        );
+      }
+
+      return json;
+    } catch (error) {
+      letzterFehler = error;
+
+      if (!istTransienterFehler(error) || versuch === MAX_VERSUCHE) {
+        throw error;
+      }
+
+      console.warn(
+        `onOffice API: transienter Verbindungsfehler (Versuch ${versuch}/${MAX_VERSUCHE}), wiederhole in ${WARTEZEIT_MS}ms...`,
+        error
+      );
+      await warte(WARTEZEIT_MS);
+    }
   }
 
-  const json = (await response.json()) as OnOfficeResponse<T>;
-
-  if (json.status && json.status.code >= 400) {
-    throw new Error(`onOffice API Fehler: ${json.status.message} (Code ${json.status.errorcode})`);
-  }
-
-  return json;
+  // Unerreichbar (die Schleife wirft oder gibt bei jedem Durchlauf zurück) — nur für TypeScript,
+  // damit die Funktion garantiert einen Rückgabewert oder Wurf hat.
+  throw letzterFehler;
 }

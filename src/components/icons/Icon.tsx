@@ -20,11 +20,13 @@ export type IconName =
   | "expand"
   | "close"
   | "contact"
+  | "team"
   | "globe"
   | "search"
   | "menu"
   | "download"
-  | "externalLink";
+  | "externalLink"
+  | "lock";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   greeting: (
@@ -128,6 +130,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M6.5 16c0-1.7 1.5-3 3-3s3 1.3 3 3M14 9.5h4M14 12.5h4" />
     </>
   ),
+  team: (
+    <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 20c0-3.6 2.5-6.2 5.5-6.2s5.5 2.6 5.5 6.2" />
+      <circle cx="17" cy="9.5" r="2.2" />
+      <path d="M14.8 14c2.4.4 3.7 2.7 3.7 6" />
+    </>
+  ),
   globe: (
     <>
       <circle cx="12" cy="12" r="8" />
@@ -153,6 +163,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M10 5H5v14h14v-5" />
       <path d="M13 3h8v8" />
       <path d="M21 3l-9 9" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="1.5" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+      <path d="M12 14.5v2.5" />
     </>
   ),
 };
