@@ -215,7 +215,7 @@ function ReferenzobjektSlot({
   );
 }
 
-// Referenzobjekt-Auswahl: Der Berater/die Beraterin wählt bis zu drei tatsächlich verkaufte
+// Referenzobjekt-Auswahl: Der Berater/die Beraterin wählt bis zu sechs tatsächlich verkaufte
 // Vergleichsobjekte aus dem echten OnOffice-Bestand aus (Suchmaske gefiltert auf status2=verkauft,
 // siehe /api/onoffice/route.ts). Eine frühere automatische Ähnlichkeits-Bewertung gegen einen
 // festen Demo-Objektpool lieferte keine zum jeweiligen Kundenobjekt passenden Treffer und wurde
@@ -230,10 +230,15 @@ function ReferenzobjektSlot({
 // Auswahl liegt (wie gewaehltesPaket) in PraesentationApp.tsx, damit sie beim Wechsel zwischen
 // Reitern erhalten bleibt.
 export function Vergleichswert({
+  immobilie,
   referenzobjekte,
   onReferenzobjektAendern,
   vorauswahlLaedt,
 }: {
+  // Das zu bewertende Kundenobjekt selbst (nicht Teil der Vergleichsobjekte) — wird für die
+  // Hochrechnung unten gebraucht (Juli 2026 Chat-Vorgabe: "rechne den durchschnittlichen €/m2
+  // hoch auf das [Kunden-]Objekt").
+  immobilie: Immobilie;
   referenzobjekte: (Immobilie | null)[];
   onReferenzobjektAendern: (index: number, objekt: Immobilie | null) => void;
   // Läuft der automatische Vorauswahl-Abruf (siehe PraesentationApp.tsx) noch? Solange das der
@@ -245,6 +250,15 @@ export function Vergleichswert({
   const ausgewaehlt = referenzobjekte.filter((o): o is Immobilie => o !== null);
   const mittelwerte = ausgewaehlt.length > 0 ? berechneMittelwerte(ausgewaehlt) : null;
   const ausgewaehlteIds = ausgewaehlt.map((o) => o.id);
+  // Hochgerechneter Wert für das Kundenobjekt: Ø Preis/m² der Vergleichsobjekte, angewendet auf
+  // die tatsächliche Wohnfläche des Kundenobjekts (Juli 2026 Chat-Vorgabe: "Setze die Mittelwerte
+  // ins Verhältnis zum Objekt und rechne den durchschnittlichen €/m2 hoch auf das Objekt") — nur
+  // auswertbar, wenn sowohl ein Preis/m²-Mittelwert vorliegt als auch die Wohnfläche des
+  // Kundenobjekts in onOffice hinterlegt ist.
+  const hochgerechneterWert =
+    mittelwerte?.preisProM2 !== undefined && immobilie.wohnflaeche
+      ? mittelwerte.preisProM2 * immobilie.wohnflaeche
+      : undefined;
   // Sobald der Nutzer manuell etwas auswählt (auch während der Vorauswahl-Abruf noch läuft),
   // sofort die normale Slot-Ansicht zeigen statt weiter den Ladeplatzhalter — die manuelle
   // Auswahl soll nie hinter dem Ladezustand verschwinden.
@@ -253,7 +267,7 @@ export function Vergleichswert({
   return (
     <SectionShell label="Marktvergleich" title="Vergleichbare, verkaufte Objekte">
       <p className="mb-lg max-w-[65ch] text-body text-anthrazit/80">
-        Wir haben bereits bis zu drei passende, tatsächlich verkaufte Objekte vorausgewählt (nach
+        Wir haben bereits bis zu sechs passende, tatsächlich verkaufte Objekte vorausgewählt (nach
         PLZ, Wohnfläche, Baujahr und Kaufpreis) — Sie können die Auswahl jederzeit anpassen oder
         gegen ein anderes Objekt aus dem Bestand austauschen. Die Suchmaske zeigt ausschließlich
         abgeschlossene Verkäufe, keine aktuell angebotenen Objekte.
@@ -286,6 +300,30 @@ export function Vergleichswert({
               </p>
             </div>
           </div>
+
+          {/* Setzt die Mittelwerte ins Verhältnis zum Kundenobjekt: Wohnfläche des Kundenobjekts
+              neben der Vergleichsfläche, plus der auf diese Wohnfläche hochgerechnete Wert (Ø
+              Preis/m² der Vergleichsobjekte × Wohnfläche des Kundenobjekts) — Juli 2026
+              Chat-Vorgabe. */}
+          <div className="mt-sm border-t border-anthrazit/10 pt-sm">
+            <p className="label mb-sm">Im Verhältnis zu Ihrem Objekt</p>
+            <div className="grid grid-cols-1 gap-sm sm:grid-cols-2">
+              <div>
+                <p className="label mb-xs">Wohnfläche Ihres Objekts</p>
+                <p className="font-slab text-2xl font-bold text-anthrazit">
+                  {immobilie.wohnflaeche ? `${immobilie.wohnflaeche} m²` : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="label mb-xs">Hochgerechneter Wert (Ø Preis/m² × Wohnfläche)</p>
+                <p className="font-slab text-2xl font-bold text-anthrazit">
+                  {hochgerechneterWert !== undefined
+                    ? formatiereBetrag(Math.round(hochgerechneterWert))
+                    : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
         </Card>
       )}
 
@@ -295,10 +333,10 @@ export function Vergleichswert({
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-sm md:grid-cols-3">
-          {[0, 1, 2].map((index) => (
+          {referenzobjekte.map((objekt, index) => (
             <ReferenzobjektSlot
               key={index}
-              objekt={referenzobjekte[index]}
+              objekt={objekt}
               ausgeschlosseneIds={ausgewaehlteIds}
               onAuswaehlen={(objekt) => onReferenzobjektAendern(index, objekt)}
               onEntfernen={() => onReferenzobjektAendern(index, null)}

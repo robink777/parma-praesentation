@@ -102,8 +102,18 @@ function Blank({
   suffix?: string;
   width?: string;
 }) {
+  // Der umgebende Container ist selbst "inline-flex" und sizt sich standardmäßig am eigenen
+  // Inhalt (max-content) statt am verfügbaren Platz der Elternzeile — ein "w-full" auf dem Input
+  // ("width" oben) bezieht sich auf diesen Container und läuft deshalb ins Leere, das Feld bleibt
+  // trotz w-full auf Standard-Inputbreite (Ort-Feld in §5 des Maklervertrags, Juli 2026
+  // Chat-Vorgabe: "die Eingabefläche zu kurz"). "flex-1" lässt den Container in der Elternzeile
+  // (siehe die "flex flex-wrap"-Absätze oben) den verbleibenden Platz einnehmen, erst dadurch
+  // greift w-full auf dem Input tatsächlich.
+  const istVollbreite = width === "w-full";
   return (
-    <span className="inline-flex items-baseline gap-xs align-baseline">
+    <span
+      className={`inline-flex items-baseline gap-xs align-baseline ${istVollbreite ? "flex-1" : ""}`}
+    >
       <input
         type="text"
         value={value ?? ""}

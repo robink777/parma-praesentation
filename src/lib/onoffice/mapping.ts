@@ -134,6 +134,24 @@ export const OBJEKTTYP_LABELS: Record<string, string> = {
   besondereImmobilie: "Besondere Immobilie",
 };
 
+// Klartext-Zuordnung für das Singleselect-Feld "objektart" (grobe Kategorie, z.B. "Haus"/
+// "Wohnung" — ergänzend zu objekttyp oben) — vollständige Werteliste (11 Einträge) gegen den
+// echten Feldkatalog geprüft (resourcetype "fields", Juli 2026). Ohne diese Zuordnung zeigte die
+// UI den rohen OnOffice-Schlüssel (z.B. "haus" statt "Haus") unverändert an.
+export const OBJEKTART_LABELS: Record<string, string> = {
+  zimmer: "Zimmer",
+  haus: "Haus",
+  wohnung: "Wohnung",
+  grundstueck: "Grundstück",
+  buero_praxen: "Büro/Praxen",
+  einzelhandel: "Laden/Einzelhandel",
+  gastgewerbe: "Gastgewerbe",
+  hallen_lager_prod: "Hallen/Lager/Produktion",
+  land_und_forstwirtschaft: "Land/Forstwirtschaft",
+  freizeitimmbilien_gewerblich: "Freizeitimmobilie (gewerblich)",
+  sonstige: "Sonstige",
+};
+
 // Klartext-Zuordnung für das Multiselect-Feld "heizungsart" — vollständige Werteliste (~15
 // Einträge) gegen den echten Feldkatalog geprüft (resourcetype "fields", Juli 2026).
 export const HEIZUNGSART_LABELS: Record<string, string> = {
@@ -189,7 +207,7 @@ export function mapEstateRecord(record: RawEstateRecord): Immobilie {
     plz: el.plz,
     strasse: el.strasse,
     hausnummer: el.hausnummer || undefined,
-    objektart: el.objektart,
+    objektart: el.objektart ? OBJEKTART_LABELS[el.objektart] || el.objektart : undefined,
     objekttyp: el.objekttyp ? OBJEKTTYP_LABELS[el.objekttyp] || el.objekttyp : undefined,
     baujahr: el.baujahr ? Number(el.baujahr) : undefined,
     zustand: el.zustand,

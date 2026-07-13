@@ -14,6 +14,12 @@ import { Leistungsversprechen } from "@/components/sections/Leistungsversprechen
 import { Maklervertrag } from "@/components/sections/Maklervertrag";
 import { waehleVorauswahl } from "@/lib/vergleichswert";
 
+// Anzahl der Vergleichsobjekt-Slots im Vergleichswert-Reiter (Juli 2026 Chat-Vorgabe: "Mache aus
+// den 3 Vergleichsobjekten bitte 6") — eine einzige Stelle statt eines an mehreren Stellen
+// wiederholten Zahlenwerts, damit eine künftige erneute Anpassung nicht wieder an mehreren Stellen
+// synchron gehalten werden muss.
+const ANZAHL_REFERENZOBJEKTE = 6;
+
 export function PraesentationApp({ daten }: { daten: Praesentation }) {
   const [activeId, setActiveId] = useState("begruessung");
   const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>();
@@ -21,7 +27,9 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
   // Reiter selbst) gehalten, damit die Auswahl beim Wechsel zwischen Reitern erhalten bleibt,
   // analog zu gewaehltesPaket oben. Wird beim ersten Laden automatisch vorbefüllt (siehe
   // useEffect unten), bleibt danach aber genau wie vorher vollständig manuell anpassbar/austauschbar.
-  const [referenzobjekte, setReferenzobjekte] = useState<(Immobilie | null)[]>([null, null, null]);
+  const [referenzobjekte, setReferenzobjekte] = useState<(Immobilie | null)[]>(
+    Array(ANZAHL_REFERENZOBJEKTE).fill(null)
+  );
   // Zeigt an, ob der Vorauswahl-Abruf unten noch läuft — damit der Vergleichswert-Reiter
   // währenddessen einen (kleinen) Ladezustand statt einfach nichts anzeigt, siehe
   // Vergleichswert.tsx (zeigtLadeplatzhalter). Start-Wert true, da der Abruf sofort beim Mounten
@@ -46,7 +54,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
   // erneut liefe. Holt den Pool tatsächlich verkaufter Objekte über denselben Endpunkt wie die
   // manuelle Suche (siehe /api/onoffice/route.ts, verkauft=1) und wendet die vom Nutzer
   // vorgegebene, kaskadierende Filterlogik (PLZ → Wohnfläche → Baujahr → Kaufpreis) an.
-  // Überschreibt NUR den Ausgangszustand (alle drei Slots noch leer, siehe setReferenzobjekte
+  // Überschreibt NUR den Ausgangszustand (alle Slots noch leer, siehe setReferenzobjekte
   // unten) — jede spätere manuelle Auswahl/Entfernung bleibt danach unangetastet, die Vorauswahl
   // ist also lediglich ein komfortabler Startwert, kein sich aufdrängendes Automatik-Feature.
   //
@@ -74,12 +82,12 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         const kandidaten = await res.json();
         if (abgebrochen || !Array.isArray(kandidaten)) return;
 
-        const vorschlag = waehleVorauswahl(daten.immobilie, kandidaten, 3);
+        const vorschlag = waehleVorauswahl(daten.immobilie, kandidaten, ANZAHL_REFERENZOBJEKTE);
         if (vorschlag.length === 0) return;
 
         setReferenzobjekte((prev) =>
           prev.every((o) => o === null)
-            ? [vorschlag[0] ?? null, vorschlag[1] ?? null, vorschlag[2] ?? null]
+            ? Array.from({ length: ANZAHL_REFERENZOBJEKTE }, (_, i) => vorschlag[i] ?? null)
             : prev
         );
       } catch {
@@ -127,6 +135,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
         {activeId === "vergleich" && (
           <Vergleichswert
+            immobilie={daten.immobilie}
             referenzobjekte={referenzobjekte}
             onReferenzobjektAendern={referenzobjektAendern}
             vorauswahlLaedt={vorauswahlLaedt}
