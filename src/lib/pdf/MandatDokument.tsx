@@ -567,13 +567,32 @@ export function MandatDokument({ kunde, immobilie, bewertung, daten, gewaehltesP
         <Text style={styles.text}>
           Ort: {daten.unterschriftOrt || "___________"}   Datum: {daten.unterschriftDatum || "___________"}
         </Text>
-        <View style={{ flexDirection: "row", marginTop: 40 }}>
-          <View style={{ flex: 1, marginRight: 12, borderTop: `0.5pt solid ${FARBE.asche}`, paddingTop: 4 }}>
-            <Text style={styles.small}>Auftraggeberin/Auftraggeber</Text>
-          </View>
-          <View style={{ flex: 1, borderTop: `0.5pt solid ${FARBE.asche}`, paddingTop: 4 }}>
-            <Text style={styles.small}>Maklerin/Makler</Text>
-          </View>
+        {/* Eine eigene Unterschriftszeile pro erfasster Vertragspartei (auftraggeber1 +
+            weitereAuftraggeber) statt nur einer einzigen generischen Zeile — bei mehreren
+            Eigentümern/Erben, die tatsächlich alle einzeln unterschreiben (kein Vollmachts-
+            verhältnis, siehe §4 oben), muss für jede Person Platz sein. Name wird angezeigt, wenn
+            im Formular erfasst, sonst ein nummerierter Platzhalter. In 2er-Reihen umgebrochen
+            (flexWrap), damit auch 4 Auftraggeber + Makler noch lesbar auf die Seite passen. */}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 40 }}>
+          {[
+            ...[daten.auftraggeber1, ...daten.weitereAuftraggeber].map(
+              (partei, i) => partei.name || (i === 0 ? "Auftraggeberin/Auftraggeber" : `Weitere/r Auftraggeber/in ${i + 1}`)
+            ),
+            "Maklerin/Makler",
+          ].map((beschriftung, i) => (
+            <View
+              key={i}
+              style={{
+                width: "48%",
+                marginRight: i % 2 === 0 ? "4%" : 0,
+                marginTop: i >= 2 ? 24 : 0,
+                borderTop: `0.5pt solid ${FARBE.asche}`,
+                paddingTop: 4,
+              }}
+            >
+              <Text style={styles.small}>{beschriftung}</Text>
+            </View>
+          ))}
         </View>
         <Fusszeile titel="Maklervertrag" />
       </Page>

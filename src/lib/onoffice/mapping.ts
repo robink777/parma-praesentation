@@ -210,10 +210,20 @@ export interface RawAddressRecord {
     Name?: string;
     Email?: string;
     Telefon1?: string;
+    // Ergänzt Juli 2026 (Logik-Check "mehrere Eigentümer"): Ohne diese drei Felder blieb
+    // Kunde.strasse/plz/ort für Eigentümer/innen (im Unterschied zu Betreuer/innen, siehe
+    // RawBetreuerRecord/BETREUER_FIELDS unten) immer leer, obwohl das Feld im Typ existiert —
+    // dadurch startete die automatische Vorbefüllung im Maklervertrag (siehe Maklervertrag.tsx,
+    // kundeZuPartei) für "weitere Auftraggeber" IMMER ohne Adresse, selbst wenn in onOffice eine
+    // hinterlegt war. Feldnamen "Strasse"/"Plz"/"Ort" bewusst identisch zu RawBetreuerRecord
+    // gewählt (dasselbe address-Modul, gleicher Feldkatalog).
+    Strasse?: string;
+    Plz?: string;
+    Ort?: string;
   };
 }
 
-export const ADDRESS_FIELDS = ["Anrede", "Vorname", "Name", "Email", "Telefon1"];
+export const ADDRESS_FIELDS = ["Anrede", "Vorname", "Name", "Email", "Telefon1", "Strasse", "Plz", "Ort"];
 
 export function mapAddressRecord(record: RawAddressRecord): Kunde {
   const el = record.elements;
@@ -223,6 +233,9 @@ export function mapAddressRecord(record: RawAddressRecord): Kunde {
     nachname: el.Name || "",
     email: el.Email,
     telefon: el.Telefon1,
+    strasse: el.Strasse || undefined,
+    plz: el.Plz || undefined,
+    ort: el.Ort || undefined,
   };
 }
 

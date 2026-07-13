@@ -12,22 +12,42 @@ import { Bewertung, Immobilie, Kunde, LeistungspaketId, MaklervertragDaten, Makl
 // Maklervertrag "aus onOffice vorausgefüllt" — alles, was onOffice (noch) nicht liefert
 // (Provision, Mängel, sonstige Vereinbarungen, Vertragsdauer), bleibt leer und wird im
 // Beratungstermin direkt im Formular ergänzt.
-function baueInitialdaten(kunde: Kunde, immobilie: Immobilie, bewertung: Bewertung): MaklervertragDaten {
-  const name = [kunde.anrede, kunde.vorname, kunde.nachname].filter(Boolean).join(" ");
-  const plzOrt = [kunde.plz, kunde.ort].filter(Boolean).join(" ");
+// Wandelt einen Kunde (aus onOffice bzw. manuell übergebene addressId) in eine Vertragspartei
+// fürs Formular um — gemeinsam genutzt für auftraggeber1 UND die automatische Vorbefüllung
+// weiterer Eigentümer unten (baueInitialdaten).
+function kundeZuPartei(kunde: Kunde): MaklervertragPartei {
+  return {
+    name: [kunde.anrede, kunde.vorname, kunde.nachname].filter(Boolean).join(" "),
+    strasse: kunde.strasse,
+    plzOrt: [kunde.plz, kunde.ort].filter(Boolean).join(" "),
+    telefon: kunde.telefon,
+    email: kunde.email,
+  };
+}
+
+// Insgesamt bis zu 4 Eigentümer/innen im Vertrag: Auftraggeber 1 (fix) + max. 3 weitere (siehe
+// MAX_WEITERE unten in der Komponente sowie MaklervertragDaten.weitereAuftraggeber). Bei mehr als
+// 4 tatsächlich hinterlegten Eigentümern (größere Erbengemeinschaft) werden nur die ersten 3
+// automatisch vorbefüllt — der Rest lässt sich weiterhin manuell über "+ Weitere/n Eigentümer/in
+// hinzufügen" ergänzen, siehe auch die Warnmeldung dazu weiter unten in der Komponente.
+const MAX_WEITERE_VORBEFUELLT = 3;
+
+function baueInitialdaten(
+  kunde: Kunde,
+  weitereEigentuemer: Kunde[],
+  immobilie: Immobilie,
+  bewertung: Bewertung
+): MaklervertragDaten {
   const objektAdresse = [immobilie.strasse, [immobilie.plz, immobilie.ort].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(", ");
 
   return {
-    auftraggeber1: {
-      name,
-      strasse: kunde.strasse,
-      plzOrt,
-      telefon: kunde.telefon,
-      email: kunde.email,
-    },
-    weitereAuftraggeber: [],
+    auftraggeber1: kundeZuPartei(kunde),
+    // Automatisch vorbefüllt aus den laut onOffice zusätzlich hinterlegten Eigentümern (siehe
+    // Praesentation.weitereEigentuemer, lib/praesentation.ts) — im Mock-Modus bzw. bei nur einem
+    // Eigentümer bleibt das weiterhin eine leere Liste, genau wie zuvor.
+    weitereAuftraggeber: weitereEigentuemer.slice(0, MAX_WEITERE_VORBEFUELLT).map(kundeZuPartei),
     objekt: immobilie.bezeichnung || objektAdresse,
     verkaufsobjektArt: immobilie.objektart,
     verkaufsobjektOrt: objektAdresse,
@@ -127,16 +147,23 @@ function ParteiFelder({
 
 export function Maklervertrag({
   kunde,
+  weitereEigentuemer = [],
   immobilie,
   bewertung,
   gewaehltesPaket,
 }: {
   kunde: Kunde;
+  // Zusätzliche Eigentümer/innen desselben Objekts (siehe Praesentation.weitereEigentuemer) —
+  // werden unten automatisch als weitere Auftraggeber vorbefüllt statt manuell eingetippt
+  // werden zu müssen.
+  weitereEigentuemer?: Kunde[];
   immobilie: Immobilie;
   bewertung: Bewertung;
   gewaehltesPaket?: LeistungspaketId;
 }) {
-  const [daten, setDaten] = useState<MaklervertragDaten>(() => baueInitialdaten(kunde, immobilie, bewertung));
+  const [daten, setDaten] = useState<MaklervertragDaten>(() =>
+    baueInitialdaten(kunde, weitereEigentuemer, immobilie, bewertung)
+  );
   const [mandatErteilt, setMandatErteilt] = useState(false);
   const [pdfWirdErstellt, setPdfWirdErstellt] = useState(false);
   const [pdfFehler, setPdfFehler] = useState<string | null>(null);
@@ -255,13 +282,21 @@ export function Maklervertrag({
         </Card>
       ))}
 
-      {daten.weitereAuftraggeber.length < MAX_WEITERE && (
+      {daten.weitereAuftraggeber.length < MAX_WEITERE ? (
         <button
           onClick={weitereHinzufuegen}
           className="mb-lg text-small text-anthrazit/70 underline hover:text-messing"
         >
           + Weitere/n Eigentümer/in hinzufügen
         </button>
+      ) : (
+        // Statt den Button kommentarlos verschwinden zu lassen (bis Juli 2026): erklärt, warum
+        // kein 5. Auftraggeber mehr eintragbar ist — bei größeren Erbengemeinschaften (5+ Erben)
+        // ein realer Fall, siehe Logik-Check.
+        <p className="mb-lg text-small text-anthrazit/50">
+          Maximal 4 Auftraggeber/innen im Formular abbildbar. Bei mehr Eigentümern bitte die
+          übrigen Personen handschriftlich auf dem ausgedruckten Vertrag ergänzen.
+        </p>
       )}
 
       <div className="mb-lg">

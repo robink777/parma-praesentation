@@ -3,6 +3,7 @@ import { MitarbeiterKennzahlen, MitarbeiterObjekt, ObjektGesamtKennzahlen } from
 import {
   ladeAlleAktivenObjekte,
   ladeAlleObjekteInAufarbeitung,
+  ladeAlleVerkauftenObjekte,
   ladeBenutzernameFuerMitarbeiter,
   ladeNutzerNrFuerMitarbeiter,
   zaehleAktiveKunden,
@@ -10,6 +11,7 @@ import {
   zaehleBesichtigungen,
   zaehleObjekteInAufarbeitung,
   zaehleTermine,
+  zaehleVerkaufteObjekteFuerMitarbeiter,
 } from "./estate";
 
 // Formatiert ein Datum als "YYYY-MM-DD HH:mm:ss", wie von den datestart/dateend-Parametern des
@@ -45,6 +47,27 @@ function ermittleZeitraeume() {
   };
 }
 
+// Datumsfenster (ohne Uhrzeitanteil) für das aktuelle Kalenderjahr, für die neue Kennzahl
+// "Verkaufte Objekte" je Mitarbeiter (siehe zaehleVerkaufteObjekteFuerMitarbeiter in estate.ts,
+// Juli 2026 Chat-Vorgabe: "die Zahl der verkauften Objekte pro Mitarbeiter in diesem Jahr ...
+// Schreibe die Funktion allerdings so dass es jedes Jahr zurück gestellt wird"). Bewusst ein
+// eigener Helfer statt einer Erweiterung von ermittleZeitraeume oben: Das Feld "verkauft_am" ist
+// ein reines Datumsfeld (kein Kalendereintrag mit Uhrzeit), live geprüft funktioniert dafür das
+// Format "YYYY-MM-DD" zuverlässig als Filterwert (siehe Kommentar in estate.ts) — anders als die
+// "YYYY-MM-DD HH:mm:ss"-Formatierung, die zaehleTermine/zaehleBesichtigungen (resourcetype
+// "calendar") benötigen. Das Jahr wird bei jedem Aufruf neu aus dem Systemdatum bestimmt, nie
+// hartkodiert, damit die Kennzahl ohne jährliche Codeänderung plausibel bleibt.
+// Exportiert (nicht mehr modul-lokal), damit auch api/admin/mitarbeiter-objekte/route.ts dasselbe
+// Jahresfenster für die neue "Verkauft {Jahr}"-Dropdown-Gruppe verwenden kann, statt das
+// Kalenderjahr dort ein zweites Mal zu bestimmen.
+export function ermittleJahresDatumsfenster() {
+  const jahr = new Date().getFullYear();
+  return {
+    vonJahr: `${jahr}-01-01`,
+    bisJahr: `${jahr}-12-31`,
+  };
+}
+
 // Aggregiert die Mitarbeiterstatistik-Kennzahlen (siehe MitarbeiterKennzahlen in types/index.ts
 // und components/admin/Mitarbeiterstatistik.tsx) für alle TEAM-Mitglieder zu EINER
 // Name-zu-Kennzahlen-Map. Alle 5 vereinbarten Parameter sind jetzt live angebunden: Parameter 1
@@ -60,6 +83,7 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
   Record<string, MitarbeiterKennzahlen>
 > {
   const { von30Tage, bis30Tage, vonJahr, bisJahr } = ermittleZeitraeume();
+  const { vonJahr: vonJahrVerkauft, bisJahr: bisJahrVerkauft } = ermittleJahresDatumsfenster();
 
   const eintraege = await Promise.all(
     TEAM.map(async (mitglied) => {
@@ -74,6 +98,7 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         besichtigungen30Tage,
         besichtigungenJahr,
         kundenAktiv,
+        verkaufteObjekteJahr,
       ] = await Promise.all([
         nutzerNr ? zaehleAktiveObjekte(nutzerNr).catch(() => null) : Promise.resolve(null),
         nutzerNr
@@ -94,6 +119,11 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         benutzername
           ? zaehleAktiveKunden(benutzername).catch(() => null)
           : Promise.resolve(null),
+        nutzerNr
+          ? zaehleVerkaufteObjekteFuerMitarbeiter(nutzerNr, vonJahrVerkauft, bisJahrVerkauft).catch(
+              () => null
+            )
+          : Promise.resolve(null),
       ]);
 
       const kennzahlen: MitarbeiterKennzahlen = {
@@ -104,6 +134,7 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         besichtigungen30Tage,
         besichtigungenJahr,
         kundenAktiv,
+        verkaufteObjekteJahr,
       };
 
       return [mitglied.name, kennzahlen] as const;
@@ -128,9 +159,12 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
 // Gesamter Aufruf per try/catch abgesichert in admin/page.tsx (analog zu ladeMitarbeiterKennzahlen
 // oben) — schlägt er fehl, zeigen die Infoboxen "–" statt eines Fehlers.
 export async function ladeObjektGesamtKennzahlen(): Promise<ObjektGesamtKennzahlen> {
-  const [aktiv, aufarbeitung] = await Promise.all([
+  const { vonJahr, bisJahr } = ermittleJahresDatumsfenster();
+
+  const [aktiv, aufarbeitung, verkauftJahr] = await Promise.all([
     ladeAlleAktivenObjekte(),
     ladeAlleObjekteInAufarbeitung(),
+    ladeAlleVerkauftenObjekte(vonJahr, bisJahr),
   ]);
 
   const alle: MitarbeiterObjekt[] = [...aktiv, ...aufarbeitung];
@@ -145,10 +179,42 @@ export async function ladeObjektGesamtKennzahlen(): Promise<ObjektGesamtKennzahl
 
   const objektvolumenGesamt = alle.reduce((summe, objekt) => summe + objekt.preis, 0);
 
+  // Provisionsvorlauf gesamt: Summe über alle Objekte mit auswertbarer Außen-/Innen-Provision
+  // (siehe MitarbeiterObjekt.provisionsvorlauf/provisionsvorlaufFehlt in onoffice/estate.ts) —
+  // Objekte ohne auswertbaren Wert fließen NICHT mit 0 in die Summe ein, sondern werden separat
+  // gezählt (provisionsvorlaufFehltAnzahl), damit die Infobox auf fehlende Daten hinweisen kann.
+  const provisionsWerte = alle
+    .map((objekt) => objekt.provisionsvorlauf)
+    .filter((wert): wert is number => wert !== null);
+  const provisionsvorlaufGesamt =
+    provisionsWerte.length === 0 ? null : provisionsWerte.reduce((summe, wert) => summe + wert, 0);
+  const provisionsvorlaufFehltAnzahl = alle.filter((objekt) => objekt.provisionsvorlaufFehlt).length;
+
+  // Neuer Block "Verkaufte Objekte {Jahr} / Provisionsvolumen {Jahr} / Gesamtvolumen {Jahr}"
+  // (Juli 2026 Chat-Vorgabe) — gleiches Muster wie oben, aber ausschließlich über die im
+  // laufenden Kalenderjahr verkauften Objekte (verkauftJahr), nicht über den Gesamtbestand.
+  const objektvolumenVerkauftJahr = verkauftJahr.reduce((summe, objekt) => summe + objekt.preis, 0);
+  const provisionsWerteVerkauftJahr = verkauftJahr
+    .map((objekt) => objekt.provisionsvorlauf)
+    .filter((wert): wert is number => wert !== null);
+  const provisionsvolumenVerkauftJahr =
+    provisionsWerteVerkauftJahr.length === 0
+      ? null
+      : provisionsWerteVerkauftJahr.reduce((summe, wert) => summe + wert, 0);
+  const provisionsvolumenVerkauftJahrFehltAnzahl = verkauftJahr.filter(
+    (objekt) => objekt.provisionsvorlaufFehlt
+  ).length;
+
   return {
     aufarbeitungGesamt: aufarbeitung.length,
     aktivGesamt: aktiv.length,
     durchschnittVermarktungsdauerTage,
     objektvolumenGesamt,
+    provisionsvorlaufGesamt,
+    provisionsvorlaufFehltAnzahl,
+    verkaufteObjekteJahrGesamt: verkauftJahr.length,
+    objektvolumenVerkauftJahr,
+    provisionsvolumenVerkauftJahr,
+    provisionsvolumenVerkauftJahrFehltAnzahl,
   };
 }

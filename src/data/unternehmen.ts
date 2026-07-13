@@ -48,16 +48,94 @@ export const PORTALANFRAGEN_JAHR = 16004;
 // (das Feld ist dort für jeden bisher geprüften Mitarbeiter leer) — Rolle daher auf Nutzerangabe
 // "Immobilienmakler" gesetzt, kein Profilfoto in OnOffice hinterlegt (erscheint vorerst mit
 // Initialen-Avatar, siehe Unternehmen.tsx).
+//
+// adressId/nutzerNr/benutzername (Juli 2026 hierher konsolidiert, siehe TeamMitglied in
+// types/index.ts für die Herleitung/den Grund): drei unterschiedliche OnOffice-ID-Räume für
+// dieselbe Person — adressId fürs address-Modul (Kontaktdaten), nutzerNr fürs user-Modul
+// (Objekt-Betreuer-Zuordnung, Statistik), benutzername der dort zusätzlich verwendete
+// Kurz-Login-Name. Celin Borgwaldt/Christian Rother/Tabea Erz/Nilgün Akbay/Santino Giese haben
+// bewusst KEINEN Eintrag (siehe Datenschutz-/Status-Hinweis, der früher bei
+// MITARBEITER_LIVE_ADRESS_IDS in onoffice/estate.ts stand): mehrere Personen haben in OnOffice
+// zusätzlich einen privaten Adressdatensatz (Wohnanschrift/private Kontaktdaten) — hier ist
+// ausschließlich die geschäftliche Adress-ID hinterlegt, damit niemals private Daten auf der
+// öffentlichen Präsentationsseite erscheinen. Tim Hartwich/Dawid Parma haben kein Profilfoto in
+// OnOffice hinterlegt (erscheinen mit Initialen-Avatar).
 export const TEAM: TeamMitglied[] = [
-  { name: "Daniel Parma", rolle: "Gründer, Geschäftsführer, DEKRA-zert. Immobilienmakler, IHK-Immobilienbewerter" },
-  { name: "Robin Kolbe", rolle: "Stellv. Geschäftsleitung, IHK-Immobilienbewerter, Marketing, Digitalisierung" },
-  { name: "Jacqueline Henot", rolle: "Bürokauffrau, Immobilienmaklerin (EIA)" },
-  { name: "Kira Woldt", rolle: "Kauffrau Büromanagement (IHK), Immobilienmaklerin (IHK), Wohnflächenberechnung, Visualisierung" },
-  { name: "Vanessa Krifft", rolle: "Kauffrau Büromanagement (IHK), Immobilienmaklerin" },
-  { name: "Sarah Barth", rolle: "Bankkauffrau (IHK), Office Managerin" },
-  { name: "Stanimira Georgieva", rolle: "Juniormaklerin" },
-  { name: "Katharina Becker", rolle: "Back Office, Social Media" },
-  { name: "Axel Wehmeier", rolle: "Immobilienmakler, Bankkaufmann, zert. Bauspar- und Finanzierungsfachmann" },
-  { name: "Tim Hartwich", rolle: "Auszubildender zum Immobilienkaufmann (IHK)" },
-  { name: "Dawid Parma", rolle: "Immobilienmakler" },
+  {
+    name: "Daniel Parma",
+    rolle: "Gründer, Geschäftsführer, DEKRA-zert. Immobilienmakler, IHK-Immobilienbewerter",
+    adressId: "119",
+    nutzerNr: "21",
+    benutzername: "Daniel",
+  },
+  {
+    name: "Robin Kolbe",
+    rolle: "Stellv. Geschäftsleitung, IHK-Immobilienbewerter, Marketing, Digitalisierung",
+    adressId: "123",
+    nutzerNr: "23",
+    benutzername: "Robin",
+  },
+  {
+    name: "Jacqueline Henot",
+    rolle: "Bürokauffrau, Immobilienmaklerin (EIA)",
+    adressId: "20483",
+    nutzerNr: "39",
+    benutzername: "Jacqueline",
+  },
+  {
+    name: "Kira Woldt",
+    rolle: "Kauffrau Büromanagement (IHK), Immobilienmaklerin (IHK), Wohnflächenberechnung, Visualisierung",
+    adressId: "125",
+    nutzerNr: "25",
+    benutzername: "Kira",
+  },
+  {
+    name: "Vanessa Krifft",
+    rolle: "Kauffrau Büromanagement (IHK), Immobilienmaklerin",
+    adressId: "20105",
+    nutzerNr: "37",
+    benutzername: "Vanessa",
+  },
+  {
+    name: "Sarah Barth",
+    rolle: "Bankkauffrau (IHK), Office Managerin",
+    adressId: "31077",
+    nutzerNr: "59",
+    benutzername: "Sarah",
+  },
+  {
+    name: "Stanimira Georgieva",
+    rolle: "Juniormaklerin",
+    adressId: "32669",
+    nutzerNr: "63",
+    benutzername: "Stanimira",
+  },
+  {
+    name: "Katharina Becker",
+    rolle: "Back Office, Social Media",
+    adressId: "6181",
+    nutzerNr: "35",
+    benutzername: "Katharina",
+  },
+  {
+    name: "Axel Wehmeier",
+    rolle: "Immobilienmakler, Bankkaufmann, zert. Bauspar- und Finanzierungsfachmann",
+    adressId: "28831",
+    nutzerNr: "55",
+    benutzername: "Axel",
+  },
+  {
+    name: "Tim Hartwich",
+    rolle: "Auszubildender zum Immobilienkaufmann (IHK)",
+    adressId: "31313",
+    nutzerNr: "41",
+    benutzername: "Tim",
+  },
+  {
+    name: "Dawid Parma",
+    rolle: "Immobilienmakler",
+    adressId: "44851",
+    nutzerNr: "79",
+    benutzername: "Dawid",
+  },
 ];

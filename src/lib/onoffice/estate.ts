@@ -380,11 +380,16 @@ interface RawQualifiedSuitorRecord {
   };
 }
 
-// Ermittelt die Adress-ID des Eigentümers eines Objekts. Das ist kein Datenfeld am
-// Estate-Datensatz, sondern eine eigene OnOffice-Relation (estate → address, Typ "owner").
-// Damit reicht im OnOffice-Link künftig die Objekt-UUID allein aus — der Kunde für die
-// persönliche Begrüßung wird automatisch über diese Relation aufgelöst.
-export async function ladeEigentuemerAddressId(estateId: string): Promise<string | null> {
+// Ermittelt ALLE Adress-IDs der Eigentümer eines Objekts (nicht nur die/den erste/n) — das ist
+// kein Datenfeld am Estate-Datensatz, sondern eine eigene OnOffice-Relation (estate → address,
+// Typ "owner"), die bei Miteigentum (z.B. Ehepaar) oder einer Erbengemeinschaft MEHRERE Adressen
+// gleichzeitig enthalten kann. Damit reicht im OnOffice-Link künftig die Objekt-UUID allein aus —
+// ALLE hinterlegten Eigentümer werden automatisch über diese Relation aufgelöst, für die
+// persönliche Begrüßung (siehe Begruessung.tsx) UND die automatische Vorbefüllung weiterer
+// Auftraggeber im Maklervertrag (siehe Maklervertrag.tsx, ladePraesentationsDaten in
+// lib/praesentation.ts). Früher (bis Juli 2026) wurde hier nur ids[0] zurückgegeben — dadurch
+// blieben zusätzliche Eigentümer dem System vollständig unbekannt statt nur "leer".
+export async function ladeEigentuemerAddressIds(estateId: string): Promise<string[]> {
   const result = await callOnOfficeApi<RawRelationRecord>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:get",
@@ -400,8 +405,7 @@ export async function ladeEigentuemerAddressId(estateId: string): Promise<string
   ]);
 
   const record = result?.response?.results?.[0]?.data?.records?.[0];
-  const ids = record?.elements?.[estateId];
-  return ids && ids.length > 0 ? ids[0] : null;
+  return record?.elements?.[estateId] ?? [];
 }
 
 export interface AutomatischeInteressenten {
@@ -425,7 +429,7 @@ export interface AutomatischeInteressenten {
 // verifiziert): Sie erwartet als "estatedata"-Parameter die Objektkriterien (nicht die
 // Objekt-ID) und liefert dafür je Interessenten-Suchprofil einen Datensatz mit "id"
 // (Adress-ID — live abgeglichen: id 123 = Robin Kolbes hinterlegte Adresse, deckt sich mit
-// MITARBEITER_LIVE_ADRESS_IDS oben) und "percentage" (0–100, exakt die vom Kunden gemeinte
+// TEAM["Robin Kolbe"].adressId in data/unternehmen.ts) und "percentage" (0–100, exakt die vom Kunden gemeinte
 // Übereinstimmungs-Kennzahl — OnOffice übernimmt die vollständige Berechnung, siehe
 // Interessent.uebereinstimmung in types/index.ts). Die Aktion unterstützt laut Doku KEIN
 // listlimit/sortby/Schwellenwert-Filter — sie liefert live durchgehend ALLE im Account
@@ -590,9 +594,9 @@ interface RawUserNameRecord {
 // unterscheiden): 1) Feldwert am Estate-Datensatz lesen (Nutzer-Nr als String, "0"/leer/
 // "0000-00-00" gelten als "nicht gesetzt" — Live-Test zeigte für ein Objekt ohne hinterlegten
 // Setter exakt "0" statt eines leeren Strings). 2) Nutzer-Nr über das "user"-Modul in
-// Vor-/Nachname auflösen. 3) Vollen Namen über die bereits gepflegte Namensliste
-// MITARBEITER_LIVE_ADRESS_IDS (weiter unten) auf die geschäftliche Adress-ID mappen — es gibt
-// im "user"-Modul selbst kein Feld, das direkt auf die Adress-ID verweist (siehe Kommentar bei
+// Vor-/Nachname auflösen. 3) Vollen Namen über die TEAM-Liste (data/unternehmen.ts,
+// TeamMitglied.adressId) auf die geschäftliche Adress-ID mappen — es gibt im "user"-Modul
+// selbst kein Feld, das direkt auf die Adress-ID verweist (siehe Kommentar bei
 // ladeUserFotosByEmails), daher der Umweg über den Namen.
 async function ladeAdressIdViaUserFeld(estateId: string, feldname: string): Promise<string | null> {
   const estateResult = await callOnOfficeApi<RawEstateUserFeldRecord>([
@@ -624,10 +628,10 @@ async function ladeAdressIdViaUserFeld(estateId: string, feldname: string): Prom
   if (!userElements?.Vorname || !userElements?.Nachname) return null;
 
   // Nachname kam live vereinzelt mit trailing Whitespace zurück (z.B. "Kolbe ") — trim(), damit
-  // der Namens-Lookup unten (exaktes String-Match gegen MITARBEITER_LIVE_ADRESS_IDS) nicht an
-  // unsichtbaren Leerzeichen scheitert.
+  // der Namens-Lookup unten (exaktes String-Match gegen TEAM, siehe types/index.ts/TeamMitglied)
+  // nicht an unsichtbaren Leerzeichen scheitert.
   const vollerName = `${userElements.Vorname.trim()} ${userElements.Nachname.trim()}`;
-  return MITARBEITER_LIVE_ADRESS_IDS[vollerName] || null;
+  return TEAM.find((t) => t.name === vollerName)?.adressId || null;
 }
 
 // Ermittelt die Adress-ID des zuständigen Mitarbeiters/der zuständigen Mitarbeiterin
@@ -836,108 +840,32 @@ export async function ladeBetreuerByEstateId(estateId: string): Promise<Betreuer
   return ladeBetreuerByAddressId(addressId);
 }
 
-// Verknüpft TEAM-Einträge (Name, siehe data/unternehmen.ts) mit ihrer geschäftlichen
-// OnOffice-Adress-ID, damit ladeAlleMitarbeiter() live Kontaktdaten (Telefon/E-Mail/Firma/
-// Anschrift) nachladen kann. Live-Recherche Juli 2026 gegen den echten Account (customerId
-// web77461): Es gibt in diesem Account weder ein "Kategorie"-Feld noch einen verifizierten
-// Weg, die Liste der Backend-Benutzer ("Alle Mitarbeiter sind als Benutzer hinterlegt", so
-// der Kunde) über die HMAC-signierte Adress-API generisch abzufragen — die Zuordnung
-// Name → Adress-ID wurde daher einzeln geprüft und hier als Liste hinterlegt. Bei neuen
-// Mitarbeitenden muss die Liste manuell ergänzt werden (siehe auch TEAM in data/unternehmen.ts).
-//
-// Wichtig (Datenschutz): Mehrere Personen haben in OnOffice ZWEI Adressdatensätze — einen
-// geschäftlichen (Firmenanschrift Monschauer Straße 64, dienstliche Rufnummer) und einen
-// privaten (Wohnanschrift, private Mobilnummer/E-Mail, vermutlich aus einem früheren Kunden-/
-// Interessentenkontakt). Hier ist ausschließlich die geschäftliche Adress-ID hinterlegt, damit
-// niemals private Wohnadressen oder private Kontaktdaten auf der öffentlichen
-// Präsentationsseite erscheinen.
-//
-// Stand Juli 2026, erneut live gegen den Account abgeglichen (resourcetype "user"/"address"):
-// Celin Borgwaldt wurde zum 30.06.2026 in OnOffice deaktiviert (Benutzerkonto nicht mehr aktiv)
-// und auf Nutzerwunsch komplett aus TEAM entfernt (siehe data/unternehmen.ts) — ihre frühere
-// Adress-ID ist daher hier absichtlich nicht mehr hinterlegt. Für Tim Hartwich existiert
-// entgegen einer früheren Prüfung inzwischen eine geschäftliche Adresse (ID 31313, kein
-// Profilfoto hinterlegt) — ergänzt. Dawid Parma wurde neu in TEAM aufgenommen (aktiver
-// OnOffice-Benutzer, Adress-ID 44851, ebenfalls kein Profilfoto hinterlegt). Christian Rother,
-// Tabea Erz, Nilgün Akbay und Santino Giese sind zwar als Benutzer in OnOffice angelegt, stehen
-// aber weiterhin nicht in der öffentlichen Team-Übersicht (TEAM) — Tabea Erz und Nilgün Akbay
-// sind zudem seit 2024 deaktivierte Alt-Accounts, für Christian Rother liegt in OnOffice
-// ausschließlich ein privater Adressdatensatz (Heimatanschrift, private E-Mail) vor.
-const MITARBEITER_LIVE_ADRESS_IDS: Record<string, string> = {
-  "Daniel Parma": "119",
-  "Robin Kolbe": "123",
-  "Kira Woldt": "125",
-  "Katharina Becker": "6181",
-  "Vanessa Krifft": "20105",
-  "Jacqueline Henot": "20483",
-  "Axel Wehmeier": "28831",
-  "Sarah Barth": "31077",
-  "Stanimira Georgieva": "32669",
-  "Tim Hartwich": "31313",
-  "Dawid Parma": "44851",
-};
+// Namensabgleich Juli 2026 konsolidiert (siehe TeamMitglied in types/index.ts für die
+// vollständige Herleitung): adressId/nutzerNr/benutzername stehen jetzt direkt an jedem
+// TEAM-Eintrag (data/unternehmen.ts) statt in drei separaten, exakt per Namens-String
+// synchron zu haltenden Record<string,string>-Tabellen hier. ladeNutzerNrFuerMitarbeiter und
+// ladeBenutzernameFuerMitarbeiter suchen daher jetzt einfach in TEAM statt in einer eigenen
+// Tabelle nachzuschlagen.
 
-// Nutzer-Nr (NICHT Adress-ID, siehe MITARBEITER_LIVE_ADRESS_IDS oben — anderer ID-Raum) je
-// TEAM-Mitglied für die Mitarbeiterstatistik im Admin-Bereich (siehe
-// components/admin/Mitarbeiterstatistik.tsx). Das Feld "benutzer" am Objekt (Objekt-Betreuer)
-// referenziert genau diese Nutzer-Nr, nicht die Adress-ID der geschäftlichen Kontaktdaten.
-// Live abgeglichen über den OnOffice-Backend-User-Export (Juli 2026, resourcetype "user",
-// Felder Vorname/Nachname/Nr) und per Name eindeutig allen 11 aktuellen TEAM-Mitgliedern
-// zugeordnet.
-const MITARBEITER_NUTZER_NR: Record<string, string> = {
-  "Daniel Parma": "21",
-  "Robin Kolbe": "23",
-  "Kira Woldt": "25",
-  "Katharina Becker": "35",
-  "Vanessa Krifft": "37",
-  "Jacqueline Henot": "39",
-  "Tim Hartwich": "41",
-  "Axel Wehmeier": "55",
-  "Sarah Barth": "59",
-  "Stanimira Georgieva": "63",
-  "Dawid Parma": "79",
-};
-
-// Liefert die Nutzer-Nr eines TEAM-Mitglieds (siehe MITARBEITER_NUTZER_NR oben) für die
+// Liefert die Nutzer-Nr eines TEAM-Mitglieds (siehe TeamMitglied.nutzerNr) für die
 // Mitarbeiterstatistik-Aggregation (siehe onoffice/mitarbeiterstatistik.ts) — null, wenn für
-// den Namen keine Nutzer-Nr hinterlegt ist.
+// den Namen kein TEAM-Eintrag oder keine Nutzer-Nr hinterlegt ist.
 export function ladeNutzerNrFuerMitarbeiter(name: string): string | null {
-  return MITARBEITER_NUTZER_NR[name] || null;
+  return TEAM.find((t) => t.name === name)?.nutzerNr || null;
 }
 
-// OnOffice-Benutzername (Kurz-Login, z.B. "Kira" statt Nutzer-Nr "25" oder Adress-ID) je
-// TEAM-Mitglied — für Parameter 5 ("Kunden aktiv", siehe Mitarbeiterstatistik.tsx) gebraucht:
-// Das Feld "Benutzer" im address-Modul (Betreuer eines Kunden-Datensatzes) speichert NICHT die
-// Nutzer-Nr wie beim Objekt-Betreuer (siehe MITARBEITER_NUTZER_NR oben), sondern exakt diesen
-// Kurz-Benutzernamen (identisch mit dem "Name"-Feld im user-Modul bzw. "username" in den
-// Kalender-Datensätzen, siehe zaehleTermine). Live abgeglichen (Juli 2026, resourcetype "user",
-// gefiltert nach den 11 bekannten Nutzer-Nr-Werten oben).
-const MITARBEITER_BENUTZERNAME: Record<string, string> = {
-  "Daniel Parma": "Daniel",
-  "Robin Kolbe": "Robin",
-  "Kira Woldt": "Kira",
-  "Katharina Becker": "Katharina",
-  "Vanessa Krifft": "Vanessa",
-  "Jacqueline Henot": "Jacqueline",
-  "Tim Hartwich": "Tim",
-  "Axel Wehmeier": "Axel",
-  "Sarah Barth": "Sarah",
-  "Stanimira Georgieva": "Stanimira",
-  "Dawid Parma": "Dawid",
-};
-
-// Liefert den OnOffice-Benutzernamen eines TEAM-Mitglieds (siehe MITARBEITER_BENUTZERNAME oben)
-// für die Mitarbeiterstatistik-Aggregation — null, wenn für den Namen kein Benutzername
-// hinterlegt ist.
+// Liefert den OnOffice-Benutzernamen eines TEAM-Mitglieds (siehe TeamMitglied.benutzername) für
+// die Mitarbeiterstatistik-Aggregation ("Kunden aktiv", siehe Mitarbeiterstatistik.tsx) — null,
+// wenn für den Namen kein TEAM-Eintrag oder kein Benutzername hinterlegt ist.
 export function ladeBenutzernameFuerMitarbeiter(name: string): string | null {
-  return MITARBEITER_BENUTZERNAME[name] || null;
+  return TEAM.find((t) => t.name === name)?.benutzername || null;
 }
 
 // Lädt alle Mitarbeiter der Agentur für den "weitere Mitarbeiter"-Slider auf der
 // Kontaktperson-Seite (objektunabhängig, im Gegensatz zum Objekt-Betreuer oben). Basis ist die
-// TEAM-Liste aus der Wissensdatei (Namen + Rolle, siehe data/unternehmen.ts), angereichert mit
-// live aus OnOffice geladenen Kontaktdaten, sofern eine geschäftliche Adress-ID bekannt ist
-// (siehe MITARBEITER_LIVE_ADRESS_IDS oben). "rolle" kommt bewusst aus der Wissensdatei, nicht
+// TEAM-Liste aus der Wissensdatei (Name + Rolle + adressId, siehe data/unternehmen.ts),
+// angereichert mit live aus OnOffice geladenen Kontaktdaten, sofern eine geschäftliche Adress-ID
+// bekannt ist. "rolle" kommt bewusst aus der Wissensdatei, nicht
 // aus OnOffice: "jobPosition" ist im Account für jede bisher geprüfte Person leer. Enthält auch
 // den Objekt-Betreuer (z.B. Robin Kolbe) — die Dublettenfilterung "Objekt-Betreuer ausschließen"
 // erfolgt beim Aufrufer anhand von Betreuer.id (siehe praesentation.ts), nicht hier.
@@ -955,7 +883,7 @@ async function ladeTeamAdressdaten(): Promise<Betreuer[]> {
         rolle: t.rolle,
       };
 
-      const adressId = MITARBEITER_LIVE_ADRESS_IDS[t.name];
+      const adressId = t.adressId;
       if (!adressId) return basis;
 
       const live = await ladeBetreuerAdressdaten(adressId).catch(() => null);
@@ -1092,12 +1020,16 @@ export async function zaehleVerkaufteObjekte(): Promise<number> {
 }
 
 // Zählt die aktuell aktiven Objekte (status=1) eines bestimmten Mitarbeiters (Objekt-Betreuer,
-// Feld "benutzer" = Nutzer-Nr, siehe MITARBEITER_NUTZER_NR/ladeNutzerNrFuerMitarbeiter oben —
+// Feld "benutzer" = Nutzer-Nr, siehe ladeNutzerNrFuerMitarbeiter/TeamMitglied.nutzerNr oben —
 // NICHT die Adress-ID) für die Mitarbeiterstatistik im Admin-Bereich (Parameter 1 von 5, siehe
 // Mitarbeiterstatistik.tsx). Bewusst ein reiner Absolut-Snapshot ohne Zeitraum (kein 30-Tage-
 // oder Jahres-Fenster wie bei Terminen/Besichtigungen weiter unten) — "wie viele Objekte
 // betreut die Person gerade". Gleiches listlimit:1 + meta.cntabsolute-Muster wie
 // zaehleVerkaufteObjekte oben, hier zusätzlich nach Betreuer gefiltert.
+// vermarktungsart=kauf schließt Vermietungsobjekte aus (Chat-Vorgabe Juli 2026: "Es gibt auch
+// Vermietungsobjekte ... Rechne diese Werte bitte überall raus" — Vermietungsobjekte werden
+// stattdessen separat geladen, siehe ladeAktiveVermietungenFuerMitarbeiter/
+// ladeVermietungenInAufarbeitungFuerMitarbeiter weiter unten).
 export async function zaehleAktiveObjekte(nutzerNr: string): Promise<number> {
   const result = await callOnOfficeApi([
     {
@@ -1111,6 +1043,7 @@ export async function zaehleAktiveObjekte(nutzerNr: string): Promise<number> {
         filter: {
           status: [{ op: "=", val: "1" }],
           benutzer: [{ op: "=", val: nutzerNr }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
         },
         listlimit: 1,
       },
@@ -1125,6 +1058,8 @@ export async function zaehleAktiveObjekte(nutzerNr: string): Promise<number> {
 // gegen den Account per get_field_definitions bestätigt (Juli 2026): status "2" = "Inaktiv",
 // status2 "vorbereitung" = "Vorbereitung". Ebenfalls ein reiner Absolut-Snapshot ohne Zeitraum
 // (wie zaehleAktiveObjekte oben) — gleiches listlimit:1 + meta.cntabsolute-Muster.
+// vermarktungsart=kauf schließt Vermietungsobjekte aus (siehe Kommentar bei zaehleAktiveObjekte
+// oben).
 export async function zaehleObjekteInAufarbeitung(nutzerNr: string): Promise<number> {
   const result = await callOnOfficeApi([
     {
@@ -1139,6 +1074,47 @@ export async function zaehleObjekteInAufarbeitung(nutzerNr: string): Promise<num
           status: [{ op: "=", val: "2" }],
           status2: [{ op: "=", val: "vorbereitung" }],
           benutzer: [{ op: "=", val: nutzerNr }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
+        },
+        listlimit: 1,
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
+// Zählt Objekte mit status2=verkauft eines bestimmten Mitarbeiters innerhalb eines Datumsfensters
+// von "verkauft_am" (Feld "Verkauft/Vermietet am", siehe mapping.ts) — für die neue Kennzahl
+// "Verkaufte Objekte" je Mitarbeiter im aktuellen Kalenderjahr (Chat-Vorgabe Juli 2026: "die Zahl
+// der verkauften Objekte pro Mitarbeiter in diesem Jahr"). von/bis werden bewusst NICHT hier
+// hartkodiert, sondern vom Aufrufer übergeben (siehe ermittleJahresDatumsfenster in
+// mitarbeiterstatistik.ts, die das aktuelle Kalenderjahr zur Laufzeit aus dem Systemdatum
+// bestimmt) — so bleibt die Kennzahl "jedes Jahr zurückgestellt" (Chat-Vorgabe), ohne dass der
+// Code jährlich angepasst werden muss. Live geprüft, Juli 2026: Datumsfilter im Format
+// "YYYY-MM-DD" funktioniert zuverlässig gegen das Feld verkauft_am. vermarktungsart=kauf schließt
+// Vermietungsobjekte aus (siehe Kommentar bei zaehleAktiveObjekte oben).
+export async function zaehleVerkaufteObjekteFuerMitarbeiter(
+  nutzerNr: string,
+  von: string,
+  bis: string
+): Promise<number> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id"],
+        filter: {
+          status2: [{ op: "=", val: "verkauft" }],
+          benutzer: [{ op: "=", val: nutzerNr }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
+          verkauft_am: [
+            { op: ">=", val: von },
+            { op: "<=", val: bis },
+          ],
         },
         listlimit: 1,
       },
@@ -1168,10 +1144,39 @@ interface RawMitarbeiterObjektRecord {
     // fehlendem Auftragsdatum "0000-00-00" statt eines echten Datums (siehe
     // berechneVermarktungsdauerTage unten).
     auftragvon?: string;
+    // "Prozent Außenprovision"/"Prozent Innenprovision" (Bereich Preise/Flächen > Preise
+    // Statistik in OnOffice) — Feldkatalog live geprüft (resourcetype "fields", Juli 2026):
+    // prozent_aussenprovision/prozent_innenprovision, Typ "float". Bewusst NICHT die
+    // gleichnamigen Freitextfelder aussen_courtage/innen_courtage (Typ "text", z.B. "3,57 %
+    // inkl. 19 % MwSt.", "3,57 % zzgl. 19 % MwSt." oder ganz ohne Prozentzeichen) — Stichprobe
+    // von 30 aktiven Objekten (Juli 2026) zeigte, dass die Freitextfelder uneinheitlich formuliert
+    // sind (mal "inkl.", mal "zzgl.", mal "inkl. ges. MwSt.") und dadurch nicht zuverlässig
+    // regelbasiert auszuwerten waren — u.a. ein Objekt mit gültigem Prozentwert laut den
+    // "prozent_*"-Feldern (1,50%), dessen Freitext ("zzgl. 19 % MwSt.") ein Parser fälschlich
+    // verwirft, sowie umgekehrt Objekte mit plausibel aussehendem Freitext ("3,57"), deren
+    // "prozent_*"-Felder tatsächlich 0 (= nicht gepflegt) sind. Auf Nutzerhinweis (Juli 2026:
+    // "diese scheinen mir etwas zuverlässiger zu sein") daher auf die strukturierten
+    // Prozent-Felder umgestellt.
+    prozent_aussenprovision?: string | number;
+    prozent_innenprovision?: string | number;
+    // Kaltmiete — bei Vermietungsobjekten (vermarktungsart=miete) ist "kaufpreis" stets 0 (live
+    // geprüft, Juli 2026), daher wird für die neue "Vermietung"-Dropdown-Gruppe (Chat-Vorgabe:
+    // "zeige sie aber Pro mitarbeiter trotzdem an als weiter dropdown funktion") stattdessen die
+    // Kaltmiete als Preis angezeigt, siehe mapMitarbeiterVermietung unten.
+    kaltmiete?: string | number;
   };
 }
 
-const MITARBEITER_OBJEKT_FIELDS = ["Id", "objekttitel", "objektnr_extern", "kaufpreis", "auftragvon"];
+const MITARBEITER_OBJEKT_FIELDS = [
+  "Id",
+  "objekttitel",
+  "objektnr_extern",
+  "kaufpreis",
+  "auftragvon",
+  "prozent_aussenprovision",
+  "prozent_innenprovision",
+  "kaltmiete",
+];
 
 // Deutlich über der realistischen Objektzahl einer einzelnen Person — anders als bei den
 // zaehle*-Funktionen oben (listlimit:1 + meta.cntabsolute) werden hier die tatsächlichen
@@ -1193,15 +1198,66 @@ function berechneVermarktungsdauerTage(auftragvon?: string): number | null {
   return Math.max(0, diffTage);
 }
 
+// prozent_aussenprovision/prozent_innenprovision liefern von OnOffice bereits eine Zahl als
+// String (z.B. "3.5700"), aber bei unbefüllten Objekten "0.0000" statt eines leeren Werts — ein
+// Provisionssatz von exakt 0% ist im hier betreuten Bestand geschäftlich nicht plausibel (siehe
+// die Auswahlwerte des Felds "Maklerprovision" im Feldkatalog, die alle > 0 liegen), daher wird
+// 0 bzw. ein nicht als Zahl interpretierbarer Wert bewusst wie "nicht gepflegt" behandelt.
+function parseProvisionsProzent(wert?: string | number): number | null {
+  const zahl = Number(wert);
+  if (!Number.isFinite(zahl) || zahl <= 0) return null;
+  return zahl;
+}
+
+// MwSt.-Satz, um aus dem in OnOffice hinterlegten Brutto-Prozentsatz (üblicherweise 3,57 % = 3 %
+// netto + 19 % MwSt., siehe Feldkatalog-Auswahlwerte von "Maklerprovision") den realen
+// Netto-Provisionssatz zu ermitteln (Chat-Vorgabe: "Hier muss einmal die Mehrwertsteuer von 19%
+// rausgerechnet werden um die reale Provision zu sehen").
+const MWST_FAKTOR = 1.19;
+
 function mapMitarbeiterObjekt(record: RawMitarbeiterObjektRecord): MitarbeiterObjekt {
+  const el = record.elements;
+  const preis = Number(el.kaufpreis) || 0;
+
+  const aussenProzent = parseProvisionsProzent(el.prozent_aussenprovision);
+  const innenProzent = parseProvisionsProzent(el.prozent_innenprovision);
+  // Nur berechnen, wenn BEIDE Felder einen auswertbaren Prozentsatz enthalten — fehlt eines,
+  // wäre die Summe unvollständig und damit irreführend, siehe provisionsvorlaufFehlt.
+  const provisionsvorlaufFehlt = aussenProzent === null || innenProzent === null;
+  const provisionsvorlauf = provisionsvorlaufFehlt
+    ? null
+    : (preis * ((aussenProzent as number) + (innenProzent as number))) / 100 / MWST_FAKTOR;
+
+  return {
+    id: String(record.id),
+    titel: el.objekttitel || `Immobilie ${record.id}`,
+    objektnr: el.objektnr_extern || String(record.id),
+    preis,
+    vermarktungsdauerTage: berechneVermarktungsdauerTage(el.auftragvon),
+    titelbildUrl: null,
+    provisionsvorlauf,
+    provisionsvorlaufFehlt,
+  };
+}
+
+// Mapping-Variante für Vermietungsobjekte (vermarktungsart=miete, siehe
+// ladeAktiveVermietungenFuerMitarbeiter/ladeVermietungenInAufarbeitungFuerMitarbeiter unten) —
+// verwendet die Kaltmiete statt des (bei Vermietungsobjekten stets 0) Kaufpreises als "preis" und
+// berechnet bewusst KEINEN Provisionsvorlauf: Das Außen-/Innen-Provisionsmodell auf den Kaufpreis
+// (siehe mapMitarbeiterObjekt oben) gilt für Vermietungsobjekte nicht in gleicher Form, daher
+// provisionsvorlaufFehlt hier bewusst false statt eines Hinweises auf fehlende OnOffice-Daten
+// (kein "Angabe fehlt", weil hier grundsätzlich nichts erwartet wird).
+function mapMitarbeiterVermietung(record: RawMitarbeiterObjektRecord): MitarbeiterObjekt {
   const el = record.elements;
   return {
     id: String(record.id),
     titel: el.objekttitel || `Immobilie ${record.id}`,
     objektnr: el.objektnr_extern || String(record.id),
-    preis: Number(el.kaufpreis) || 0,
+    preis: Number(el.kaltmiete) || 0,
     vermarktungsdauerTage: berechneVermarktungsdauerTage(el.auftragvon),
     titelbildUrl: null,
+    provisionsvorlauf: null,
+    provisionsvorlaufFehlt: false,
   };
 }
 
@@ -1209,7 +1265,9 @@ function mapMitarbeiterObjekt(record: RawMitarbeiterObjektRecord): MitarbeiterOb
 // zaehleAktiveObjekte oben, hier aber mit echten Anzeige-Feldern statt nur "Id" und ohne
 // listlimit:1. Wird NICHT beim initialen Laden der Admin-Seite für alle Mitarbeiter aufgerufen,
 // sondern erst bei Bedarf, wenn eine Zeile in der Mitarbeiterstatistik aufgeklappt wird (siehe
-// api/admin/mitarbeiter-objekte/route.ts).
+// api/admin/mitarbeiter-objekte/route.ts). vermarktungsart=kauf schließt Vermietungsobjekte aus
+// (siehe Kommentar bei zaehleAktiveObjekte oben) — diese werden separat über
+// ladeAktiveVermietungenFuerMitarbeiter unten geladen.
 export async function ladeAktiveObjekteFuerMitarbeiter(
   nutzerNr: string
 ): Promise<MitarbeiterObjekt[]> {
@@ -1225,6 +1283,7 @@ export async function ladeAktiveObjekteFuerMitarbeiter(
         filter: {
           status: [{ op: "=", val: "1" }],
           benutzer: [{ op: "=", val: nutzerNr }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
         },
         listlimit: MITARBEITER_OBJEKT_LISTLIMIT,
         sortby: { objekttitel: "ASC" },
@@ -1237,7 +1296,8 @@ export async function ladeAktiveObjekteFuerMitarbeiter(
 
 // Lädt Objekte "in Aufarbeitung" eines Mitarbeiters als Liste — identischer Filter wie
 // zaehleObjekteInAufarbeitung oben, hier aber mit echten Anzeige-Feldern (siehe
-// ladeAktiveObjekteFuerMitarbeiter direkt darüber für das gemeinsame Muster).
+// ladeAktiveObjekteFuerMitarbeiter direkt darüber für das gemeinsame Muster). vermarktungsart=kauf
+// schließt Vermietungsobjekte aus (siehe Kommentar bei zaehleAktiveObjekte oben).
 export async function ladeObjekteInAufarbeitungFuerMitarbeiter(
   nutzerNr: string
 ): Promise<MitarbeiterObjekt[]> {
@@ -1254,6 +1314,116 @@ export async function ladeObjekteInAufarbeitungFuerMitarbeiter(
           status: [{ op: "=", val: "2" }],
           status2: [{ op: "=", val: "vorbereitung" }],
           benutzer: [{ op: "=", val: nutzerNr }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
+        },
+        listlimit: MITARBEITER_OBJEKT_LISTLIMIT,
+        sortby: { objekttitel: "ASC" },
+      },
+    },
+  ]);
+  const records = result?.response?.results?.[0]?.data?.records || [];
+  return records.map(mapMitarbeiterObjekt);
+}
+
+// Lädt aktive Vermietungsobjekte (status=1, vermarktungsart=miete) eines Mitarbeiters — Pendant zu
+// ladeAktiveObjekteFuerMitarbeiter oben, nur für Vermietungsobjekte statt Kaufobjekte (Chat-Vorgabe
+// Juli 2026: "Es gibt auch Vermietungsobjekte ... zeige sie aber Pro mitarbeiter trotzdem an als
+// weiter dropdown funktion"). Wird vom Aufrufer (api/admin/mitarbeiter-objekte/route.ts)
+// zusammen mit ladeVermietungenInAufarbeitungFuerMitarbeiter zu EINER gemeinsamen
+// "Vermietung"-Dropdown-Gruppe zusammengeführt, statt hier zwei getrennte Gruppen wie bei
+// Kaufobjekten (aktiv/Aufarbeitung) abzubilden — der Nutzer bat um EINEN zusätzlichen Dropdown,
+// nicht zwei.
+export async function ladeAktiveVermietungenFuerMitarbeiter(
+  nutzerNr: string
+): Promise<MitarbeiterObjekt[]> {
+  const result = await callOnOfficeApi<RawMitarbeiterObjektRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: MITARBEITER_OBJEKT_FIELDS,
+        filter: {
+          status: [{ op: "=", val: "1" }],
+          benutzer: [{ op: "=", val: nutzerNr }],
+          vermarktungsart: [{ op: "=", val: "miete" }],
+        },
+        listlimit: MITARBEITER_OBJEKT_LISTLIMIT,
+        sortby: { objekttitel: "ASC" },
+      },
+    },
+  ]);
+  const records = result?.response?.results?.[0]?.data?.records || [];
+  return records.map(mapMitarbeiterVermietung);
+}
+
+// Lädt Vermietungsobjekte "in Aufarbeitung" (status=2, status2=vorbereitung, vermarktungsart=miete)
+// eines Mitarbeiters — Pendant zu ladeObjekteInAufarbeitungFuerMitarbeiter oben, siehe
+// ladeAktiveVermietungenFuerMitarbeiter direkt darüber für den gemeinsamen Hintergrund (eine
+// einzige "Vermietung"-Gruppe statt zweier getrennter).
+export async function ladeVermietungenInAufarbeitungFuerMitarbeiter(
+  nutzerNr: string
+): Promise<MitarbeiterObjekt[]> {
+  const result = await callOnOfficeApi<RawMitarbeiterObjektRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: MITARBEITER_OBJEKT_FIELDS,
+        filter: {
+          status: [{ op: "=", val: "2" }],
+          status2: [{ op: "=", val: "vorbereitung" }],
+          benutzer: [{ op: "=", val: nutzerNr }],
+          vermarktungsart: [{ op: "=", val: "miete" }],
+        },
+        listlimit: MITARBEITER_OBJEKT_LISTLIMIT,
+        sortby: { objekttitel: "ASC" },
+      },
+    },
+  ]);
+  const records = result?.response?.results?.[0]?.data?.records || [];
+  return records.map(mapMitarbeiterVermietung);
+}
+
+// Lädt die einzelnen verkauften Objekte (status2=verkauft, Datumsfenster auf "verkauft_am") eines
+// Mitarbeiters als Liste — Pendant zu zaehleVerkaufteObjekteFuerMitarbeiter oben (dort nur die
+// Anzahl über meta.cntabsolute), hier mit echten Anzeige-Feldern für die aufklappbare
+// "Verkauft {Jahr}"-Dropdown-Gruppe (Juli 2026 Chat-Vorgabe: "ich sehe immer noch keine
+// Verkauften Objekte! Bitte auch noch ausführen" — die reine Zahl in der Tabelle reichte nicht,
+// die einzelnen Objekte sollen wie bei Vermietung/Aufarbeitung/Aktive Vermarktung aufklappbar
+// sein). Nutzt dieselben Anzeige-Felder wie ladeAktiveObjekteFuerMitarbeiter/mapMitarbeiterObjekt
+// (echte Kaufobjekte, kein Vermietungs-Sonderfall) — der Provisionsvorlauf ist hier sogar
+// besonders aussagekräftig, da die Provision bei einem verkauften Objekt tatsächlich realisiert
+// wurde. von/bis werden vom Aufrufer übergeben (siehe ermittleJahresDatumsfenster in
+// mitarbeiterstatistik.ts), damit das Kalenderjahr zur Laufzeit bestimmt wird statt hartkodiert zu
+// sein.
+export async function ladeVerkaufteObjekteFuerMitarbeiter(
+  nutzerNr: string,
+  von: string,
+  bis: string
+): Promise<MitarbeiterObjekt[]> {
+  const result = await callOnOfficeApi<RawMitarbeiterObjektRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: MITARBEITER_OBJEKT_FIELDS,
+        filter: {
+          status2: [{ op: "=", val: "verkauft" }],
+          benutzer: [{ op: "=", val: nutzerNr }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
+          verkauft_am: [
+            { op: ">=", val: von },
+            { op: "<=", val: bis },
+          ],
         },
         listlimit: MITARBEITER_OBJEKT_LISTLIMIT,
         sortby: { objekttitel: "ASC" },
@@ -1272,7 +1442,9 @@ const GESAMT_OBJEKT_LISTLIMIT = 500;
 
 // Lädt ALLE aktiven Objekte (status=1) unternehmensweit, ohne Filter nach Mitarbeiter — für die
 // Infobox "Aktive Vermarktung gesamt" über der Mitarbeitertabelle (siehe Mitarbeiterstatistik.tsx,
-// Chat-Vorgabe). Bewusst EIN Abruf für alle Mitarbeiter zusammen statt einer Summe aus 11
+// Chat-Vorgabe). vermarktungsart=kauf schließt Vermietungsobjekte aus (siehe Kommentar bei
+// zaehleAktiveObjekte oben) — die unternehmensweiten Summen sollen laut Nutzervorgabe
+// ausschließlich Kaufobjekte umfassen. Bewusst EIN Abruf für alle Mitarbeiter zusammen statt einer Summe aus 11
 // Einzelabrufen (ladeAktiveObjekteFuerMitarbeiter je Mitarbeiter) — spart ~10 zusätzliche
 // OnOffice-Abrufe beim initialen Laden der Admin-Seite.
 export async function ladeAlleAktivenObjekte(): Promise<MitarbeiterObjekt[]> {
@@ -1287,6 +1459,7 @@ export async function ladeAlleAktivenObjekte(): Promise<MitarbeiterObjekt[]> {
         data: MITARBEITER_OBJEKT_FIELDS,
         filter: {
           status: [{ op: "=", val: "1" }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
         },
         listlimit: GESAMT_OBJEKT_LISTLIMIT,
         sortby: { objekttitel: "ASC" },
@@ -1312,6 +1485,45 @@ export async function ladeAlleObjekteInAufarbeitung(): Promise<MitarbeiterObjekt
         filter: {
           status: [{ op: "=", val: "2" }],
           status2: [{ op: "=", val: "vorbereitung" }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
+        },
+        listlimit: GESAMT_OBJEKT_LISTLIMIT,
+        sortby: { objekttitel: "ASC" },
+      },
+    },
+  ]);
+  const records = result?.response?.results?.[0]?.data?.records || [];
+  return records.map(mapMitarbeiterObjekt);
+}
+
+// Lädt ALLE im übergebenen Zeitfenster verkauften Objekte unternehmensweit, ohne Filter nach
+// Mitarbeiter — Pendant zu ladeAlleAktivenObjekte/ladeAlleObjekteInAufarbeitung oben, gleicher
+// Filter wie ladeVerkaufteObjekteFuerMitarbeiter, nur ohne benutzer-Filter. Für den neuen
+// unternehmensweiten Block "Verkaufte Objekte {Jahr} / Provisionsvolumen {Jahr} / Gesamtvolumen
+// {Jahr}" über der Mitarbeitertabelle (Juli 2026 Chat-Vorgabe: "Zeige oben in der Gesamtstatistik
+// bitte einen weiteren Block an"), siehe ladeObjektGesamtKennzahlen in mitarbeiterstatistik.ts.
+// von/bis werden vom Aufrufer übergeben (ermittleJahresDatumsfenster), damit das Kalenderjahr zur
+// Laufzeit bestimmt wird statt hartkodiert zu sein.
+export async function ladeAlleVerkauftenObjekte(
+  von: string,
+  bis: string
+): Promise<MitarbeiterObjekt[]> {
+  const result = await callOnOfficeApi<RawMitarbeiterObjektRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: MITARBEITER_OBJEKT_FIELDS,
+        filter: {
+          status2: [{ op: "=", val: "verkauft" }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
+          verkauft_am: [
+            { op: ">=", val: von },
+            { op: "<=", val: bis },
+          ],
         },
         listlimit: GESAMT_OBJEKT_LISTLIMIT,
         sortby: { objekttitel: "ASC" },
@@ -1410,7 +1622,7 @@ export async function zaehleBesichtigungen(
 // Status2Adr="status2adr_active" (Permitted-Value live per get_field_definitions bestätigt,
 // Juli 2026: "Aktiv") UND Benutzer=Benutzername. WICHTIG: Das Feld "Benutzer" im address-Modul
 // ist NICHT die Nutzer-Nr (anders als "benutzer" im estate-Filter oben), sondern der
-// OnOffice-Kurz-Benutzername (siehe MITARBEITER_BENUTZERNAME/ladeBenutzernameFuerMitarbeiter
+// OnOffice-Kurz-Benutzername (siehe ladeBenutzernameFuerMitarbeiter/TeamMitglied.benutzername
 // oben) — mit Nutzer-Nr gefiltert hätte die Abfrage schlicht 0 Treffer geliefert. Außerdem
 // nimmt resourcetype "address" hier bewusst "Name" statt "Id" als data-Feld (ein Testaufruf mit
 // data:["Id"] lieferte den Fehler "Unknown field: Id" — anders als bei "estate", wo "Id"

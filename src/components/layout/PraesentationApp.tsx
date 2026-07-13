@@ -27,7 +27,13 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
   // Vergleichswert.tsx (zeigtLadeplatzhalter). Start-Wert true, da der Abruf sofort beim Mounten
   // dieser Komponente losläuft (useEffect unten).
   const [vorauswahlLaedt, setVorauswahlLaedt] = useState(true);
-  const kundeName = [daten.kunde.vorname, daten.kunde.nachname].filter(Boolean).join(" ");
+  // Sidebar zeigt bei mehreren Eigentümern (Miteigentum/Erbengemeinschaft) jede Person auf einer
+  // eigenen Zeile (siehe Sidebar.tsx) — bewusst nur Anrede + Nachname (kurz, passt auch bei
+  // mehreren Zeilen in die schmale Sidebar); der vollständige Name (inkl. Vorname) steht weiterhin
+  // auf der Begrüßungsseite, siehe Begruessung.tsx.
+  const kundeNamen = [daten.kunde, ...daten.weitereEigentuemer]
+    .map((k) => [k.anrede, k.nachname].filter(Boolean).join(" "))
+    .filter(Boolean);
 
   function referenzobjektAendern(index: number, objekt: Immobilie | null) {
     setReferenzobjekte((prev) => prev.map((o, i) => (i === index ? objekt : o)));
@@ -97,10 +103,10 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
 
   return (
     <div className="flex h-screen w-screen">
-      <Sidebar activeId={activeId} onSelect={setActiveId} kundeName={kundeName} />
+      <Sidebar activeId={activeId} onSelect={setActiveId} kundeNamen={kundeNamen} />
       <main className="flex-1 overflow-hidden bg-reinweiss">
         {activeId === "begruessung" && (
-          <Begruessung kunde={daten.kunde} />
+          <Begruessung kunde={daten.kunde} weitereEigentuemer={daten.weitereEigentuemer} />
         )}
         {activeId === "kontaktperson" && (
           <Kontaktperson betreuer={daten.betreuer} setter={daten.setter} />
@@ -132,6 +138,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         {activeId === "maklervertrag" && (
           <Maklervertrag
             kunde={daten.kunde}
+            weitereEigentuemer={daten.weitereEigentuemer}
             immobilie={daten.immobilie}
             bewertung={daten.bewertung}
             gewaehltesPaket={gewaehltesPaket}

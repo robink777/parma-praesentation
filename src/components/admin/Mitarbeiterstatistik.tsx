@@ -11,9 +11,11 @@ import { MitarbeiterKennzahlen, MitarbeiterObjekt, ObjektGesamtKennzahlen, TeamM
 const zahlenformat = new Intl.NumberFormat("de-DE");
 
 // Spaltenbreiten je Objektzeile innerhalb einer aufgeklappten Gruppe (siehe ObjektGruppe unten)
-// — von links nach rechts genau die vier Chat-Vorgabe-Inhalte: Titelbild, Objektnummer, Preis,
-// Vermarktungsdauer.
-const OBJEKT_GRID_COLS = "grid-cols-[48px_minmax(0,1fr)_110px_110px]";
+// — von links nach rechts: Titelbild, Objektnummer, Preis, Vermarktungsdauer, Provisionsvorlauf
+// (fünfte Spalte, Juli 2026 Chat-Vorgabe: "bitte pro Objekt und einmal gesamt" — etwas breiter als
+// die übrigen Zahlenspalten, da hier bei fehlenden OnOffice-Werten zusätzlich ein Hinweis-Icon
+// samt Text erscheint, siehe ObjektZeile).
+const OBJEKT_GRID_COLS = "grid-cols-[48px_minmax(0,1fr)_110px_110px_160px]";
 
 // Feste Spaltenbreiten (siehe Objektdaten.tsx/InteressentZeile für dasselbe Muster) statt
 // justify-between, damit Kopf- und Datenzeilen unabhängig von ihrem jeweiligen Inhalt exakt
@@ -21,9 +23,10 @@ const OBJEKT_GRID_COLS = "grid-cols-[48px_minmax(0,1fr)_110px_110px]";
 // bekommen je Zeitraum (30 Tage, Jahr) eine EIGENE Spalte statt einer zusammengefassten
 // "81 / 456"-Darstellung (siehe Chat-Vorgabe) — dadurch acht Spalten statt vorher sechs. Die
 // erste, schmale Spalte (28px) ist neu und nimmt den Auf-/Zuklapp-Button auf (siehe Chat-Vorgabe:
-// Dropdown je Mitarbeiter mit der Objektliste).
+// Dropdown je Mitarbeiter mit der Objektliste). Letzte Spalte (100px, Juli 2026 Chat-Vorgabe:
+// "die Zahl der verkauften Objekte pro Mitarbeiter in diesem Jahr") für "Verkauft {Jahr}".
 const KENNZAHLEN_GRID_COLS =
-  "grid-cols-[28px_minmax(0,1.2fr)_110px_110px_90px_90px_100px_100px_100px]";
+  "grid-cols-[28px_minmax(0,1.2fr)_110px_110px_90px_90px_100px_100px_100px_100px]";
 
 function formatWert(n: number | null): string {
   return n === null ? "–" : zahlenformat.format(n);
@@ -35,6 +38,23 @@ function formatTage(n: number | null): string {
 
 function formatBetrag(n: number | null): string {
   return n === null ? "–" : formatiereBetrag(n);
+}
+
+// Kleiner Hinweis-Baustein für Werte, die sich NICHT aus einem "noch nicht geladen"-Zustand
+// ergeben, sondern daraus, dass ein OnOffice-Feld leer oder nicht auswertbar ist (aktuell:
+// Provisionsvorlauf, siehe MitarbeiterObjekt.provisionsvorlaufFehlt) — bewusst mit Icon + Text
+// statt eines schlichten "–", damit auf einen Blick klar ist, dass hier in OnOffice etwas
+// nachgetragen werden muss (Chat-Vorgabe: "Hinweisfeld ... wenn Werte fehlen").
+function DatenFehltHinweis({ titel }: { titel: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-[3px] text-anthrazit/50"
+      title={`${titel}: In OnOffice nicht (vollständig) ausgefüllt`}
+    >
+      <Icon name="warning" size={13} />
+      <span className="text-small italic">Angabe fehlt</span>
+    </span>
+  );
 }
 
 // Namen der Vertriebs-Mitarbeiter (Chat-Vorgabe: "1. Liste Vertrieb. hier Vanessa, Jacqueline,
@@ -65,6 +85,10 @@ function teileTeamAuf(): { vertrieb: TeamMitglied[]; weitere: TeamMitglied[] } {
 // Unternehmen.tsx (Card + zentrierte Icon/Wert/Label-Spalte), damit die Admin-Seite optisch zum
 // Rest der Anwendung passt, statt ein neues Kartenmuster einzuführen.
 function Infoboxen({ gesamt }: { gesamt?: ObjektGesamtKennzahlen }) {
+  const fehltAnzahl = gesamt?.provisionsvorlaufFehltAnzahl ?? 0;
+  const jahr = aktuellesJahr();
+  const verkauftFehltAnzahl = gesamt?.provisionsvolumenVerkauftJahrFehltAnzahl ?? 0;
+
   const eintraege = [
     { label: "In Aufarbeitung gesamt", wert: formatWert(gesamt?.aufarbeitungGesamt ?? null), icon: "building" as const },
     { label: "Aktive Vermarktung gesamt", wert: formatWert(gesamt?.aktivGesamt ?? null), icon: "house" as const },
@@ -72,17 +96,90 @@ function Infoboxen({ gesamt }: { gesamt?: ObjektGesamtKennzahlen }) {
     { label: "Objektvolumen gesamt", wert: formatBetrag(gesamt?.objektvolumenGesamt ?? null), icon: "calculator" as const },
   ];
 
+  // Neuer Block "Verkaufte Objekte {Jahr} / Provisionsvolumen {Jahr} / Gesamtvolumen {Jahr}" (Juli
+  // 2026 Chat-Vorgabe: "Zeige oben in der Gesamtstatistik bitte einen weiteren Block an") — bewusst
+  // OBEN, als eigene Reihe vor den bestehenden vier Boxen, da diese drei Kennzahlen (anders als die
+  // Snapshot-Werte darunter) das laufende Kalenderjahr betreffen und dadurch inhaltlich
+  // zusammengehören. Jahreszahl über aktuellesJahr() (siehe unten) dynamisch, analog zur
+  // Spaltenüberschrift-Logik, die zuvor "Verkauft {Jahr}" beschriftete (jetzt ohne Jahr, da die
+  // Jahresangabe hier oben zentral steht statt an jeder einzelnen Stelle wiederholt zu werden).
+  const jahresEintraege = [
+    {
+      label: `Verkaufte Objekte ${jahr}`,
+      wert: formatWert(gesamt?.verkaufteObjekteJahrGesamt ?? null),
+      icon: "check" as const,
+    },
+    {
+      label: `Provisionsvolumen ${jahr}`,
+      wert: formatBetrag(gesamt?.provisionsvolumenVerkauftJahr ?? null),
+      icon: "handshake" as const,
+      hinweisAnzahl: verkauftFehltAnzahl,
+    },
+    {
+      label: `Gesamtvolumen ${jahr}`,
+      wert: formatBetrag(gesamt?.objektvolumenVerkauftJahr ?? null),
+      icon: "calculator" as const,
+    },
+  ];
+
+  // Provisionsvorlauf gesamt (Juli 2026 Chat-Vorgabe) bekommt eine eigene Reihe unter den vier
+  // übrigen Infoboxen, in der Breite auf die vier Boxen darüber angeglichen (Nutzerwunsch) statt
+  // als fünfte, schmalere Box im selben Grid — dadurch bleibt Platz für die Hinweiszeile, wenn
+  // nicht alle Objekte einen auswertbaren Wert liefern.
   return (
-    <div className="mb-lg grid grid-cols-2 gap-sm md:grid-cols-4">
-      {eintraege.map((eintrag) => (
-        <Card key={eintrag.label} className="text-center">
-          <Icon name={eintrag.icon} size={28} className="mx-auto mb-xs text-walnuss" />
-          <p className="font-slab text-3xl font-bold text-walnuss">{eintrag.wert}</p>
-          <p className="label mt-xs">{eintrag.label}</p>
-        </Card>
-      ))}
+    <div className="mb-lg">
+      <div className="grid grid-cols-1 gap-sm md:grid-cols-3">
+        {jahresEintraege.map((eintrag) => (
+          <Card key={eintrag.label} className="text-center">
+            <Icon name={eintrag.icon} size={28} className="mx-auto mb-xs text-walnuss" />
+            <p className="font-slab text-3xl font-bold text-walnuss">{eintrag.wert}</p>
+            <p className="label mt-xs">{eintrag.label}</p>
+            {"hinweisAnzahl" in eintrag && (eintrag.hinweisAnzahl ?? 0) > 0 && (
+              <p className="mt-xs flex items-center justify-center gap-[3px] text-anthrazit/50">
+                <Icon name="warning" size={12} />
+                <span className="text-small italic">
+                  {zahlenformat.format(eintrag.hinweisAnzahl ?? 0)} Objekte ohne Angabe
+                </span>
+              </p>
+            )}
+          </Card>
+        ))}
+      </div>
+      <div className="mt-sm grid grid-cols-2 gap-sm md:grid-cols-4">
+        {eintraege.map((eintrag) => (
+          <Card key={eintrag.label} className="text-center">
+            <Icon name={eintrag.icon} size={28} className="mx-auto mb-xs text-walnuss" />
+            <p className="font-slab text-3xl font-bold text-walnuss">{eintrag.wert}</p>
+            <p className="label mt-xs">{eintrag.label}</p>
+          </Card>
+        ))}
+      </div>
+      <Card className="mt-sm text-center">
+        <Icon name="handshake" size={28} className="mx-auto mb-xs text-walnuss" />
+        <p className="font-slab text-3xl font-bold text-walnuss">
+          {formatBetrag(gesamt?.provisionsvorlaufGesamt ?? null)}
+        </p>
+        <p className="label mt-xs">Provisionsvorlauf gesamt</p>
+        {fehltAnzahl > 0 && (
+          <p className="mt-xs flex items-center justify-center gap-[3px] text-anthrazit/50">
+            <Icon name="warning" size={12} />
+            <span className="text-small italic">
+              {zahlenformat.format(fehltAnzahl)} Objekte ohne Angabe
+            </span>
+          </p>
+        )}
+      </Card>
     </div>
   );
+}
+
+// Jahreszahl für die Spaltenüberschrift "Verkauft {Jahr}" — bewusst zur Laufzeit aus dem
+// Systemdatum bestimmt statt hartkodiert (Chat-Vorgabe: "Schreibe die Funktion allerdings so dass
+// es jedes Jahr zurück gestellt wird"), damit die Beschriftung automatisch mit der zugrunde
+// liegenden Kennzahl (siehe ermittleJahresDatumsfenster in onoffice/mitarbeiterstatistik.ts)
+// Schritt hält.
+function aktuellesJahr(): number {
+  return new Date().getFullYear();
 }
 
 function KennzahlenKopfzeile() {
@@ -99,6 +196,7 @@ function KennzahlenKopfzeile() {
       <span className="label text-left">Besicht. 30T</span>
       <span className="label text-left">Besicht. Jahr</span>
       <span className="label text-left">Kunden aktiv</span>
+      <span className="label text-left">Verkauft</span>
     </div>
   );
 }
@@ -128,6 +226,18 @@ function ObjektZeile({ objekt }: { objekt: MitarbeiterObjekt }) {
         {objekt.vermarktungsdauerTage === null
           ? "–"
           : `${zahlenformat.format(objekt.vermarktungsdauerTage)} Tage`}
+      </span>
+      <span className="text-left font-mono text-sm text-anthrazit">
+        {objekt.provisionsvorlaufFehlt ? (
+          <DatenFehltHinweis titel="Außen-/Innen-Provision" />
+        ) : objekt.provisionsvorlauf === null ? (
+          // Vermietungsobjekte (siehe mapMitarbeiterVermietung in onoffice/estate.ts): kein
+          // Hinweis-Icon, da hier grundsätzlich kein Provisionsvorlauf erwartet wird (anders als
+          // bei Kaufobjekten mit fehlenden OnOffice-Werten, siehe provisionsvorlaufFehlt oben).
+          "–"
+        ) : (
+          formatiereBetrag(objekt.provisionsvorlauf)
+        )}
       </span>
     </div>
   );
@@ -166,6 +276,15 @@ function ObjektGruppe({ titel, objekte }: { titel: string; objekte: MitarbeiterO
           <p className="py-xs pl-5 text-small text-anthrazit/40">Keine Objekte</p>
         ) : (
           <div className="pl-5">
+            <div
+              className={`grid ${OBJEKT_GRID_COLS} gap-sm border-b border-anthrazit/5 pb-[2px]`}
+            >
+              <span aria-hidden="true" />
+              <span className="label text-left">Objekt</span>
+              <span className="label text-left">Preis</span>
+              <span className="label text-left">Vermarktung</span>
+              <span className="label text-left">Provisionsvorlauf</span>
+            </div>
             {objekte.map((objekt) => (
               <ObjektZeile key={objekt.id} objekt={objekt} />
             ))}
@@ -178,7 +297,19 @@ function ObjektGruppe({ titel, objekte }: { titel: string; objekte: MitarbeiterO
 type ObjektlisteZustand =
   | { status: "lädt" }
   | { status: "fehler" }
-  | { status: "geladen"; aktiv: MitarbeiterObjekt[]; aufarbeitung: MitarbeiterObjekt[] };
+  | {
+      status: "geladen";
+      aktiv: MitarbeiterObjekt[];
+      aufarbeitung: MitarbeiterObjekt[];
+      // Vermietungsobjekte (vermarktungsart=miete, Juli 2026 Chat-Vorgabe) — bewusst EINE
+      // gemeinsame Liste statt zweier nach Status getrennter Listen wie bei Kaufobjekten (aktiv/
+      // aufarbeitung), da der Nutzer nur EINEN zusätzlichen Dropdown wollte.
+      vermietung: MitarbeiterObjekt[];
+      // Verkaufte Objekte im aktuellen Kalenderjahr (Juli 2026 Chat-Vorgabe: "ich sehe immer noch
+      // keine Verkauften Objekte! Bitte auch noch ausführen") — die reine Zahl in der Tabelle
+      // reichte nicht, hier die einzelnen Objekte für die vierte Dropdown-Gruppe.
+      verkauft: MitarbeiterObjekt[];
+    };
 
 // Lädt die Objektliste EINES Mitarbeiters erst beim ersten Aufklappen (siehe Chat-Vorgabe: kein
 // zusätzlicher Abruf für alle ~20 Mitarbeiter beim initialen Seitenaufruf, siehe auch
@@ -203,11 +334,24 @@ function MitarbeiterObjekte({ name }: { name: string }) {
         if (!res.ok) throw new Error("Antwort nicht ok");
         return res.json();
       })
-      .then((daten: { aktiv: MitarbeiterObjekt[]; aufarbeitung: MitarbeiterObjekt[] }) => {
-        if (!abgebrochen) {
-          setZustand({ status: "geladen", aktiv: daten.aktiv, aufarbeitung: daten.aufarbeitung });
+      .then(
+        (daten: {
+          aktiv: MitarbeiterObjekt[];
+          aufarbeitung: MitarbeiterObjekt[];
+          vermietung: MitarbeiterObjekt[];
+          verkauft: MitarbeiterObjekt[];
+        }) => {
+          if (!abgebrochen) {
+            setZustand({
+              status: "geladen",
+              aktiv: daten.aktiv,
+              aufarbeitung: daten.aufarbeitung,
+              vermietung: daten.vermietung,
+              verkauft: daten.verkauft,
+            });
+          }
         }
-      })
+      )
       .catch(() => {
         if (!abgebrochen) setZustand({ status: "fehler" });
       });
@@ -235,8 +379,14 @@ function MitarbeiterObjekte({ name }: { name: string }) {
   }
   return (
     <div className="flex flex-col py-sm">
+      {/* Reihenfolge laut Chat-Vorgabe: "Vermietung" als erster Punkt, vor "In Aufarbeitung" und
+          "Aktive Vermarktung". "Verkauft {Jahr}" (Juli 2026 Chat-Vorgabe: "ich sehe immer noch
+          keine Verkauften Objekte! Bitte auch noch ausführen") kommt als vierte Gruppe dazu — der
+          Nutzer hat für diese Gruppe keine bestimmte Position verlangt, daher ans Ende. */}
+      <ObjektGruppe titel="Vermietung" objekte={zustand.vermietung} />
       <ObjektGruppe titel="In Aufarbeitung" objekte={zustand.aufarbeitung} />
       <ObjektGruppe titel="Aktive Vermarktung" objekte={zustand.aktiv} />
+      <ObjektGruppe titel="Verkauft" objekte={zustand.verkauft} />
     </div>
   );
 }
@@ -259,6 +409,7 @@ function KennzahlenZeile({
     besichtigungen30Tage: null,
     besichtigungenJahr: null,
     kundenAktiv: null,
+    verkaufteObjekteJahr: null,
   };
 
   function umschalten() {
@@ -304,6 +455,9 @@ function KennzahlenZeile({
         </span>
         <span className="text-left font-mono text-sm text-anthrazit">
           {formatWert(k.kundenAktiv)}
+        </span>
+        <span className="text-left font-mono text-sm text-anthrazit">
+          {formatWert(k.verkaufteObjekteJahr)}
         </span>
       </div>
       {wurdeGeoeffnet && (

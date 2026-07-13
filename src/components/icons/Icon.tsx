@@ -26,7 +26,8 @@ export type IconName =
   | "menu"
   | "download"
   | "externalLink"
-  | "lock";
+  | "lock"
+  | "warning";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   greeting: (
@@ -170,6 +171,16 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <rect x="5" y="11" width="14" height="9" rx="1.5" />
       <path d="M8 11V8a4 4 0 0 1 8 0v3" />
       <path d="M12 14.5v2.5" />
+    </>
+  ),
+  // Für Hinweise auf fehlende/nicht auswertbare Daten (z.B. Provisionsvorlauf, siehe
+  // Mitarbeiterstatistik.tsx) — bewusst kein Ausrufezeichen im Kreis, sondern ein Dreieck, um
+  // sich klar vom "check"-Icon (Erfolg) zu unterscheiden.
+  warning: (
+    <>
+      <path d="M12 3.5L21 19.5H3z" />
+      <path d="M12 10v3.5" />
+      <circle cx="12" cy="16.7" r="0.75" fill="currentColor" stroke="none" />
     </>
   ),
 };

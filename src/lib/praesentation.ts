@@ -5,7 +5,7 @@ import {
   ladeAutomatischeInteressenten,
   ladeBetreuerAddressId,
   ladeBetreuerUndAlleMitarbeiter,
-  ladeEigentuemerAddressId,
+  ladeEigentuemerAddressIds,
   ladeEstateIdByUuid,
   ladeImmobilieById,
   ladeKundeByAddressId,
@@ -45,9 +45,14 @@ export interface PraesentationsParams {
  * estateId kann entweder die interne numerische OnOffice-ID sein (z.B. für manuelle
  * Test-Links) oder die öffentliche Objekt-UUID (der künftige Normalfall: Link direkt aus
  * OnOffice über ein berechnetes Feld auf Basis von [uuid]). Wird keine addressId
- * mitgegeben, wird der Kunde automatisch über die Eigentümer-Relation des Objekts ermittelt
- * — der OnOffice-Link braucht dadurch nur die Objekt-UUID, die Begrüßung bleibt trotzdem
- * persönlich. Der zuständige Betreuer (inkl. Profilbild) wird analog über die
+ * mitgegeben, werden ALLE Eigentümer automatisch über die Eigentümer-Relation des Objekts
+ * ermittelt (siehe ladeEigentuemerAddressIds in onoffice/estate.ts) — bei Miteigentum
+ * (Ehepaar) oder einer Erbengemeinschaft können das mehrere Personen sein. Die erste
+ * gefundene Person bleibt `kunde` (persönliche Begrüßung, Rückwärtskompatibilität), alle
+ * weiteren stehen als `weitereEigentuemer` bereit und werden im Maklervertrag automatisch als
+ * zusätzliche Auftraggeber vorbefüllt (siehe Maklervertrag.tsx). Wird explizit eine addressId
+ * mitgegeben (manueller Test-Link), gilt weiterhin nur diese eine Person — der Eigentümer-
+ * Abruf entfällt dann komplett. Der zuständige Betreuer (inkl. Profilbild) wird analog über die
  * Mitarbeiter-Relation des Objekts ermittelt; schlägt das fehl, wird MOCK_BETREUER verwendet.
  * Zusätzlich werden alle übrigen Mitarbeiter-Adressen der Agentur geladen (objektunabhängig,
  * für den "weitere Mitarbeiter"-Slider auf der Kontaktperson-Seite) und um den Objekt-Betreuer
@@ -72,8 +77,12 @@ export async function ladePraesentationsDaten(
         throw new Error(`Objekt mit Referenz "${params.estateId}" nicht gefunden`);
       }
 
-      const addressId =
-        params.addressId || (await ladeEigentuemerAddressId(estateId).catch(() => null));
+      // Bei explizit übergebener addressId (z.B. manueller Test-Link) gilt weiterhin nur diese
+      // eine Person — sonst ALLE über die Eigentümer-Relation gefundenen Adress-IDs (kann bei
+      // Miteigentum/Erbengemeinschaft mehr als eine sein, siehe ladeEigentuemerAddressIds).
+      const addressIds = params.addressId
+        ? [params.addressId]
+        : await ladeEigentuemerAddressIds(estateId).catch(() => []);
       const [betreuerAddressId, setterAddressId] = await Promise.all([
         ladeBetreuerAddressId(estateId).catch(() => null),
         ladeSetterAddressId(estateId).catch(() => null),
@@ -81,7 +90,7 @@ export async function ladePraesentationsDaten(
 
       const [
         immobilie,
-        kunde,
+        kundenRoh,
         betreuerUndMitarbeiter,
         dokumente,
         priceHubbleWerte,
@@ -90,7 +99,11 @@ export async function ladePraesentationsDaten(
         automatischeInteressenten,
       ] = await Promise.all([
           ladeImmobilieById(estateId),
-          addressId ? ladeKundeByAddressId(addressId) : Promise.resolve(null),
+          // Jede Adress-ID unabhängig per .catch(() => null) abgesichert (Muster analog zu den
+          // übrigen Einzelabrufen hier) — schlägt der Abruf für EINEN Eigentümer fehl, sollen die
+          // übrigen trotzdem geladen werden statt die ganze Präsentation ohne Kundendaten dastehen
+          // zu lassen.
+          Promise.all(addressIds.map((id) => ladeKundeByAddressId(id).catch(() => null))),
           // Betreuer (Hauptkontakt), Setter und komplette Mitarbeiterliste bewusst in EINEM
           // gemeinsamen Aufruf statt mehrerer paralleler (siehe ladeBetreuerUndAlleMitarbeiter in
           // estate.ts) — mehrere unabhängige, aber durch dieses Promise.all gleichzeitig laufende
@@ -122,9 +135,15 @@ export async function ladePraesentationsDaten(
         ? alleMitarbeiter.filter((m) => m.id !== betreuerAddressId)
         : alleMitarbeiter;
 
+      // Fehlgeschlagene Einzelabrufe (null) herausfiltern, dann die erste gefundene Person als
+      // `kunde` (Rückwärtskompatibilität, siehe Praesentation.kunde), alle weiteren als
+      // `weitereEigentuemer` — leer, wenn nur eine Person gefunden wurde (der Normalfall).
+      const [kunde, ...weitereEigentuemer] = kundenRoh.filter((k): k is NonNullable<typeof k> => k !== null);
+
       if (immobilie) {
         return {
           kunde: kunde || { vorname: "", nachname: "" },
+          weitereEigentuemer,
           immobilie,
           // Die übrigen Bewertungsfelder (sachwert/ertragswert/etc.) bleiben MOCK_BEWERTUNG
           // (aktuell weiterhin manuell aus Sprengnetter gepflegt, siehe Bewertung-Typ) — nur
@@ -163,6 +182,9 @@ export async function ladePraesentationsDaten(
 
   return {
     kunde: MOCK_KUNDE,
+    // Keine weiteren Demo-Eigentümer — Mock-Modus bildet bewusst den (häufigeren) Einzeleigentümer-
+    // Normalfall ab, siehe Praesentation.weitereEigentuemer.
+    weitereEigentuemer: [],
     immobilie: MOCK_IMMOBILIE,
     bewertung: MOCK_BEWERTUNG,
     betreuer: MOCK_BETREUER,

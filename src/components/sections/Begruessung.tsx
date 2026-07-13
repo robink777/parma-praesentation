@@ -8,11 +8,36 @@ import Image from "next/image";
 const WILLKOMMENSBILD =
   "https://www.parmaimmobilien.de/wp-content/uploads/2025/09/fotokleer_207-KOpie-scaled.jpg";
 
-export function Begruessung({ kunde }: { kunde: Kunde }) {
-  const name = [kunde.anrede, kunde.vorname, kunde.nachname].filter(Boolean).join(" ");
+// Kurzform pro Person (z.B. "Herr Mustermann") — bewusst ohne Vorname: Bei mehreren
+// Eigentümern/innen (Miteigentum, Erbengemeinschaft) stehen die Namen untereinander (siehe
+// Rendering unten), ein vollständiger Name pro Zeile wäre dort unnötig lang.
+function formatiereName(kunde: Kunde): string {
+  return [kunde.anrede, kunde.nachname].filter(Boolean).join(" ");
+}
+
+export function Begruessung({
+  kunde,
+  weitereEigentuemer = [],
+}: {
+  kunde: Kunde;
+  // Bei Miteigentum (z.B. Ehepaar) oder einer Erbengemeinschaft können mehrere Eigentümer/innen
+  // an einem Objekt hinterlegt sein (siehe Praesentation.weitereEigentuemer, lib/praesentation.ts)
+  // — die Begrüßung soll dann alle namentlich ansprechen, nicht nur die erste gefundene Person.
+  weitereEigentuemer?: Kunde[];
+}) {
+  const namen = [kunde, ...weitereEigentuemer].map(formatiereName).filter(Boolean);
 
   return (
-    <SectionShell label="Willkommen" title={`Herzlich willkommen, ${name || "bei Parma Immobilien"}`}>
+    <SectionShell label="Willkommen" title="Herzlich Willkommen!">
+      {namen.length > 0 && (
+        <div className="mb-lg">
+          {namen.map((name, i) => (
+            <p key={i} className="text-lg font-slab leading-[1.4] text-anthrazit">
+              {name}
+            </p>
+          ))}
+        </div>
+      )}
       <p className="mb-lg max-w-[60ch] text-lg font-slab leading-[1.4] text-anthrazit">
         Schön, dass Sie da sind. Heute sprechen wir gemeinsam über Ihre Immobilie — in Ruhe,
         mit allen Zahlen auf dem Tisch.

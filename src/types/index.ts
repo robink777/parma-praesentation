@@ -235,6 +235,26 @@ export interface TeamMitglied {
   name: string;
   rolle: string;
   standort?: string;
+  // Ergänzt Juli 2026 (Logik-Check "Namensabgleich konsolidieren"): Früher standen dieselben
+  // Namen (exaktes String-Match auf "Vorname Nachname") in VIER unabhängigen Listen — hier in
+  // TEAM sowie in drei separaten Record<string,string>-Tabellen in onoffice/estate.ts
+  // (MITARBEITER_LIVE_ADRESS_IDS, MITARBEITER_NUTZER_NR, MITARBEITER_BENUTZERNAME). Ein Tippfehler
+  // oder eine vergessene Ergänzung bei neuen Mitarbeitenden in nur EINER dieser vier Listen führte
+  // dazu, dass genau dieser eine Datenpunkt (Kontaktdaten, Statistik-Zuordnung oder
+  // Objekt-Betreuer-Auflösung) für die betroffene Person still und ohne Fehlermeldung fehlte.
+  // Jetzt an einer einzigen Stelle gepflegt: fehlt eines dieser drei Felder, ist das direkt am
+  // TEAM-Eintrag selbst sichtbar statt in einer von vier verstreuten Tabellen.
+  //
+  // Geschäftliche Adress-ID im address-Modul (Kontaktdaten: Telefon/E-Mail/Firma/Anschrift) —
+  // siehe ladeTeamAdressdaten in onoffice/estate.ts.
+  adressId?: string;
+  // Nutzer-Nr im user-Modul (anderer ID-Raum als adressId!) — für die Zuordnung
+  // Objekt-Betreuer→Mitarbeiter (Feld "benutzer" am Estate-Datensatz) und die
+  // Mitarbeiterstatistik im Admin-Bereich, siehe ladeNutzerNrFuerMitarbeiter/estate.ts.
+  nutzerNr?: string;
+  // OnOffice-Kurz-Benutzername (z.B. "Kira" statt Nutzer-Nr) — für die
+  // Mitarbeiterstatistik-Aggregation ("Kunden aktiv"), siehe ladeBenutzernameFuerMitarbeiter/estate.ts.
+  benutzername?: string;
 }
 
 // Auslastungskennzahlen einer Person aus der TEAM-Liste (data/unternehmen.ts) für die
@@ -264,6 +284,14 @@ export interface MitarbeiterKennzahlen {
   besichtigungen30Tage: number | null;
   besichtigungenJahr: number | null;
   kundenAktiv: number | null;
+  // Anzahl verkaufter Objekte (status2=verkauft, vermarktungsart=kauf) im aktuellen Kalenderjahr
+  // (Feld verkauft_am, siehe zaehleVerkaufteObjekteFuerMitarbeiter/ermittleJahresDatumsfenster in
+  // onoffice/estate.ts bzw. mitarbeiterstatistik.ts, Juli 2026 Chat-Vorgabe: "die Zahl der
+  // verkauften Objekte pro Mitarbeiter in diesem Jahr"). Das Kalenderjahr wird zur Laufzeit aus
+  // dem Systemdatum bestimmt, nicht hartkodiert — die Kennzahl bleibt dadurch jedes Jahr plausibel
+  // ("es jedes Jahr zurückgestellt wird", Chat-Vorgabe), ohne dass der Code jährlich angepasst
+  // werden muss.
+  verkaufteObjekteJahr: number | null;
 }
 
 // Einzelnes Objekt in der aufklappbaren Objektliste je Mitarbeiter (Admin-Bereich, siehe
@@ -283,22 +311,57 @@ export interface MitarbeiterObjekt {
   vermarktungsdauerTage: number | null;
   // URL des Titelbilds (siehe ladeTitelbilder in estate.ts) — null, wenn kein Bild hinterlegt ist.
   titelbildUrl: string | null;
+  // Provisionsvorlauf = (Außen-Provision % + Innen-Provision %) auf den Kaufpreis, abzüglich
+  // 19% MwSt. (siehe parseProvisionsProzent/mapMitarbeiterObjekt in onoffice/estate.ts, Juli 2026
+  // Chat-Vorgabe). null, wenn nicht berechenbar — siehe provisionsvorlaufFehlt für den Grund.
+  provisionsvorlauf: number | null;
+  // true, wenn aussen_courtage/innen_courtage in OnOffice leer sind ODER sich nicht als
+  // Prozentsatz auswerten lassen (z.B. Freitext-Tippfehler wie "2 KM") — die Statistik-UI zeigt
+  // dafür einen eigenen Hinweis statt eines schlichten "–", um "Feld in OnOffice nicht gepflegt"
+  // von "Wert ist 0" zu unterscheiden (Chat-Vorgabe).
+  provisionsvorlaufFehlt: boolean;
 }
 
-// Unternehmensweite Summen über ALLE Mitarbeiter hinweg (nicht je Person), für die vier
+// Unternehmensweite Summen über ALLE Mitarbeiter hinweg (nicht je Person), für die
 // Infoboxen über der Mitarbeitertabelle (siehe Mitarbeiterstatistik.tsx, Chat-Vorgabe). Bewusst
 // ein eigener, schlanker Typ statt einer Erweiterung von MitarbeiterKennzahlen — hier geht es um
-// EINE einzige Gesamtsumme für den ganzen Bestand, nicht um Werte je Mitarbeiter. Ø-Vermarktungsdauer
-// und Objektvolumen werden über BEIDE Gruppen (aktive Vermarktung UND Aufarbeitung) zusammen
-// berechnet (siehe ladeObjektGesamtKennzahlen in onoffice/mitarbeiterstatistik.ts) — anders als
-// die getrennt ausgewiesenen Zähler aufarbeitungGesamt/aktivGesamt, die bewusst pro Gruppe bleiben,
-// analog zu den bereits getrennten Spalten "Aktive Objekte"/"Aufarbeitung" in der Tabelle.
+// EINE einzige Gesamtsumme für den ganzen Bestand, nicht um Werte je Mitarbeiter. Ø-Vermarktungsdauer,
+// Objektvolumen und Provisionsvorlauf werden über BEIDE Gruppen (aktive Vermarktung UND
+// Aufarbeitung) zusammen berechnet (siehe ladeObjektGesamtKennzahlen in
+// onoffice/mitarbeiterstatistik.ts) — anders als die getrennt ausgewiesenen Zähler
+// aufarbeitungGesamt/aktivGesamt, die bewusst pro Gruppe bleiben, analog zu den bereits getrennten
+// Spalten "Aktive Objekte"/"Aufarbeitung" in der Tabelle.
 export interface ObjektGesamtKennzahlen {
   aufarbeitungGesamt: number | null;
   aktivGesamt: number | null;
   // null, wenn kein Objekt im gesamten Bestand ein auswertbares Auftragsdatum hat.
   durchschnittVermarktungsdauerTage: number | null;
   objektvolumenGesamt: number | null;
+  // Summe von MitarbeiterObjekt.provisionsvorlauf über alle Objekte, bei denen der Wert
+  // berechenbar war (siehe provisionsvorlaufFehltAnzahl für die ausgeschlossenen Objekte).
+  provisionsvorlaufGesamt: number | null;
+  // Anzahl Objekte im gesamten Bestand, bei denen Außen-/Innen-Provision in OnOffice fehlen oder
+  // nicht auswertbar sind (siehe MitarbeiterObjekt.provisionsvorlaufFehlt) — für den
+  // Hinweis-Zusatz neben der Infobox (Chat-Vorgabe: Hinweisfeld bei fehlenden Werten).
+  provisionsvorlaufFehltAnzahl: number;
+  // Unternehmensweiter Block "Verkaufte Objekte {Jahr} / Provisionsvolumen {Jahr} / Gesamtvolumen
+  // {Jahr}" (Juli 2026 Chat-Vorgabe: "Zeige oben in der Gesamtstatistik bitte einen weiteren
+  // Block an") — bewusst über das laufende Kalenderjahr (verkauft_am, siehe
+  // ladeAlleVerkauftenObjekte/ermittleJahresDatumsfenster in onoffice/estate.ts bzw.
+  // mitarbeiterstatistik.ts), analog zur bereits bestehenden Pro-Mitarbeiter-Kennzahl
+  // verkaufteObjekteJahr, hier nur unternehmensweit aggregiert. Das Jahr wird in der UI dynamisch
+  // aus dem Systemdatum bestimmt (aktuellesJahr() in Mitarbeiterstatistik.tsx), nicht hier im Typ.
+  verkaufteObjekteJahrGesamt: number | null;
+  // Summe von MitarbeiterObjekt.preis (= Kaufpreis) über alle im laufenden Kalenderjahr
+  // verkauften Objekte — "Gesamtvolumen {Jahr}".
+  objektvolumenVerkauftJahr: number | null;
+  // Summe von MitarbeiterObjekt.provisionsvorlauf über alle im laufenden Kalenderjahr verkauften
+  // Objekte, bei denen der Wert berechenbar war — "Provisionsvolumen {Jahr}". null, wenn kein
+  // einziges verkauftes Objekt einen auswertbaren Provisionswert hat.
+  provisionsvolumenVerkauftJahr: number | null;
+  // Anzahl der im laufenden Kalenderjahr verkauften Objekte ohne auswertbare Provisionsangabe
+  // (siehe provisionsvorlaufFehltAnzahl oben, gleiches Hinweis-Muster für den neuen Block).
+  provisionsvolumenVerkauftJahrFehltAnzahl: number;
 }
 
 export interface Standort {
@@ -393,6 +456,14 @@ export interface ObjektDokument {
 
 export interface Praesentation {
   kunde: Kunde;
+  // Zusätzliche Eigentümer/innen desselben Objekts (Miteigentum, z.B. Ehepaar, oder
+  // Erbengemeinschaft) — leer, wenn laut OnOffice nur eine Person an der Eigentümer-Relation
+  // hinterlegt ist (der Normalfall) oder im Mock-Modus. `kunde` oben bleibt dabei bewusst die
+  // ERSTE gefundene Person (Rückwärtskompatibilität für Begruessung/Maklervertrag, die
+  // ursprünglich nur eine einzelne Person kannten); alle weiteren stehen hier als Liste bereit,
+  // siehe ladePraesentationsDaten (lib/praesentation.ts, ladeEigentuemerAddressIds in
+  // onoffice/estate.ts) sowie die automatische Vorbefüllung in Maklervertrag.tsx.
+  weitereEigentuemer: Kunde[];
   immobilie: Immobilie;
   bewertung: Bewertung;
   betreuer: Betreuer;

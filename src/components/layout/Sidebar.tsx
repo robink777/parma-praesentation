@@ -9,11 +9,14 @@ import { NAV_ITEMS } from "./nav";
 export function Sidebar({
   activeId,
   onSelect,
-  kundeName,
+  kundeNamen,
 }: {
   activeId: string;
   onSelect: (id: string) => void;
-  kundeName?: string;
+  // Bei mehreren Eigentümern (Miteigentum, Erbengemeinschaft) eine Zeile pro Person (siehe
+  // PraesentationApp.tsx) — Array statt eines zusammengesetzten Strings, damit hier pro Name ein
+  // eigener <p> gerendert werden kann (untereinander statt in einem Fließtext-Satz).
+  kundeNamen?: string[];
 }) {
   const router = useRouter();
   // Eingeklappter Zustand ist bewusst lokaler Component-State (statt in PraesentationApp
@@ -117,10 +120,14 @@ export function Sidebar({
           })}
         </nav>
 
-        {!eingeklappt && kundeName && (
+        {!eingeklappt && kundeNamen && kundeNamen.length > 0 && (
           <div className="mt-lg border-t border-sand pt-sm">
             <p className="label">Präsentation für</p>
-            <p className="font-slab text-lg text-anthrazit">{kundeName}</p>
+            {kundeNamen.map((name, i) => (
+              <p key={i} className="font-slab text-lg text-anthrazit">
+                {name}
+              </p>
+            ))}
           </div>
         )}
       </aside>
