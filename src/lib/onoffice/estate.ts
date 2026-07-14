@@ -1083,22 +1083,39 @@ export async function zaehleObjekteInAufarbeitung(nutzerNr: string): Promise<num
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
-// Zählt Objekte mit status2=verkauft eines bestimmten Mitarbeiters innerhalb eines Datumsfensters
-// von "verkauft_am" (Feld "Verkauft/Vermietet am", siehe mapping.ts) — für die neue Kennzahl
-// "Verkaufte Objekte" je Mitarbeiter im aktuellen Kalenderjahr (Chat-Vorgabe Juli 2026: "die Zahl
-// der verkauften Objekte pro Mitarbeiter in diesem Jahr"). von/bis werden bewusst NICHT hier
-// hartkodiert, sondern vom Aufrufer übergeben (siehe ermittleJahresDatumsfenster in
-// mitarbeiterstatistik.ts, die das aktuelle Kalenderjahr zur Laufzeit aus dem Systemdatum
-// bestimmt) — so bleibt die Kennzahl "jedes Jahr zurückgestellt" (Chat-Vorgabe), ohne dass der
-// Code jährlich angepasst werden muss. Live geprüft, Juli 2026: Datumsfilter im Format
-// "YYYY-MM-DD" funktioniert zuverlässig gegen das Feld verkauft_am. vermarktungsart=kauf schließt
-// Vermietungsobjekte aus (siehe Kommentar bei zaehleAktiveObjekte oben).
+// Zählt Objekte eines bestimmten Mitarbeiters innerhalb eines Datumsfensters von "verkauft_am"
+// (Feld "Verkauft/Vermietet am", siehe mapping.ts) — für die Kennzahl "Verkaufte Objekte" je
+// Mitarbeiter im aktuellen Kalenderjahr (Chat-Vorgabe Juli 2026: "die Zahl der verkauften Objekte
+// pro Mitarbeiter in diesem Jahr"). von/bis werden bewusst NICHT hier hartkodiert, sondern vom
+// Aufrufer übergeben (siehe ermittleJahresDatumsfenster in mitarbeiterstatistik.ts, die das
+// aktuelle Kalenderjahr zur Laufzeit aus dem Systemdatum bestimmt) — so bleibt die Kennzahl
+// "jedes Jahr zurückgestellt" (Chat-Vorgabe), ohne dass der Code jährlich angepasst werden muss.
+// Live geprüft, Juli 2026: Datumsfilter im Format "YYYY-MM-DD" funktioniert zuverlässig gegen das
+// Feld verkauft_am. vermarktungsart=kauf schließt Vermietungsobjekte aus (siehe Kommentar bei
+// zaehleAktiveObjekte oben).
+//
+// BEWUSST OHNE status2=verkauft-Filter (anders als noch im Juli 2026 beim ersten Bau dieser
+// Funktion): Ein Abgleich gegen die tatsächliche, vom Büro geführte Verkaufsliste (Excel,
+// Farbcode Notartermin/Zahlung) zeigte, dass status2 im Tagesgeschäft oft NICHT auf "verkauft"
+// nachgepflegt wird, obwohl verkauft_am bereits korrekt gesetzt ist — 27 von 56 im Account
+// gefundenen, nachweislich verkauften Objekten hatten leeres status2 trotz gültigem verkauft_am.
+// verkauft_am selbst wird zuverlässig erst gesetzt, sobald der Notartermin stattgefunden hat
+// (Objekte mit noch ausstehendem Notartermin hatten in der Stichprobe durchgehend
+// verkauft_am="0000-00-00", also außerhalb jedes Datumsfensters) — die Datumsfilterung oben
+// grenzt also bereits korrekt auf tatsächlich abgeschlossene Verkäufe ein, ein zusätzlicher
+// status2-Filter blendet lediglich unvollständig gepflegte Datensätze fälschlich aus.
+//
+// BEWUSST kein reiner meta.cntabsolute-Abruf mehr (anders als die übrigen zaehle*-Funktionen
+// oben): Ein per Duplikat-Check (siehe dedupliziereVerkaufteObjekte) bereinigtes Ergebnis braucht
+// die tatsächlichen Datensätze, nicht nur die rohe Trefferzahl — sonst zählt diese Spalte anders
+// als die zugehörige aufklappbare Liste (ladeVerkaufteObjekteFuerMitarbeiter unten), die denselben
+// Duplikat-Check anwendet.
 export async function zaehleVerkaufteObjekteFuerMitarbeiter(
   nutzerNr: string,
   von: string,
   bis: string
 ): Promise<number> {
-  const result = await callOnOfficeApi([
+  const result = await callOnOfficeApi<{ elements: { objekttitel?: string; verkauft_am?: string; status2?: string } }>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
       resourcetype: "estate",
@@ -1106,9 +1123,8 @@ export async function zaehleVerkaufteObjekteFuerMitarbeiter(
       identifier: "",
       cacheable: false,
       parameters: {
-        data: ["Id"],
+        data: ["Id", "objekttitel", "verkauft_am", "status2"],
         filter: {
-          status2: [{ op: "=", val: "verkauft" }],
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
           verkauft_am: [
@@ -1116,11 +1132,12 @@ export async function zaehleVerkaufteObjekteFuerMitarbeiter(
             { op: "<=", val: bis },
           ],
         },
-        listlimit: 1,
+        listlimit: MITARBEITER_OBJEKT_LISTLIMIT,
       },
     },
   ]);
-  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+  const records = result?.response?.results?.[0]?.data?.records || [];
+  return dedupliziereVerkaufteObjekte(records).length;
 }
 
 // Leichte Objekt-Kennung für die aufklappbare Objektliste je Mitarbeiter (Admin-Bereich, siehe
@@ -1164,6 +1181,12 @@ interface RawMitarbeiterObjektRecord {
     // "zeige sie aber Pro mitarbeiter trotzdem an als weiter dropdown funktion") stattdessen die
     // Kaltmiete als Preis angezeigt, siehe mapMitarbeiterVermietung unten.
     kaltmiete?: string | number;
+    // Nur für den Duplikat-Check bei den "Verkauft"-Abfragen gebraucht (siehe
+    // dedupliziereVerkaufteObjekte unten) — für Aktive/Aufarbeitung/Vermietung bleiben beide
+    // Felder ungenutzt, schaden dort aber nicht (ein Feld mehr im ohnehin gemeinsamen
+    // MITARBEITER_OBJEKT_FIELDS-Katalog).
+    verkauft_am?: string;
+    status2?: string;
   };
 }
 
@@ -1176,7 +1199,37 @@ const MITARBEITER_OBJEKT_FIELDS = [
   "prozent_aussenprovision",
   "prozent_innenprovision",
   "kaltmiete",
+  "verkauft_am",
+  "status2",
 ];
+
+// Manche Objekte existieren in OnOffice als exaktes Duplikat desselben tatsächlichen Verkaufs —
+// live beobachtet (August 2026, Abgleich gegen die tatsächliche Verkaufsliste des Büros):
+// "In der Mühlenau 123, 52355 Düren" hatte zwei Datensätze mit identischem Objekttitel und
+// identischem verkauft_am (2026-05-12), aber unterschiedlichem Kaufpreis — vermutlich ein
+// Alt-Datensatz, der bei einer Preiskorrektur stehen blieb, statt bearbeitet zu werden. Ohne
+// diesen Filter zählte die unternehmensweite Jahreszahl 62 statt der tatsächlichen 61 Verkäufe.
+// Gruppiert nach Objekttitel + Verkaufsdatum (beides zusammen identisch zu finden ist für zwei
+// tatsächlich unterschiedliche Verkäufe praktisch ausgeschlossen) und behält je Gruppe nur EINEN
+// Datensatz — bevorzugt den mit status2=verkauft (vom Büro als abgeschlossen markiert), sonst
+// den ersten der Gruppe.
+function dedupliziereVerkaufteObjekte<T extends { elements: { objekttitel?: string; verkauft_am?: string; status2?: string } }>(
+  records: T[]
+): T[] {
+  const gruppen = new Map<string, T[]>();
+  for (const record of records) {
+    const schluessel = `${record.elements.objekttitel ?? ""}|${record.elements.verkauft_am ?? ""}`;
+    const gruppe = gruppen.get(schluessel);
+    if (gruppe) {
+      gruppe.push(record);
+    } else {
+      gruppen.set(schluessel, [record]);
+    }
+  }
+  return [...gruppen.values()].map(
+    (gruppe) => gruppe.find((r) => r.elements.status2 === "verkauft") ?? gruppe[0]
+  );
+}
 
 // Deutlich über der realistischen Objektzahl einer einzelnen Person — anders als bei den
 // zaehle*-Funktionen oben (listlimit:1 + meta.cntabsolute) werden hier die tatsächlichen
@@ -1390,18 +1443,22 @@ export async function ladeVermietungenInAufarbeitungFuerMitarbeiter(
   return records.map(mapMitarbeiterVermietung);
 }
 
-// Lädt die einzelnen verkauften Objekte (status2=verkauft, Datumsfenster auf "verkauft_am") eines
-// Mitarbeiters als Liste — Pendant zu zaehleVerkaufteObjekteFuerMitarbeiter oben (dort nur die
-// Anzahl über meta.cntabsolute), hier mit echten Anzeige-Feldern für die aufklappbare
-// "Verkauft {Jahr}"-Dropdown-Gruppe (Juli 2026 Chat-Vorgabe: "ich sehe immer noch keine
-// Verkauften Objekte! Bitte auch noch ausführen" — die reine Zahl in der Tabelle reichte nicht,
-// die einzelnen Objekte sollen wie bei Vermietung/Aufarbeitung/Aktive Vermarktung aufklappbar
-// sein). Nutzt dieselben Anzeige-Felder wie ladeAktiveObjekteFuerMitarbeiter/mapMitarbeiterObjekt
-// (echte Kaufobjekte, kein Vermietungs-Sonderfall) — der Provisionsvorlauf ist hier sogar
-// besonders aussagekräftig, da die Provision bei einem verkauften Objekt tatsächlich realisiert
-// wurde. von/bis werden vom Aufrufer übergeben (siehe ermittleJahresDatumsfenster in
-// mitarbeiterstatistik.ts), damit das Kalenderjahr zur Laufzeit bestimmt wird statt hartkodiert zu
-// sein.
+// Lädt die einzelnen verkauften Objekte (Datumsfenster auf "verkauft_am") eines Mitarbeiters als
+// Liste — Pendant zu zaehleVerkaufteObjekteFuerMitarbeiter oben (dort nur die Anzahl über
+// meta.cntabsolute), hier mit echten Anzeige-Feldern für die aufklappbare "Verkauft"-Dropdown-
+// Gruppe (Juli 2026 Chat-Vorgabe: "ich sehe immer noch keine Verkauften Objekte! Bitte auch noch
+// ausführen" — die reine Zahl in der Tabelle reichte nicht, die einzelnen Objekte sollen wie bei
+// Vermietung/Aufarbeitung/Aktive Vermarktung aufklappbar sein). Nutzt dieselben Anzeige-Felder
+// wie ladeAktiveObjekteFuerMitarbeiter/mapMitarbeiterObjekt (echte Kaufobjekte, kein
+// Vermietungs-Sonderfall) — der Provisionsvorlauf ist hier sogar besonders aussagekräftig, da die
+// Provision bei einem verkauften Objekt tatsächlich realisiert wurde. von/bis werden vom Aufrufer
+// übergeben (siehe ermittleJahresDatumsfenster in mitarbeiterstatistik.ts), damit das Kalenderjahr
+// zur Laufzeit bestimmt wird statt hartkodiert zu sein.
+//
+// BEWUSST OHNE status2=verkauft-Filter — siehe ausführliche Begründung bei
+// zaehleVerkaufteObjekteFuerMitarbeiter oben (Abgleich gegen die tatsächliche Verkaufsliste des
+// Büros zeigte, dass status2 unzuverlässig gepflegt wird, verkauft_am dagegen zuverlässig erst ab
+// stattgefundenem Notartermin gesetzt wird).
 export async function ladeVerkaufteObjekteFuerMitarbeiter(
   nutzerNr: string,
   von: string,
@@ -1417,7 +1474,6 @@ export async function ladeVerkaufteObjekteFuerMitarbeiter(
       parameters: {
         data: MITARBEITER_OBJEKT_FIELDS,
         filter: {
-          status2: [{ op: "=", val: "verkauft" }],
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
           verkauft_am: [
@@ -1431,7 +1487,7 @@ export async function ladeVerkaufteObjekteFuerMitarbeiter(
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records || [];
-  return records.map(mapMitarbeiterObjekt);
+  return dedupliziereVerkaufteObjekte(records).map(mapMitarbeiterObjekt);
 }
 
 // Deutlich über dem live beobachteten Gesamtbestand (Juli 2026: rund 103 aktive + 22 in
@@ -1504,6 +1560,14 @@ export async function ladeAlleObjekteInAufarbeitung(): Promise<MitarbeiterObjekt
 // bitte einen weiteren Block an"), siehe ladeObjektGesamtKennzahlen in mitarbeiterstatistik.ts.
 // von/bis werden vom Aufrufer übergeben (ermittleJahresDatumsfenster), damit das Kalenderjahr zur
 // Laufzeit bestimmt wird statt hartkodiert zu sein.
+//
+// BEWUSST OHNE status2=verkauft-Filter — siehe ausführliche Begründung bei
+// zaehleVerkaufteObjekteFuerMitarbeiter oben (Abgleich gegen die tatsächliche Verkaufsliste des
+// Büros zeigte, dass status2 unzuverlässig gepflegt wird, verkauft_am dagegen zuverlässig erst ab
+// stattgefundenem Notartermin gesetzt wird — der status2-Filter allein hatte die unternehmensweite
+// Jahreszahl auf 36 gedrückt statt der tatsächlichen 61, siehe Chat, August 2026). Zusätzlich per
+// dedupliziereVerkaufteObjekte (siehe oben) um exakte Duplikate bereinigt — ohne diesen Schritt
+// lieferte die reine Datumsfilterung 62 statt 61 (ein Objekt existierte doppelt in OnOffice).
 export async function ladeAlleVerkauftenObjekte(
   von: string,
   bis: string
@@ -1518,7 +1582,6 @@ export async function ladeAlleVerkauftenObjekte(
       parameters: {
         data: MITARBEITER_OBJEKT_FIELDS,
         filter: {
-          status2: [{ op: "=", val: "verkauft" }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
           verkauft_am: [
             { op: ">=", val: von },
@@ -1531,7 +1594,7 @@ export async function ladeAlleVerkauftenObjekte(
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records || [];
-  return records.map(mapMitarbeiterObjekt);
+  return dedupliziereVerkaufteObjekte(records).map(mapMitarbeiterObjekt);
 }
 
 // Terminarten, die NICHT in die "Termine"-Kennzahl (Parameter 3 von 5) einfließen — reine
