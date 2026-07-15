@@ -4,7 +4,8 @@ import {
   ladeMitarbeiterKennzahlen,
   ladeObjektGesamtKennzahlen,
 } from "@/lib/onoffice/mitarbeiterstatistik";
-import { MitarbeiterKennzahlen, ObjektGesamtKennzahlen } from "@/types";
+import { ladeKontrollObjekte } from "@/lib/onoffice/estate";
+import { KontrollObjekt, MitarbeiterKennzahlen, ObjektGesamtKennzahlen } from "@/types";
 
 // Admin-Bereich, zusätzlich zur App-weiten Anmeldung durch ein zweites, separates Passwort
 // geschützt (siehe middleware.ts, lib/auth.ts, admin/login/page.tsx). Zeigt die
@@ -23,15 +24,15 @@ import { MitarbeiterKennzahlen, ObjektGesamtKennzahlen } from "@/types";
 export default async function AdminPage() {
   let kennzahlen: Record<string, MitarbeiterKennzahlen> | undefined;
   let gesamtKennzahlen: ObjektGesamtKennzahlen | undefined;
+  let kontrollObjekte: KontrollObjekt[] | undefined;
 
   if (ONOFFICE_MODE === "live") {
-    // Beide Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
-    // voneinander, ein sequenzielles await würde die Ladezeit der Seite unnötig verdoppeln.
-    // Trotzdem einzeln abgesichert (zwei separate try/catch statt einem gemeinsamen um das
-    // Promise.all) — schlägt einer der beiden Abrufe fehl, soll der jeweils andere trotzdem
-    // angezeigt werden (analog zum bestehenden Muster der einzelnen .catch(() => null) in
-    // ladeMitarbeiterKennzahlen).
-    const [kennzahlenErgebnis, gesamtKennzahlenErgebnis] = await Promise.all([
+    // Alle drei Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
+    // voneinander, ein sequenzielles await würde die Ladezeit der Seite unnötig verlängern.
+    // Trotzdem einzeln abgesichert (separate try/catch statt einem gemeinsamen um das
+    // Promise.all) — schlägt einer der Abrufe fehl, sollen die übrigen trotzdem angezeigt werden
+    // (analog zum bestehenden Muster der einzelnen .catch(() => null) in ladeMitarbeiterKennzahlen).
+    const [kennzahlenErgebnis, gesamtKennzahlenErgebnis, kontrollErgebnis] = await Promise.all([
       ladeMitarbeiterKennzahlen().catch((error) => {
         console.error(
           "Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:",
@@ -46,13 +47,24 @@ export default async function AdminPage() {
         );
         return undefined;
       }),
+      ladeKontrollObjekte().catch((error) => {
+        console.error("Live-Abruf der Kontrollobjekte aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
     ]);
     kennzahlen = kennzahlenErgebnis;
     gesamtKennzahlen = gesamtKennzahlenErgebnis;
+    kontrollObjekte = kontrollErgebnis;
   }
 
   // Kein SectionShell-Wrapper mehr — Mitarbeiterstatistik baut seit August 2026 ihr eigenes
   // Vollbild-Layout mit Sidebar auf (Chat-Vorgabe: "identisches Layout wie bei der Präsentation"),
   // analog dazu, wie app/page.tsx PraesentationApp ohne umgebendes SectionShell rendert.
-  return <Mitarbeiterstatistik kennzahlen={kennzahlen} gesamtKennzahlen={gesamtKennzahlen} />;
+  return (
+    <Mitarbeiterstatistik
+      kennzahlen={kennzahlen}
+      gesamtKennzahlen={gesamtKennzahlen}
+      kontrollObjekte={kontrollObjekte}
+    />
+  );
 }

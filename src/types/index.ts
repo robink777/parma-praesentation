@@ -364,6 +364,27 @@ export interface ObjektGesamtKennzahlen {
   provisionsvolumenVerkauftJahrFehltAnzahl: number;
 }
 
+// Ein Objekt mit mindestens einer erkannten Dateninkonsistenz in OnOffice, für die "Kontrolle"-
+// Seite im Admin-Bereich (siehe ladeKontrollObjekte in onoffice/estate.ts, Chat-Vorgabe August
+// 2026: "eine Kontrollseite einrichten wo in jedem Status nachgeschaut werden soll ob alles
+// vernünftig in OnOffice hinterlegt wird"). Absichtlich EIN flacher Eintrag pro Objekt mit einer
+// Liste von Problemtexten statt mehrerer getrennter Listen je Problemtyp — ein Objekt kann
+// mehrere Probleme gleichzeitig haben (z.B. fehlende Provision UND Status-Widerspruch).
+export interface KontrollObjekt {
+  id: string;
+  titel: string;
+  objektnr: string;
+  // Aufgelöster TEAM-Name (siehe TeamMitglied in unternehmen.ts) über das Feld "benutzer" — null,
+  // wenn der zuständige Nutzer keinem TEAM-Eintrag zugeordnet werden kann.
+  mitarbeiter: string | null;
+  // Klartext von Status 1 ("Aktiv"/"Inaktiv"/"Archiviert", siehe Feldkatalog-permittedvalues,
+  // Live-Check August 2026).
+  statusLabel: string;
+  // Menschenlesbare Problembeschreibungen, z.B. "Provisionsangabe fehlt",
+  // "Status widerspricht Verkaufsdatum (Aktive Vermarktung)", "Möglicherweise doppelt angelegt".
+  probleme: string[];
+}
+
 export interface Standort {
   name: string;
   adresse?: string;

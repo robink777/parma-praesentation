@@ -4,10 +4,17 @@ import { useEffect, useState } from "react";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ADMIN_NAV_ITEMS } from "./adminNav";
+import { Kontrolle } from "./Kontrolle";
 import { TEAM } from "@/data/unternehmen";
 import { Icon } from "@/components/icons/Icon";
 import { formatiereBetrag } from "@/lib/berechnung";
-import { MitarbeiterKennzahlen, MitarbeiterObjekt, ObjektGesamtKennzahlen, TeamMitglied } from "@/types";
+import {
+  KontrollObjekt,
+  MitarbeiterKennzahlen,
+  MitarbeiterObjekt,
+  ObjektGesamtKennzahlen,
+  TeamMitglied,
+} from "@/types";
 
 // Deutsches Tausendertrennzeichen, analog zu Unternehmen.tsx.
 const zahlenformat = new Intl.NumberFormat("de-DE");
@@ -522,9 +529,11 @@ function MitarbeiterTabelle({
 export function Mitarbeiterstatistik({
   kennzahlen,
   gesamtKennzahlen,
+  kontrollObjekte,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
+  kontrollObjekte?: KontrollObjekt[];
 }) {
   const { vertrieb, weitere } = teileTeamAuf();
   const [abschnitt, setAbschnitt] = useState("uebersicht");
@@ -553,6 +562,11 @@ export function Mitarbeiterstatistik({
               <MitarbeiterTabelle titel="Vertrieb" mitglieder={vertrieb} kennzahlen={kennzahlen} />
               <MitarbeiterTabelle titel="Weitere Mitarbeiter" mitglieder={weitere} kennzahlen={kennzahlen} />
             </div>
+          </SectionShell>
+        )}
+        {abschnitt === "kontrolle" && (
+          <SectionShell label="Admin-Bereich" title="Kontrolle">
+            <Kontrolle objekte={kontrollObjekte} />
           </SectionShell>
         )}
       </main>

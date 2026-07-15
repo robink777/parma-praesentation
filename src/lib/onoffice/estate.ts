@@ -1,4 +1,4 @@
-import { Betreuer, Immobilie, Interessent, Kunde, MitarbeiterObjekt, ObjektDokument } from "@/types";
+import { Betreuer, Immobilie, Interessent, KontrollObjekt, Kunde, MitarbeiterObjekt, ObjektDokument } from "@/types";
 import { TEAM } from "@/data/unternehmen";
 import { distanzZwischenPlzKm } from "@/lib/geo";
 import { callOnOfficeApi } from "./client";
@@ -1595,6 +1595,169 @@ export async function ladeAlleVerkauftenObjekte(
   ]);
   const records = result?.response?.results?.[0]?.data?.records || [];
   return dedupliziereVerkaufteObjekte(records).map(mapMitarbeiterObjekt);
+}
+
+interface RawKontrollRecord {
+  id: string;
+  elements: {
+    objekttitel?: string;
+    objektnr_extern?: string;
+    kaufpreis?: string | number;
+    status?: string;
+    status2?: string;
+    verkauft_am?: string;
+    benutzer?: string;
+    prozent_aussenprovision?: string | number;
+    prozent_innenprovision?: string | number;
+  };
+}
+
+const KONTROLL_FIELDS = [
+  "Id",
+  "objekttitel",
+  "objektnr_extern",
+  "kaufpreis",
+  "status",
+  "status2",
+  "verkauft_am",
+  "benutzer",
+  "prozent_aussenprovision",
+  "prozent_innenprovision",
+];
+
+// Klartext von "Status 1" (Live-Feldkatalog geprüft, August 2026: permittedvalues 0/1/2).
+const STATUS_LABELS: Record<string, string> = {
+  "0": "Archiviert",
+  "1": "Aktiv",
+  "2": "Inaktiv",
+};
+
+// status2-Werte, die eine noch laufende Vermarktung/Prüfung bedeuten (Live-Feldkatalog geprüft,
+// August 2026) — widersprechen sich fachlich mit einem bereits gesetzten Verkaufsdatum
+// (verkauft_am). Live beobachtet (August 2026, Abgleich gegen die Verkaufsliste des Büros):
+// mehrere Objekte hatten trotz "Aktive Vermarktung"/"Vorbereitung" bereits ein Verkaufsdatum,
+// vermutlich ein versehentlich gesetztes Datum bei einem tatsächlich noch aktiven Objekt.
+// Bewusst nur diese vier (nicht die volle status2-Werteliste): das sind die live bestätigten
+// "eindeutig noch nicht verkauft"-Zustände — "reserviert" oder die Akquise-Unterphasen sind als
+// Übergangszustände kurz vor/nach einem Verkauf zu mehrdeutig, um sie pauschal als Fehler zu
+// werten.
+const STATUS2_NOCH_AKTIV_LABELS: Record<string, string> = {
+  status2obj_aktiv: "Aktiv",
+  in_akquise: "In Akquise",
+  vorbereitung: "Vorbereitung",
+  aktive_vermarktung: "Aktive Vermarktung",
+};
+
+async function ladeKontrollRecordsSeite(offset: number): Promise<RawKontrollRecord[]> {
+  const result = await callOnOfficeApi<RawKontrollRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: KONTROLL_FIELDS,
+        filter: { vermarktungsart: [{ op: "=", val: "kauf" }] },
+        listlimit: GESAMT_OBJEKT_LISTLIMIT,
+        listoffset: offset,
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.records || [];
+}
+
+// Lädt unternehmensweit ALLE Kaufobjekte (kein Status-/Datumsfilter, anders als die übrigen
+// Lader oben) und bricht sie auf Objekte mit mindestens einer erkannten Dateninkonsistenz
+// herunter — für die "Kontrolle"-Seite im Admin-Bereich (Chat-Vorgabe August 2026: "eine
+// Kontrollseite einrichten wo in jedem Status nachgeschaut werden soll ob alles vernünftig in
+// OnOffice hinterlegt wird"). Paginiert in GESAMT_OBJEKT_LISTLIMIT-Schritten (500), bricht ab,
+// sobald eine Seite weniger als das Seitenlimit liefert (Bestand erschöpft) — der Kauf-Bestand
+// lag zuletzt bei rund 1.037 Objekten (August 2026, live geprüft), also mehr als eine einzelne
+// 500er-Seite.
+//
+// Geprüfte Probleme (siehe KontrollObjekt in types/index.ts):
+// 1. Provisionsangabe fehlt — dieselbe Prüfung wie MitarbeiterObjekt.provisionsvorlaufFehlt
+//    (siehe parseProvisionsProzent/mapMitarbeiterObjekt oben), hier unternehmensweit statt nur
+//    für aktive/in Aufarbeitung befindliche Objekte.
+// 2. Status widerspricht Verkaufsdatum — verkauft_am ist gesetzt, status2 sagt aber noch
+//    "aktiv"/"in Vorbereitung" (siehe STATUS2_NOCH_AKTIV_LABELS oben). Genau das Muster, das der
+//    Abgleich gegen die Excel-Verkaufsliste des Büros wiederholt aufgedeckt hat.
+// 3. Möglicherweise doppelt angelegt — zwei Datensätze mit identischem Objekttitel UND
+//    identischem Verkaufsdatum (dasselbe Kriterium wie dedupliziereVerkaufteObjekte oben, hier
+//    aber bewusst NICHT still bereinigt, sondern als Problem ausgewiesen, damit der Duplikat-Fall
+//    selbst in OnOffice bereinigt werden kann).
+export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
+  const alle: RawKontrollRecord[] = [];
+  let offset = 0;
+  for (;;) {
+    const seite = await ladeKontrollRecordsSeite(offset);
+    alle.push(...seite);
+    if (seite.length < GESAMT_OBJEKT_LISTLIMIT) break;
+    offset += GESAMT_OBJEKT_LISTLIMIT;
+  }
+
+  const gruppenNachTitelUndDatum = new Map<string, RawKontrollRecord[]>();
+  for (const record of alle) {
+    const datum = record.elements.verkauft_am;
+    if (!datum || datum === "0000-00-00") continue;
+    const schluessel = `${record.elements.objekttitel ?? ""}|${datum}`;
+    const gruppe = gruppenNachTitelUndDatum.get(schluessel);
+    if (gruppe) {
+      gruppe.push(record);
+    } else {
+      gruppenNachTitelUndDatum.set(schluessel, [record]);
+    }
+  }
+  const duplikatIds = new Set<string>();
+  for (const gruppe of gruppenNachTitelUndDatum.values()) {
+    if (gruppe.length > 1) gruppe.forEach((record) => duplikatIds.add(record.id));
+  }
+
+  const ergebnis: KontrollObjekt[] = [];
+  for (const record of alle) {
+    const el = record.elements;
+    const probleme: string[] = [];
+
+    const verkauftAmGueltig = !!el.verkauft_am && el.verkauft_am !== "0000-00-00";
+
+    // Provisionsangabe nur bei potenziell relevanten Objekten prüfen — NICHT bei jedem
+    // status=2 ("Inaktiv"), das umfasst auch frühe Akquise-Stufen (Marktbeobachtung, Akquise -
+    // Nachfass, Akquise - Absage etc.), in denen noch gar kein Provisionssatz vereinbart sein
+    // kann. Live geprüft (August 2026): ein Abzug nur auf status=1 (Aktiv) und status2=
+    // "vorbereitung" (dieselbe Definition wie "In Aufarbeitung" an anderer Stelle der App)
+    // reduzierte die Trefferzahl von 492 auf einen plausiblen, tatsächlich handlungsrelevanten
+    // Bereich. status=0 (Archiviert) OHNE Verkaufsdatum sind laut Nutzerdefinition (Chat: "Status
+    // 1 = Archiviert, Status 2 = keine Angabe ... nicht weiter verfolgt oder Absage erhalten")
+    // endgültig abgesagte/verlorene Vorgänge, für die nie eine Provision anfallen wird.
+    const potenziellRelevant =
+      el.status === "1" || el.status2 === "vorbereitung" || verkauftAmGueltig;
+    const aussenProzent = parseProvisionsProzent(el.prozent_aussenprovision);
+    const innenProzent = parseProvisionsProzent(el.prozent_innenprovision);
+    if (potenziellRelevant && (aussenProzent === null || innenProzent === null)) {
+      probleme.push("Provisionsangabe fehlt");
+    }
+    if (verkauftAmGueltig && el.status2 && STATUS2_NOCH_AKTIV_LABELS[el.status2]) {
+      probleme.push(`Status widerspricht Verkaufsdatum (${STATUS2_NOCH_AKTIV_LABELS[el.status2]})`);
+    }
+
+    if (duplikatIds.has(record.id)) {
+      probleme.push("Möglicherweise doppelt angelegt");
+    }
+
+    if (probleme.length === 0) continue;
+
+    ergebnis.push({
+      id: String(record.id),
+      titel: el.objekttitel || `Immobilie ${record.id}`,
+      objektnr: el.objektnr_extern || String(record.id),
+      mitarbeiter: TEAM.find((t) => t.nutzerNr === el.benutzer)?.name ?? null,
+      statusLabel: STATUS_LABELS[el.status ?? ""] ?? "Unbekannt",
+      probleme,
+    });
+  }
+
+  return ergebnis;
 }
 
 // Terminarten, die NICHT in die "Termine"-Kennzahl (Parameter 3 von 5) einfließen — reine
