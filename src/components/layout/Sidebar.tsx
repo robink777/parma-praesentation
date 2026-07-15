@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
-import { NAV_ITEMS } from "./nav";
+import { NAV_ITEMS, NavZustandEintrag, erstelleStandardNavZustand } from "./nav";
 
 export function Sidebar({
   activeId,
@@ -28,10 +28,68 @@ export function Sidebar({
   // Breite wegzunehmen (siehe Mobile-Bug: Sidebar verschmälerte den Content auf < 100px).
   const [mobilOffen, setMobilOffen] = useState(false);
 
+  // Reihenfolge + Sichtbarkeit der Navigationspunkte, live während der Präsentation anpassbar
+  // (Chat-Vorgabe: "die Möglichkeit die Reihenfolge der Navigation live bei jedem Objekt
+  // anzupassen und einzelne Punkte ein und auszublenden je nach Kunde"). Bewusst lokaler
+  // Component-State ohne Persistierung (kein localStorage/Backend) — die Sidebar mountet pro
+  // Präsentation/Objekt frisch (siehe app/page.tsx), der Zustand startet dadurch automatisch
+  // wieder beim Default (alle Punkte sichtbar, Reihenfolge aus NAV_ITEMS), ohne dass eine
+  // Anpassung für Kunde A versehentlich bei Kunde B weiterlebt.
+  const [navZustand, setNavZustand] = useState<NavZustandEintrag[]>(erstelleStandardNavZustand);
+  const [bearbeitungsModus, setBearbeitungsModus] = useState(false);
+
   const handleSelect = (id: string) => {
     onSelect(id);
     setMobilOffen(false);
   };
+
+  // Öffnet den Bearbeitungsmodus über das Zahnrad — klappt eine eingeklappte Sidebar dafür
+  // zuerst automatisch wieder auf, da die Bearbeitung (Label, Auf/Ab-Pfeile, Sichtbarkeits-Icon
+  // je Punkt) im schmalen Icon-Rail-Modus keinen Platz hätte.
+  const toggleBearbeitungsModus = () => {
+    if (!bearbeitungsModus && eingeklappt) setEingeklappt(false);
+    setBearbeitungsModus((v) => !v);
+  };
+
+  const verschieben = (index: number, richtung: -1 | 1) => {
+    setNavZustand((prev) => {
+      const ziel = index + richtung;
+      if (ziel < 0 || ziel >= prev.length) return prev;
+      const kopie = [...prev];
+      [kopie[index], kopie[ziel]] = [kopie[ziel], kopie[index]];
+      return kopie;
+    });
+  };
+
+  // Mindestens ein Punkt muss sichtbar bleiben — sonst hätte die Präsentation keine erreichbare
+  // Seite mehr und activeId liefe ins Leere.
+  const umschalten = (id: string) => {
+    setNavZustand((prev) => {
+      const sichtbareAnzahl = prev.filter((e) => e.sichtbar).length;
+      return prev.map((e) =>
+        e.id === id && !(e.sichtbar && sichtbareAnzahl <= 1) ? { ...e, sichtbar: !e.sichtbar } : e
+      );
+    });
+  };
+
+  const zuruecksetzen = () => setNavZustand(erstelleStandardNavZustand());
+
+  // Springt automatisch auf den ersten sichtbaren Punkt, falls der gerade aktive Punkt während
+  // der Bearbeitung ausgeblendet wird — sonst zeigt der Content-Bereich weiter eine Seite, die
+  // in der Navigation gar nicht mehr erreichbar ist.
+  useEffect(() => {
+    const aktiverEintrag = navZustand.find((e) => e.id === activeId);
+    if (aktiverEintrag && !aktiverEintrag.sichtbar) {
+      const ersterSichtbarer = navZustand.find((e) => e.sichtbar);
+      if (ersterSichtbarer) onSelect(ersterSichtbarer.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navZustand, activeId]);
+
+  const sichtbareNavItems = navZustand
+    .filter((e) => e.sichtbar)
+    .map((e) => NAV_ITEMS.find((item) => item.id === e.id))
+    .filter((item): item is (typeof NAV_ITEMS)[number] => !!item);
 
   return (
     <>
@@ -77,50 +135,129 @@ export function Sidebar({
               />
             </button>
           )}
-          {/* Schließen-Button für den Mobile-Drawer */}
-          <button
-            type="button"
-            onClick={() => setMobilOffen(false)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss md:hidden"
-            title="Navigation schließen"
-          >
-            <Icon name="close" size={18} />
-          </button>
-          {/* Ein-/Ausklapp-Button für den Desktop-Icon-Rail-Modus */}
-          <button
-            type="button"
-            onClick={() => setEingeklappt((v) => !v)}
-            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss md:flex"
-            title={eingeklappt ? "Navigation ausklappen" : "Navigation einklappen"}
-          >
-            <Icon name={eingeklappt ? "chevronRight" : "chevronLeft"} size={18} />
-          </button>
+          <div className={`flex shrink-0 items-center gap-xs ${eingeklappt ? "md:flex-col" : ""}`}>
+            {/* Zahnrad: öffnet/schließt den Bearbeitungsmodus für Reihenfolge/Sichtbarkeit der
+                Navigation (Chat-Vorgabe). Immer sichtbar, unabhängig von eingeklappt/mobilOffen. */}
+            <button
+              type="button"
+              onClick={toggleBearbeitungsModus}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-reinweiss/60 ${
+                bearbeitungsModus ? "bg-reinweiss text-walnuss" : "text-walnuss/60 hover:text-walnuss"
+              }`}
+              title={bearbeitungsModus ? "Bearbeitung schließen" : "Navigation anpassen"}
+            >
+              <Icon name="settings" size={18} />
+            </button>
+            {/* Schließen-Button für den Mobile-Drawer */}
+            <button
+              type="button"
+              onClick={() => setMobilOffen(false)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss md:hidden"
+              title="Navigation schließen"
+            >
+              <Icon name="close" size={18} />
+            </button>
+            {/* Ein-/Ausklapp-Button für den Desktop-Icon-Rail-Modus */}
+            <button
+              type="button"
+              onClick={() => setEingeklappt((v) => !v)}
+              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss md:flex"
+              title={eingeklappt ? "Navigation ausklappen" : "Navigation einklappen"}
+            >
+              <Icon name={eingeklappt ? "chevronRight" : "chevronLeft"} size={18} />
+            </button>
+          </div>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-xs overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
-            const active = item.id === activeId;
-            return (
+        {bearbeitungsModus ? (
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            <p className="label mb-xs px-sm">Navigation anpassen</p>
+            <div className="flex flex-col gap-[2px]">
+              {navZustand.map((eintrag, index) => {
+                const item = NAV_ITEMS.find((i) => i.id === eintrag.id);
+                if (!item) return null;
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center gap-xs rounded-md px-sm py-xs ${
+                      eintrag.sichtbar ? "text-walnuss" : "text-walnuss/40"
+                    }`}
+                  >
+                    <Icon name={item.icon} size={16} className="shrink-0" />
+                    <span className="flex-1 truncate text-[13px]">{item.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => verschieben(index, -1)}
+                      disabled={index === 0}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-reinweiss/60 disabled:opacity-20"
+                      title="Nach oben verschieben"
+                    >
+                      <Icon name="chevronUp" size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => verschieben(index, 1)}
+                      disabled={index === navZustand.length - 1}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-reinweiss/60 disabled:opacity-20"
+                      title="Nach unten verschieben"
+                    >
+                      <Icon name="chevronDown" size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => umschalten(item.id)}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-reinweiss/60"
+                      title={eintrag.sichtbar ? "Ausblenden" : "Einblenden"}
+                    >
+                      <Icon name={eintrag.sichtbar ? "eye" : "eyeOff"} size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-sm flex items-center justify-between gap-xs border-t border-sand px-sm pt-sm">
               <button
-                key={item.id}
-                onClick={() => handleSelect(item.id)}
-                title={eingeklappt ? item.label : undefined}
-                className={`flex items-center gap-sm rounded-md px-sm py-xs text-left transition-colors ${
-                  eingeklappt ? "md:justify-center" : ""
-                } ${
-                  active
-                    ? "bg-reinweiss text-walnuss font-medium"
-                    : "text-walnuss/70 hover:bg-reinweiss/60 hover:text-walnuss"
-                }`}
+                type="button"
+                onClick={zuruecksetzen}
+                className="text-[13px] text-walnuss/60 underline-offset-2 hover:text-walnuss hover:underline"
               >
-                <Icon name={item.icon} size={20} />
-                {!eingeklappt && <span className="text-[15px]">{item.label}</span>}
+                Zurücksetzen
               </button>
-            );
-          })}
-        </nav>
+              <button
+                type="button"
+                onClick={() => setBearbeitungsModus(false)}
+                className="rounded-md bg-walnuss px-sm py-xs text-[13px] font-medium text-reinweiss transition-colors hover:bg-anthrazit"
+              >
+                Fertig
+              </button>
+            </div>
+          </div>
+        ) : (
+          <nav className="flex flex-1 flex-col gap-xs overflow-y-auto">
+            {sichtbareNavItems.map((item) => {
+              const active = item.id === activeId;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleSelect(item.id)}
+                  title={eingeklappt ? item.label : undefined}
+                  className={`flex items-center gap-sm rounded-md px-sm py-xs text-left transition-colors ${
+                    eingeklappt ? "md:justify-center" : ""
+                  } ${
+                    active
+                      ? "bg-reinweiss text-walnuss font-medium"
+                      : "text-walnuss/70 hover:bg-reinweiss/60 hover:text-walnuss"
+                  }`}
+                >
+                  <Icon name={item.icon} size={20} />
+                  {!eingeklappt && <span className="text-[15px]">{item.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
-        {!eingeklappt && kundeNamen && kundeNamen.length > 0 && (
+        {!eingeklappt && !bearbeitungsModus && kundeNamen && kundeNamen.length > 0 && (
           <div className="mt-lg border-t border-sand pt-sm">
             <p className="label">Präsentation für</p>
             {kundeNamen.map((name, i) => (

@@ -55,7 +55,7 @@ function DokumentZeile({ dokument }: { dokument: ObjektDokument }) {
 // "Bewertung"-Reiter erhalten (siehe Bewertung.tsx, Link auf bewertung.pdfUrl).
 export function Dokumente({ dokumente }: { dokumente: ObjektDokument[] }) {
   return (
-    <SectionShell label="Dokumente" title="Interne Dokumente zum Objekt">
+    <SectionShell label="Bewertungsunterlagen" title="Interne Dokumente zum Objekt">
       {dokumente.length > 0 ? (
         <div className="flex flex-col gap-sm">
           {dokumente.map((dokument) => (

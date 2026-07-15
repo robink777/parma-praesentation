@@ -27,7 +27,12 @@ export type IconName =
   | "download"
   | "externalLink"
   | "lock"
-  | "warning";
+  | "warning"
+  | "settings"
+  | "eye"
+  | "eyeOff"
+  | "chevronUp"
+  | "chevronDown";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   greeting: (
@@ -183,6 +188,29 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <circle cx="12" cy="16.7" r="0.75" fill="currentColor" stroke="none" />
     </>
   ),
+  // Zahnrad für den Bearbeitungsmodus der Navigation (siehe Sidebar.tsx) — klassische
+  // Kreis-plus-acht-Speichen-Form, damit sie sich klar von "close"/"menu" unterscheidet.
+  settings: (
+    <>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 5.2A10.4 10.4 0 0 1 12 5c6 0 10 7 10 7a17.7 17.7 0 0 1-3.2 4M6.6 6.6C4 8.3 2 12 2 12s4 7 10 7c1.4 0 2.7-.3 3.9-.8" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </>
+  ),
+  chevronUp: <path d="M5 15l7-7 7 7" />,
+  chevronDown: <path d="M5 9l7 7 7-7" />,
 };
 
 export function Icon({
