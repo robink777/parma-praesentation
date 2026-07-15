@@ -158,9 +158,9 @@ export function Sidebar({
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center gap-xs rounded-md py-xs pr-sm ${
-                      item.parentId ? "pl-lg" : "pl-sm"
-                    } ${eintrag.sichtbar ? "text-walnuss" : "text-walnuss/40"}`}
+                    className={`flex items-center gap-xs rounded-md px-sm py-xs ${
+                      eintrag.sichtbar ? "text-walnuss" : "text-walnuss/40"
+                    }`}
                   >
                     <Icon name={item.icon} size={16} className="shrink-0" />
                     <span className="flex-1 truncate text-[13px]">{item.label}</span>
@@ -215,25 +215,20 @@ export function Sidebar({
           <nav className="flex flex-1 flex-col gap-xs overflow-y-auto">
             {sichtbareNavItems.map((item) => {
               const active = item.id === activeId;
-              // Eingerückt dargestellt, wenn dieser Punkt einem anderen zugeordnet ist (siehe
-              // NavItem.parentId, Chat-Vorgabe "Gliedere die beiden Punkte bitte unter
-              // DeepImmo") — nur im ausgeklappten Zustand sinnvoll, im Icon-Rail-Modus
-              // (eingeklappt) bleibt jedes Icon zentriert wie die übrigen Punkte.
-              const eingerueckt = !!item.parentId && !eingeklappt;
               return (
                 <button
                   key={item.id}
                   onClick={() => handleSelect(item.id)}
                   title={eingeklappt ? item.label : undefined}
-                  className={`flex items-center gap-sm rounded-md py-xs text-left transition-colors ${
-                    eingerueckt ? "pl-lg pr-sm" : "px-sm"
-                  } ${eingeklappt ? "md:justify-center" : ""} ${
+                  className={`flex items-center gap-sm rounded-md px-sm py-xs text-left transition-colors ${
+                    eingeklappt ? "md:justify-center" : ""
+                  } ${
                     active
                       ? "bg-reinweiss text-walnuss font-medium"
                       : "text-walnuss/70 hover:bg-reinweiss/60 hover:text-walnuss"
                   }`}
                 >
-                  <Icon name={item.icon} size={eingerueckt ? 16 : 20} />
+                  <Icon name={item.icon} size={20} />
                   {!eingeklappt && <span className="text-[15px]">{item.label}</span>}
                 </button>
               );

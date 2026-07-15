@@ -1,8 +1,9 @@
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
 
-// Unterpunkt unter "DeepImmo" (Chat-Vorgabe, Juli 2026: "Gliedere die beiden Punkte bitte unter
-// DeepImmo"). Inhalt/Zahlen stammen 1:1 aus der Chat-Vorgabe (Beschreibung der vier Phasen sowie
+// Eigenständiger Navigationspunkt (siehe nav.ts) — ursprünglich als Unterpunkt von "DeepImmo"
+// angelegt, auf Nutzerkorrektur hin aber wieder gleichrangig eingeordnet. Inhalt/Zahlen stammen
+// 1:1 aus der Chat-Vorgabe (Beschreibung der vier Phasen sowie
 // "in der ersten Phase starten 10, in der 3. Phase steigen 8 von 10 Leute aus, kaufen tun nur
 // 2") — die Prozentwerte je Phase (100/95/30/20) entsprechen dem vom Nutzer als Referenz
 // mitgeschickten Schaubild ("4 Phasen des Käufers").

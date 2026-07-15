@@ -4,11 +4,6 @@ export interface NavItem {
   id: string;
   label: string;
   icon: IconName;
-  // Gesetzt, wenn dieser Punkt unter einem anderen (siehe NAV_ITEMS-Reihenfolge, direkt danach
-  // einsortiert) gruppiert dargestellt werden soll — Sidebar.tsx zeigt ihn dafür eingerückt an
-  // (Chat-Vorgabe Juli 2026: "Gliedere die beiden Punkte bitte unter DeepImmo"). Rein visuell,
-  // keine eigene Klapp-/Baum-Logik: die Einrückung folgt einfach der Reihenfolge im Array.
-  parentId?: string;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -18,8 +13,11 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "objekt", label: "Objektdaten", icon: "house" },
   { id: "dokumente", label: "Bewertungsunterlagen", icon: "document" },
   { id: "deepimmo", label: "DeepImmo", icon: "externalLink" },
-  { id: "kaeuferverhalten", label: "Käuferverhalten", icon: "team", parentId: "deepimmo" },
-  { id: "preis-des-wartens", label: "Preis des Wartens", icon: "clock", parentId: "deepimmo" },
+  // Eigenständige Punkte, bewusst NICHT als Unterpunkte von DeepImmo eingerückt (Chat-Vorgabe
+  // Juli 2026: "Bitte die beiden neuen Punkte nicht als Unterpunkte von DeepImmo sondern als
+  // eigenständige Punkte ausgeben" — Korrektur einer vorherigen Einrückungs-Vorgabe).
+  { id: "kaeuferverhalten", label: "Käuferverhalten", icon: "team" },
+  { id: "preis-des-wartens", label: "Preis des Wartens", icon: "clock" },
   { id: "vergleich", label: "Vergleichswert", icon: "compare" },
   { id: "leistungsversprechen", label: "Leistungsversprechen", icon: "check" },
   { id: "maklervertrag", label: "Maklervertrag", icon: "document" },

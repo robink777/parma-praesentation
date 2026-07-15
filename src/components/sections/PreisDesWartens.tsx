@@ -1,7 +1,8 @@
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 
-// Unterpunkt unter "DeepImmo" (Chat-Vorgabe, Juli 2026: "Gliedere die beiden Punkte bitte unter
-// DeepImmo"). Inhalt/Zahlen 1:1 aus dem vom Nutzer mitgeschickten Schaubild übernommen ("Der
+// Eigenständiger Navigationspunkt (siehe nav.ts) — ursprünglich als Unterpunkt von "DeepImmo"
+// angelegt, auf Nutzerkorrektur hin aber wieder gleichrangig eingeordnet. Inhalt/Zahlen 1:1 aus
+// dem vom Nutzer mitgeschickten Schaubild übernommen ("Der
 // Effekt zu hoher Vermarktungspreise in der Praxis", DeepImmo Real Estate OS Info Deck, Sommer
 // 2025) — Chat-Vorgabe: "Bitte setze dies in unserer CI um, bleib aber 1 zu 1 beim Inhalt
 // identisch". Farben/Bausteine daher komplett auf Parma-CI (walnuss/messing/stein/sand,
