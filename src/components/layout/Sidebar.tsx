@@ -136,18 +136,6 @@ export function Sidebar({
             </button>
           )}
           <div className={`flex shrink-0 items-center gap-xs ${eingeklappt ? "md:flex-col" : ""}`}>
-            {/* Zahnrad: öffnet/schließt den Bearbeitungsmodus für Reihenfolge/Sichtbarkeit der
-                Navigation (Chat-Vorgabe). Immer sichtbar, unabhängig von eingeklappt/mobilOffen. */}
-            <button
-              type="button"
-              onClick={toggleBearbeitungsModus}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-reinweiss/60 ${
-                bearbeitungsModus ? "bg-reinweiss text-walnuss" : "text-walnuss/60 hover:text-walnuss"
-              }`}
-              title={bearbeitungsModus ? "Bearbeitung schließen" : "Navigation anpassen"}
-            >
-              <Icon name="settings" size={18} />
-            </button>
             {/* Schließen-Button für den Mobile-Drawer */}
             <button
               type="button"
@@ -257,14 +245,36 @@ export function Sidebar({
           </nav>
         )}
 
-        {!eingeklappt && !bearbeitungsModus && kundeNamen && kundeNamen.length > 0 && (
-          <div className="mt-lg border-t border-sand pt-sm">
-            <p className="label">Präsentation für</p>
-            {kundeNamen.map((name, i) => (
-              <p key={i} className="font-slab text-lg text-anthrazit">
-                {name}
-              </p>
-            ))}
+        {/* Zahnrad bewusst hier unten platziert, direkt über den Eigentümerdaten, statt oben in
+            der Kopfzeile neben Logo/Zuklapp-Button (Chat-Vorgabe: "Die Platzierung der Navigation
+            gefällt mir nicht ... Vielleicht über die Eigentümerdaten"). Öffnet/schließt den
+            Bearbeitungsmodus für Reihenfolge/Sichtbarkeit der Navigation; nur außerhalb des
+            Bearbeitungsmodus sichtbar, da dort bereits ein eigener "Fertig"-Button zum Schließen
+            existiert. */}
+        {!bearbeitungsModus && (
+          <div className="mt-sm border-t border-sand pt-sm">
+            <button
+              type="button"
+              onClick={toggleBearbeitungsModus}
+              className={`flex w-full items-center gap-sm rounded-md px-sm py-xs text-left text-walnuss/70 transition-colors hover:bg-reinweiss/60 hover:text-walnuss ${
+                eingeklappt ? "md:justify-center" : ""
+              }`}
+              title={eingeklappt ? "Navigation anpassen" : undefined}
+            >
+              <Icon name="settings" size={20} />
+              {!eingeklappt && <span className="text-[15px]">Navigation anpassen</span>}
+            </button>
+
+            {!eingeklappt && kundeNamen && kundeNamen.length > 0 && (
+              <div className="mt-sm">
+                <p className="label">Präsentation für</p>
+                {kundeNamen.map((name, i) => (
+                  <p key={i} className="font-slab text-lg text-anthrazit">
+                    {name}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </aside>
