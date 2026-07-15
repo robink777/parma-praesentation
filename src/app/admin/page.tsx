@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { SectionShell } from "@/components/layout/SectionShell";
 import { Mitarbeiterstatistik } from "@/components/admin/Mitarbeiterstatistik";
 import { ONOFFICE_MODE } from "@/lib/onoffice/config";
 import {
@@ -53,24 +51,8 @@ export default async function AdminPage() {
     gesamtKennzahlen = gesamtKennzahlenErgebnis;
   }
 
-  return (
-    <SectionShell label="Admin-Bereich" title="Mitarbeiterstatistik">
-      {/* Bisher gab es keine UI, um den Admin-Bereich wieder zu verlassen (siehe Chat-Vorgabe:
-          die Admin-Anmeldung soll bei jedem Verlassen neu verlangt werden — das setzt eine
-          tatsächliche Möglichkeit zum Verlassen voraus). Klick hier löst per Layout-Unmount
-          (siehe app/admin/layout.tsx, AdminSessionWaechter) die Abmeldung der Admin-Session aus. */}
-      <Link
-        href="/"
-        className="mb-lg inline-block text-small text-anthrazit/60 underline-offset-4 hover:text-anthrazit hover:underline"
-      >
-        ← Zurück zur Startseite
-      </Link>
-      <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
-        Auslastung des Teams als Entscheidungsgrundlage dafür, wer ein Objekt nach der Akquise
-        übernimmt. Die Kennzahlen-Spalten werden Schritt für Schritt mit echten Werten aus
-        OnOffice befüllt.
-      </p>
-      <Mitarbeiterstatistik kennzahlen={kennzahlen} gesamtKennzahlen={gesamtKennzahlen} />
-    </SectionShell>
-  );
+  // Kein SectionShell-Wrapper mehr — Mitarbeiterstatistik baut seit August 2026 ihr eigenes
+  // Vollbild-Layout mit Sidebar auf (Chat-Vorgabe: "identisches Layout wie bei der Präsentation"),
+  // analog dazu, wie app/page.tsx PraesentationApp ohne umgebendes SectionShell rendert.
+  return <Mitarbeiterstatistik kennzahlen={kennzahlen} gesamtKennzahlen={gesamtKennzahlen} />;
 }

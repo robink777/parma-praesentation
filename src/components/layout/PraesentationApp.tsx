@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
+import { NAV_ITEMS } from "./nav";
 import { Immobilie, LeistungspaketId, Praesentation } from "@/types";
 import { Begruessung } from "@/components/sections/Begruessung";
 import { Kontaktperson } from "@/components/sections/Kontaktperson";
@@ -113,7 +114,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
 
   return (
     <div className="flex h-screen w-screen">
-      <Sidebar activeId={activeId} onSelect={setActiveId} kundeNamen={kundeNamen} />
+      <Sidebar navItems={NAV_ITEMS} activeId={activeId} onSelect={setActiveId} kundeNamen={kundeNamen} />
       <main className="flex-1 overflow-hidden bg-reinweiss">
         {activeId === "begruessung" && (
           <Begruessung kunde={daten.kunde} weitereEigentuemer={daten.weitereEigentuemer} />

@@ -4,18 +4,31 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
-import { NAV_ITEMS, NavZustandEintrag, erstelleStandardNavZustand } from "./nav";
+import { NavItem, NavZustandEintrag, erstelleStandardNavZustand } from "./nav";
 
+// Wiederverwendbare Sidebar-Chrome (Logo, Ein-/Ausklappen, Bearbeitungsmodus für Reihenfolge/
+// Sichtbarkeit) — genutzt sowohl von der Kundenpräsentation (PraesentationApp.tsx, NAV_ITEMS aus
+// nav.ts) als auch vom Admin-Bereich (Mitarbeiterstatistik.tsx, ADMIN_NAV_ITEMS aus
+// admin/adminNav.ts). Chat-Vorgabe August 2026: "ich hätte gerne in der Statistik ein identisches
+// Layout wie bei der Präsentation" — beide Bereiche teilen sich seitdem dieselbe Komponente statt
+// zweier optisch/funktional auseinanderlaufender Nachbauten.
 export function Sidebar({
+  navItems,
   activeId,
   onSelect,
+  logoHref = "/",
   kundeNamen,
 }: {
+  navItems: NavItem[];
   activeId: string;
   onSelect: (id: string) => void;
+  // Ziel des Logo-Klicks — Präsentation führt zurück zur Objektauswahl ("/"), der Admin-Bereich
+  // übergibt stattdessen "/admin".
+  logoHref?: string;
   // Bei mehreren Eigentümern (Miteigentum, Erbengemeinschaft) eine Zeile pro Person (siehe
   // PraesentationApp.tsx) — Array statt eines zusammengesetzten Strings, damit hier pro Name ein
-  // eigener <p> gerendert werden kann (untereinander statt in einem Fließtext-Satz).
+  // eigener <p> gerendert werden kann (untereinander statt in einem Fließtext-Satz). Im
+  // Admin-Bereich schlicht nicht übergeben, der Block dort bleibt dann ausgeblendet.
   kundeNamen?: string[];
 }) {
   const router = useRouter();
@@ -33,9 +46,11 @@ export function Sidebar({
   // anzupassen und einzelne Punkte ein und auszublenden je nach Kunde"). Bewusst lokaler
   // Component-State ohne Persistierung (kein localStorage/Backend) — die Sidebar mountet pro
   // Präsentation/Objekt frisch (siehe app/page.tsx), der Zustand startet dadurch automatisch
-  // wieder beim Default (alle Punkte sichtbar, Reihenfolge aus NAV_ITEMS), ohne dass eine
+  // wieder beim Default (alle Punkte sichtbar, Reihenfolge aus navItems), ohne dass eine
   // Anpassung für Kunde A versehentlich bei Kunde B weiterlebt.
-  const [navZustand, setNavZustand] = useState<NavZustandEintrag[]>(erstelleStandardNavZustand);
+  const [navZustand, setNavZustand] = useState<NavZustandEintrag[]>(() =>
+    erstelleStandardNavZustand(navItems)
+  );
   const [bearbeitungsModus, setBearbeitungsModus] = useState(false);
 
   const handleSelect = (id: string) => {
@@ -72,7 +87,7 @@ export function Sidebar({
     });
   };
 
-  const zuruecksetzen = () => setNavZustand(erstelleStandardNavZustand());
+  const zuruecksetzen = () => setNavZustand(erstelleStandardNavZustand(navItems));
 
   // Springt automatisch auf den ersten sichtbaren Punkt, falls der gerade aktive Punkt während
   // der Bearbeitung ausgeblendet wird — sonst zeigt der Content-Bereich weiter eine Seite, die
@@ -88,8 +103,8 @@ export function Sidebar({
 
   const sichtbareNavItems = navZustand
     .filter((e) => e.sichtbar)
-    .map((e) => NAV_ITEMS.find((item) => item.id === e.id))
-    .filter((item): item is (typeof NAV_ITEMS)[number] => !!item);
+    .map((e) => navItems.find((item) => item.id === e.id))
+    .filter((item): item is NavItem => !!item);
 
   return (
     <>
@@ -115,16 +130,16 @@ export function Sidebar({
         } ${eingeklappt ? "md:w-[72px]" : "md:w-[280px]"}`}
       >
         <div className={`mb-xl flex items-center justify-between ${eingeklappt ? "md:justify-center" : ""}`}>
-          {/* Klick aufs Logo führt zurück zur Objektauswahl (Basis-URL ohne estateId, siehe
-              app/page.tsx) — im eingeklappten Zustand ausgeblendet, da für das Logo in der
-              schmalen Breite keine Icon-only-Variante als Datei existiert (siehe parma-design
-              Skill: Logo nie nachbauen/zuschneiden). */}
+          {/* Klick aufs Logo führt zu logoHref (Präsentation: Objektauswahl "/", Admin-Bereich:
+              "/admin") — im eingeklappten Zustand ausgeblendet, da für das Logo in der schmalen
+              Breite keine Icon-only-Variante als Datei existiert (siehe parma-design Skill: Logo
+              nie nachbauen/zuschneiden). */}
           {!eingeklappt && (
             <button
               type="button"
-              onClick={() => router.push("/")}
+              onClick={() => router.push(logoHref)}
               className="transition-opacity hover:opacity-70"
-              title="Zurück zur Objektauswahl"
+              title="Zurück"
             >
               <Image
                 src="/logos/immobilien-quer.svg"
@@ -153,7 +168,7 @@ export function Sidebar({
             <p className="label mb-xs px-sm">Navigation anpassen</p>
             <div className="flex flex-col gap-[2px]">
               {navZustand.map((eintrag, index) => {
-                const item = NAV_ITEMS.find((i) => i.id === eintrag.id);
+                const item = navItems.find((i) => i.id === eintrag.id);
                 if (!item) return null;
                 return (
                   <div

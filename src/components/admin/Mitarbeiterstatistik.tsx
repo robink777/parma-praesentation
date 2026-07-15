@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card } from "@/components/layout/SectionShell";
+import { SectionShell, Card } from "@/components/layout/SectionShell";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { TEAM } from "@/data/unternehmen";
 import { Icon } from "@/components/icons/Icon";
 import { formatiereBetrag } from "@/lib/berechnung";
@@ -500,59 +502,17 @@ function MitarbeiterTabelle({
   );
 }
 
-// Abschnitte der seitlichen Admin-Navigation (Chat-Vorgabe August 2026: "Variante 3" — zuerst
-// Struktur/Navigation aufsetzen, die Kontrollseite wird später als weiterer Punkt hier eingehängt,
-// siehe ADMIN_NAV_ITEMS unten). Eigener, schlanker Aufbau statt Wiederverwendung von
-// components/layout/Sidebar.tsx — jene Sidebar ist auf die Kundenpräsentation zugeschnitten
-// (Logo, Ein-/Ausklappen, Bearbeitungsmodus für Reihenfolge/Sichtbarkeit) und bringt hier nur
-// unpassenden Ballast mit; der Admin-Bereich braucht lediglich eine einfache Abschnittsauswahl.
-type AdminAbschnitt = "uebersicht" | "mitarbeiter";
-
-const ADMIN_NAV_ITEMS: { id: AdminAbschnitt; label: string; icon: "calculator" | "team" }[] = [
-  { id: "uebersicht", label: "Auf einen Blick", icon: "calculator" },
-  { id: "mitarbeiter", label: "Mitarbeiter", icon: "team" },
-];
-
-function AdminNav({
-  aktiv,
-  onSelect,
-}: {
-  aktiv: AdminAbschnitt;
-  onSelect: (abschnitt: AdminAbschnitt) => void;
-}) {
-  return (
-    <nav className="flex gap-xs overflow-x-auto border-b border-anthrazit/10 pb-sm md:w-[200px] md:shrink-0 md:flex-col md:gap-[2px] md:overflow-visible md:border-b-0 md:border-r md:pb-0 md:pr-md">
-      {ADMIN_NAV_ITEMS.map((item) => {
-        const active = item.id === aktiv;
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => onSelect(item.id)}
-            className={`flex shrink-0 items-center gap-sm whitespace-nowrap rounded-md px-sm py-xs text-left transition-colors ${
-              active
-                ? "bg-stein font-medium text-walnuss"
-                : "text-anthrazit/60 hover:bg-stein/60 hover:text-anthrazit"
-            }`}
-          >
-            <Icon name={item.icon} size={18} />
-            <span className="text-[14px]">{item.label}</span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
 // Grundgerüst der Mitarbeiterstatistik: Zeigt die bestehende TEAM-Liste (data/unternehmen.ts,
 // NICHT alle Live-OnOffice-Nutzer — auf ausdrücklichen Nutzerwunsch, siehe Chat), aufgeteilt in
 // zwei Listen ("Vertrieb" und "Weitere Mitarbeiter", siehe teileTeamAuf/VERTRIEB_NAMEN oben,
 // Chat-Vorgabe), jeweils mit den fünf vereinbarten Auslastungs-Kennzahlen. Die unternehmensweiten
-// Infoboxen (siehe Infoboxen oben, Chat-Vorgabe) und die Mitarbeiter-Tabellen liegen seit August
-// 2026 in getrennten, per seitlicher Navigation wählbaren Abschnitten (Chat-Vorgabe: "ich denke
-// Variante 3" — erst Struktur/Navigation, die Kontrollseite je Status kommt als weiterer
-// ADMIN_NAV_ITEMS-Eintrag später dazu) statt einer einzigen langen Scroll-Seite. Die Kennzahlen
-// selbst werden erst in den nächsten Schritten einzeln aus OnOffice geladen (siehe
+// Infoboxen (siehe Infoboxen oben, Chat-Vorgabe) und die Mitarbeiter-Tabellen liegen in getrennten,
+// per Sidebar wählbaren Abschnitten (ADMIN_NAV_ITEMS, siehe admin/adminNav.ts) statt einer
+// einzigen langen Scroll-Seite — dieselbe Sidebar-Komponente wie in der Kundenpräsentation
+// (components/layout/Sidebar.tsx), auf Chat-Vorgabe hin: "ich hätte gerne in der Statistik ein
+// identisches Layout wie bei der Präsentation". Eine "Kontrolle"-Seite je Status (Datenqualität,
+// siehe Chat) kommt als weiterer ADMIN_NAV_ITEMS-Eintrag dazu, sobald sie gebaut ist. Die
+// Kennzahlen selbst werden erst in den nächsten Schritten einzeln aus OnOffice geladen (siehe
 // MitarbeiterKennzahlen in types/index.ts) — bis dahin zeigt jede Zelle bewusst "–" statt einer
 // erfundenen Zahl (kennzahlen-Prop optional, fehlt hier vollständig). Die übergebende Seite
 // (app/admin/page.tsx) reicht die Kennzahlen später als Map "Name → MitarbeiterKennzahlen" durch.
@@ -567,20 +527,35 @@ export function Mitarbeiterstatistik({
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
 }) {
   const { vertrieb, weitere } = teileTeamAuf();
-  const [abschnitt, setAbschnitt] = useState<AdminAbschnitt>("uebersicht");
+  const [abschnitt, setAbschnitt] = useState("uebersicht");
 
   return (
-    <div className="flex flex-col gap-lg md:flex-row">
-      <AdminNav aktiv={abschnitt} onSelect={setAbschnitt} />
-      <div className="min-w-0 flex-1">
-        {abschnitt === "uebersicht" && <Infoboxen gesamt={gesamtKennzahlen} />}
-        {abschnitt === "mitarbeiter" && (
-          <div className="flex flex-col gap-lg">
-            <MitarbeiterTabelle titel="Vertrieb" mitglieder={vertrieb} kennzahlen={kennzahlen} />
-            <MitarbeiterTabelle titel="Weitere Mitarbeiter" mitglieder={weitere} kennzahlen={kennzahlen} />
-          </div>
+    <div className="flex h-screen w-screen">
+      {/* logoHref bewusst NICHT gesetzt (Default "/") — der Logo-Klick führt wie in der
+          Präsentation zurück zur Startseite und verlässt damit zugleich den Admin-Bereich
+          (siehe app/admin/layout.tsx, AdminSessionWaechter: meldet die Admin-Session beim
+          Verlassen des Layouts automatisch ab). Ersetzt den früheren separaten
+          "Zurück zur Startseite"-Link in app/admin/page.tsx. */}
+      <Sidebar navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
+      <main className="flex-1 overflow-hidden bg-reinweiss">
+        {abschnitt === "uebersicht" && (
+          <SectionShell label="Admin-Bereich" title="Auf einen Blick">
+            <Infoboxen gesamt={gesamtKennzahlen} />
+          </SectionShell>
         )}
-      </div>
+        {abschnitt === "mitarbeiter" && (
+          <SectionShell label="Admin-Bereich" title="Mitarbeiter">
+            <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
+              Auslastung des Teams als Entscheidungsgrundlage dafür, wer ein Objekt nach der
+              Akquise übernimmt.
+            </p>
+            <div className="flex flex-col gap-lg">
+              <MitarbeiterTabelle titel="Vertrieb" mitglieder={vertrieb} kennzahlen={kennzahlen} />
+              <MitarbeiterTabelle titel="Weitere Mitarbeiter" mitglieder={weitere} kennzahlen={kennzahlen} />
+            </div>
+          </SectionShell>
+        )}
+      </main>
     </div>
   );
 }

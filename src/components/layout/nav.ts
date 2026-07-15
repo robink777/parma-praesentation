@@ -35,11 +35,16 @@ export interface NavZustandEintrag {
   sichtbar: boolean;
 }
 
-// Default-Zustand: alle Punkte sichtbar, in der in NAV_ITEMS hinterlegten Reihenfolge (Chat-Vorgabe:
-// "Default sollte sein dass alle Punkte in der jetzigen Reihenfolge stehen und eingeblendet
-// sind"). Wird bei jedem Mounten der Sidebar (also bei jedem neuen Objekt/jeder neuen
-// Präsentation) frisch aufgebaut, NICHT persistiert — die Anpassung ist laut Chat-Vorgabe "live
-// bei jedem Objekt", nicht dauerhaft über Objekte hinweg gültig.
-export function erstelleStandardNavZustand(): NavZustandEintrag[] {
-  return NAV_ITEMS.map((item) => ({ id: item.id, sichtbar: true }));
+// Default-Zustand: alle Punkte sichtbar, in der übergebenen Reihenfolge (Chat-Vorgabe: "Default
+// sollte sein dass alle Punkte in der jetzigen Reihenfolge stehen und eingeblendet sind"). Wird
+// bei jedem Mounten der Sidebar (also bei jedem neuen Objekt/jeder neuen Präsentation) frisch
+// aufgebaut, NICHT persistiert — die Anpassung ist laut Chat-Vorgabe "live bei jedem Objekt",
+// nicht dauerhaft über Objekte hinweg gültig.
+//
+// Nimmt die Navigationspunkte als Parameter entgegen (statt fest NAV_ITEMS zu verwenden) — die
+// Sidebar-Komponente ist seit August 2026 wiederverwendbar für beliebige Punktlisten (Chat-Vorgabe:
+// "identisches Layout wie bei der Präsentation" auch im Admin-Bereich, siehe
+// components/admin/adminNav.ts).
+export function erstelleStandardNavZustand(navItems: NavItem[]): NavZustandEintrag[] {
+  return navItems.map((item) => ({ id: item.id, sichtbar: true }));
 }
