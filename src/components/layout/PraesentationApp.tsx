@@ -8,6 +8,8 @@ import { Kontaktperson } from "@/components/sections/Kontaktperson";
 import { Unternehmen } from "@/components/sections/Unternehmen";
 import { Objektdaten } from "@/components/sections/Objektdaten";
 import { DeepImmo } from "@/components/sections/DeepImmo";
+import { Kaeuferverhalten } from "@/components/sections/Kaeuferverhalten";
+import { PreisDesWartens } from "@/components/sections/PreisDesWartens";
 import { Dokumente } from "@/components/sections/Dokumente";
 import { Vergleichswert } from "@/components/sections/Vergleichswert";
 import { Leistungsversprechen } from "@/components/sections/Leistungsversprechen";
@@ -132,6 +134,8 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
           />
         )}
         {activeId === "deepimmo" && <DeepImmo immobilie={daten.immobilie} />}
+        {activeId === "kaeuferverhalten" && <Kaeuferverhalten />}
+        {activeId === "preis-des-wartens" && <PreisDesWartens />}
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
         {activeId === "vergleich" && (
           <Vergleichswert

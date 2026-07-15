@@ -135,26 +135,17 @@ export function Sidebar({
               />
             </button>
           )}
-          <div className={`flex shrink-0 items-center gap-xs ${eingeklappt ? "md:flex-col" : ""}`}>
-            {/* Schließen-Button für den Mobile-Drawer */}
-            <button
-              type="button"
-              onClick={() => setMobilOffen(false)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss md:hidden"
-              title="Navigation schließen"
-            >
-              <Icon name="close" size={18} />
-            </button>
-            {/* Ein-/Ausklapp-Button für den Desktop-Icon-Rail-Modus */}
-            <button
-              type="button"
-              onClick={() => setEingeklappt((v) => !v)}
-              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss md:flex"
-              title={eingeklappt ? "Navigation ausklappen" : "Navigation einklappen"}
-            >
-              <Icon name={eingeklappt ? "chevronRight" : "chevronLeft"} size={18} />
-            </button>
-          </div>
+          {/* Schließen-Button für den Mobile-Drawer — bleibt oben, da er eine andere Funktion hat
+              als der Zuklapp-Button unten (schließt den Overlay-Drawer, statt die Sidebar auf den
+              Icon-Rail-Modus zu verschmälern). */}
+          <button
+            type="button"
+            onClick={() => setMobilOffen(false)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss md:hidden"
+            title="Navigation schließen"
+          >
+            <Icon name="close" size={18} />
+          </button>
         </div>
 
         {bearbeitungsModus ? (
@@ -167,9 +158,9 @@ export function Sidebar({
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center gap-xs rounded-md px-sm py-xs ${
-                      eintrag.sichtbar ? "text-walnuss" : "text-walnuss/40"
-                    }`}
+                    className={`flex items-center gap-xs rounded-md py-xs pr-sm ${
+                      item.parentId ? "pl-lg" : "pl-sm"
+                    } ${eintrag.sichtbar ? "text-walnuss" : "text-walnuss/40"}`}
                   >
                     <Icon name={item.icon} size={16} className="shrink-0" />
                     <span className="flex-1 truncate text-[13px]">{item.label}</span>
@@ -224,20 +215,25 @@ export function Sidebar({
           <nav className="flex flex-1 flex-col gap-xs overflow-y-auto">
             {sichtbareNavItems.map((item) => {
               const active = item.id === activeId;
+              // Eingerückt dargestellt, wenn dieser Punkt einem anderen zugeordnet ist (siehe
+              // NavItem.parentId, Chat-Vorgabe "Gliedere die beiden Punkte bitte unter
+              // DeepImmo") — nur im ausgeklappten Zustand sinnvoll, im Icon-Rail-Modus
+              // (eingeklappt) bleibt jedes Icon zentriert wie die übrigen Punkte.
+              const eingerueckt = !!item.parentId && !eingeklappt;
               return (
                 <button
                   key={item.id}
                   onClick={() => handleSelect(item.id)}
                   title={eingeklappt ? item.label : undefined}
-                  className={`flex items-center gap-sm rounded-md px-sm py-xs text-left transition-colors ${
-                    eingeklappt ? "md:justify-center" : ""
-                  } ${
+                  className={`flex items-center gap-sm rounded-md py-xs text-left transition-colors ${
+                    eingerueckt ? "pl-lg pr-sm" : "px-sm"
+                  } ${eingeklappt ? "md:justify-center" : ""} ${
                     active
                       ? "bg-reinweiss text-walnuss font-medium"
                       : "text-walnuss/70 hover:bg-reinweiss/60 hover:text-walnuss"
                   }`}
                 >
-                  <Icon name={item.icon} size={20} />
+                  <Icon name={item.icon} size={eingerueckt ? 16 : 20} />
                   {!eingeklappt && <span className="text-[15px]">{item.label}</span>}
                 </button>
               );
@@ -245,36 +241,41 @@ export function Sidebar({
           </nav>
         )}
 
-        {/* Zahnrad bewusst hier unten platziert, direkt über den Eigentümerdaten, statt oben in
-            der Kopfzeile neben Logo/Zuklapp-Button (Chat-Vorgabe: "Die Platzierung der Navigation
-            gefällt mir nicht ... Vielleicht über die Eigentümerdaten"). Öffnet/schließt den
-            Bearbeitungsmodus für Reihenfolge/Sichtbarkeit der Navigation; nur außerhalb des
-            Bearbeitungsmodus sichtbar, da dort bereits ein eigener "Fertig"-Button zum Schließen
-            existiert. */}
-        {!bearbeitungsModus && (
-          <div className="mt-sm border-t border-sand pt-sm">
-            <button
-              type="button"
-              onClick={toggleBearbeitungsModus}
-              className={`flex w-full items-center gap-sm rounded-md px-sm py-xs text-left text-walnuss/70 transition-colors hover:bg-reinweiss/60 hover:text-walnuss ${
-                eingeklappt ? "md:justify-center" : ""
-              }`}
-              title={eingeklappt ? "Navigation anpassen" : undefined}
-            >
-              <Icon name="settings" size={20} />
-              {!eingeklappt && <span className="text-[15px]">Navigation anpassen</span>}
-            </button>
+        {/* Zuklapp-Button und Zahnrad bewusst hier unten platziert, als reine Symbolzeile direkt
+            über dem Strich vor den Eigentümerdaten, statt oben in der Kopfzeile neben dem Logo
+            (Chat-Vorgabe: "lege ... über den Strich der über den Eigentümern angezeigt wird...
+            Bitte verwende nur Symbole"). Beide Buttons bleiben auch im Bearbeitungsmodus sichtbar
+            (Zuklapp weiterhin bedienbar, Zahnrad dient dort zugleich als zweiter Weg, den Modus
+            wieder zu schließen, neben dem "Fertig"-Button). */}
+        <div className={`flex items-center gap-xs px-sm ${eingeklappt ? "md:justify-center" : ""}`}>
+          <button
+            type="button"
+            onClick={() => setEingeklappt((v) => !v)}
+            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss md:flex"
+            title={eingeklappt ? "Navigation ausklappen" : "Navigation einklappen"}
+          >
+            <Icon name={eingeklappt ? "chevronRight" : "chevronLeft"} size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={toggleBearbeitungsModus}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-reinweiss/60 ${
+              bearbeitungsModus ? "bg-reinweiss text-walnuss" : "text-walnuss/60 hover:text-walnuss"
+            }`}
+            title={bearbeitungsModus ? "Bearbeitung schließen" : "Navigation anpassen"}
+          >
+            <Icon name="settings" size={18} />
+          </button>
+        </div>
 
-            {!eingeklappt && kundeNamen && kundeNamen.length > 0 && (
-              <div className="mt-sm">
-                <p className="label">Präsentation für</p>
-                {kundeNamen.map((name, i) => (
-                  <p key={i} className="font-slab text-lg text-anthrazit">
-                    {name}
-                  </p>
-                ))}
-              </div>
-            )}
+        {!bearbeitungsModus && !eingeklappt && kundeNamen && kundeNamen.length > 0 && (
+          <div className="mt-sm border-t border-sand pt-sm">
+            <p className="label">Präsentation für</p>
+            {kundeNamen.map((name, i) => (
+              <p key={i} className="font-slab text-lg text-anthrazit">
+                {name}
+              </p>
+            ))}
           </div>
         )}
       </aside>
