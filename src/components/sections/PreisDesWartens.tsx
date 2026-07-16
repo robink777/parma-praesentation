@@ -1,65 +1,62 @@
+"use client";
+
+import { useState } from "react";
 import { SectionShell } from "@/components/layout/SectionShell";
+import { formatiereBetrag } from "@/lib/berechnung";
+import { Immobilie } from "@/types";
 
 // Eigenständiger Navigationspunkt (siehe nav.ts) — ursprünglich als Unterpunkt von "DeepImmo"
 // angelegt, auf Nutzerkorrektur hin aber wieder gleichrangig eingeordnet. Inhalt/Zahlen 1:1 aus
 // dem ursprünglich mitgeschickten Schaubild übernommen ("Der Effekt zu hoher
-// Vermarktungspreise in der Praxis"). Die grafische Darstellung selbst folgt seit August 2026
-// dem vom Nutzer per Design-Handoff bereitgestellten Original ("Waterfall
-// Vermarktungspreise.html", aus Parma Immobilien-handoff.zip) — ein 1920×1080-Deck-Slide mit
-// Haus-Icon, Baseline und schwebenden "Aufschlag"-Pillen/"Verlust"-Badges. Hier als responsive
-// Grid statt fester Bühnengröße nachgebaut (Chat-Vorgabe: "passe sie so an dass sie zum Rest der
-// Seite passt"), Zahlen/Struktur/Farblogik aber bewusst nah am Original.
-const MARKTWERT = "420.000 €";
+// Vermarktungspreise in der Praxis"). Die grafische Darstellung folgt dem vom Nutzer per
+// Design-Handoff bereitgestellten Original ("Waterfall Vermarktungspreise.html", aus Parma
+// Immobilien-handoff.zip) — ein 1920×1080-Deck-Slide mit Haus-Icon, Baseline und schwebenden
+// "Aufschlag"-Pillen/"Verlust"-Badges. Hier als responsive Grid statt fester Bühnengröße
+// nachgebaut, Struktur/Farblogik aber bewusst nah am Original.
+//
+// Marktwert-Basis seit August 2026 wählbar (Chat-Vorgabe: "erstelle statt der 420.000€ eine
+// dropdown Funktion in der einmal statisch die 420.000€ stehen und einmal dynamisch der
+// hinterlegte Kaufpreis gezogen wird ... Prozentzahlen bleiben gleich, die absoluten Zahlen
+// sollen sich aber dann rechnerisch nach dem ausgewählten Preis verändern") — Aufschlag-/
+// Verlust-Prozentsätze je Stufe bleiben fix (das ist die reale, aus der Kreissparkasse-Köln-
+// Auswertung stammende Kennzahl), nur die daraus abgeleiteten Euro-Beträge werden neu berechnet.
+const BEISPIEL_MARKTWERT = 420000;
+
+type MarktwertBasis = "beispiel" | "kaufpreis";
 
 interface Stufe {
   aufschlagProzent: number;
   // Höhe der "Aufschlag"-Pille in px — im Original wächst sie mit der Schwere des Aufschlags
   // (190/250/320px bei +5/+10/+20%), hier proportional übernommen.
   pillHoehe: number;
-  dipLabel: string;
+  // Verlust/Rabatt in Prozent relativ zum Marktwert (negativ) — live gegen die Original-Zahlen
+  // geprüft: 420.000 € × (1 + dipProzent/100) trifft "415/407/357 Tsd. €" nahezu exakt (357.000 €
+  // bei -15% sogar exakt), das ist also die Formel, mit der auch die dynamische Basis
+  // umgerechnet wird.
+  dipProzent: number;
   // Nur bei der schwersten Stufe gesetzt ("Verlust", siehe Original) — die beiden leichteren
   // Stufen zeigen nur den nackten Prozentwert.
   dipZusatzlabel?: string;
   schweregrad: "mild" | "mittel" | "hoch";
   tageOnline: number;
-  startpreis: string;
-  verkaufspreis: string;
 }
 
 const STUFEN: Stufe[] = [
-  {
-    aufschlagProzent: 5,
-    pillHoehe: 72,
-    dipLabel: "-1%",
-    schweregrad: "mild",
-    tageOnline: 63,
-    startpreis: "441 Tsd. €",
-    verkaufspreis: "415 Tsd. €",
-  },
-  {
-    aufschlagProzent: 10,
-    pillHoehe: 96,
-    dipLabel: "-3%",
-    schweregrad: "mittel",
-    tageOnline: 281,
-    startpreis: "462 Tsd. €",
-    verkaufspreis: "407 Tsd. €",
-  },
+  { aufschlagProzent: 5, pillHoehe: 72, dipProzent: -1, schweregrad: "mild", tageOnline: 63 },
+  { aufschlagProzent: 10, pillHoehe: 96, dipProzent: -3, schweregrad: "mittel", tageOnline: 281 },
   {
     aufschlagProzent: 20,
     pillHoehe: 124,
-    dipLabel: "-15%",
+    dipProzent: -15,
     dipZusatzlabel: "Verlust",
     schweregrad: "hoch",
     tageOnline: 379,
-    startpreis: "504 Tsd. €",
-    verkaufspreis: "357 Tsd. €",
   },
 ];
 
 // Die drei Schweregrad-Farben stammen 1:1 aus dem Design-Handoff (dort als oklch(...) auf
 // --dip-mild/-mid/-severe hinterlegt) — bewusst NICHT auf die neutrale Walnuss-Skala reduziert
-// wie in der vorherigen Version dieser Seite: Das Handoff ist die verbindliche Vorlage für genau
+// wie in einer früheren Version dieser Seite: Das Handoff ist die verbindliche Vorlage für genau
 // diese Darstellung, sie legt eine eigene, gedeckte Grün-/Bernstein-/Dunkelrot-Ampel für die
 // Verlust-Eskalation fest.
 const SCHWEREGRAD_FARBEN: Record<Stufe["schweregrad"], { bg: string; text: string }> = {
@@ -92,16 +89,41 @@ function HausIcon() {
 // Stufen-Bereich gemeinsam auf einer Baseline sitzen.
 const RASTER = "grid-cols-[88px_repeat(3,1fr)] md:grid-cols-[130px_repeat(3,1fr)]";
 
-export function PreisDesWartens() {
+export function PreisDesWartens({ immobilie }: { immobilie: Immobilie }) {
+  const kaufpreisVorhanden = immobilie.kaufpreis > 0;
+  const [basis, setBasis] = useState<MarktwertBasis>("beispiel");
+
+  const marktwert =
+    basis === "kaufpreis" && kaufpreisVorhanden ? immobilie.kaufpreis : BEISPIEL_MARKTWERT;
+
   return (
     <SectionShell label="Die Konsequenz" title="Der Effekt zu hoher Vermarktungspreise in der Praxis">
-      <p className="mb-xl max-w-[70ch] text-body text-anthrazit/80">
+      <p className="mb-lg max-w-[70ch] text-body text-anthrazit/80">
         <strong className="font-medium text-anthrazit">
           Wer einmal reduziert, reduziert meist zweimal
         </strong>{" "}
         – was wie Maklerweisheit klingt, belegen Daten klar: Preisabschläge kosten Vertrauen und
         Umsatz, bezahlt von Makler:innen und Eigentümern gemeinsam.
       </p>
+
+      <div className="mb-xl flex flex-wrap items-center gap-sm">
+        <label htmlFor="marktwert-basis" className="label">
+          Marktwert-Basis
+        </label>
+        <select
+          id="marktwert-basis"
+          value={basis}
+          onChange={(e) => setBasis(e.target.value as MarktwertBasis)}
+          className="rounded-md border-2 border-asche bg-reinweiss px-sm py-xs text-small text-anthrazit outline-none transition-colors focus:border-messing"
+        >
+          <option value="beispiel">Beispielwert ({formatiereBetrag(BEISPIEL_MARKTWERT)})</option>
+          <option value="kaufpreis" disabled={!kaufpreisVorhanden}>
+            {kaufpreisVorhanden
+              ? `Kaufpreis dieses Objekts (${formatiereBetrag(immobilie.kaufpreis)})`
+              : "Kaufpreis dieses Objekts (kein Kaufpreis hinterlegt)"}
+          </option>
+        </select>
+      </div>
 
       {/* Obere Reihe: Haus-Icon (Marktwert) + die drei "Aufschlag"-Pillen, alle bodenbündig auf
           der Baseline darunter — je höher der Aufschlag, desto höher die Pille (siehe pillHoehe). */}
@@ -130,10 +152,12 @@ export function PreisDesWartens() {
       <div className={`grid gap-sm border-t-2 border-anthrazit/25 md:gap-md ${RASTER}`}>
         <div className="flex flex-col items-center pt-xs text-center">
           <p className="label">Marktwert</p>
-          <p className="font-slab text-lg font-bold text-anthrazit">{MARKTWERT}</p>
+          <p className="font-slab text-lg font-bold text-anthrazit">{formatiereBetrag(marktwert)}</p>
         </div>
         {STUFEN.map((stufe) => {
           const farbe = SCHWEREGRAD_FARBEN[stufe.schweregrad];
+          const startpreis = marktwert * (1 + stufe.aufschlagProzent / 100);
+          const verkaufspreis = marktwert * (1 + stufe.dipProzent / 100);
           return (
             <div key={stufe.aufschlagProzent} className="flex flex-col items-center">
               <div
@@ -145,7 +169,7 @@ export function PreisDesWartens() {
                     {stufe.dipZusatzlabel}
                   </span>
                 )}
-                {stufe.dipLabel}
+                {stufe.dipProzent}%
               </div>
 
               <p className="mt-sm font-sans text-small italic text-anthrazit/60">
@@ -155,14 +179,16 @@ export function PreisDesWartens() {
               <div className="mt-sm w-full max-w-[220px]">
                 <div className="flex items-center justify-between rounded-sm bg-stein px-sm py-xs text-small text-anthrazit">
                   <span>Startpreis von</span>
-                  <span className="font-slab font-bold">{stufe.startpreis}</span>
+                  <span className="font-slab font-bold">{formatiereBetrag(Math.round(startpreis))}</span>
                 </div>
                 <div
                   className="mt-[3px] flex items-center justify-between rounded-sm px-sm py-xs text-small font-medium"
                   style={{ background: farbe.bg, color: farbe.text }}
                 >
                   <span>Verkauf bei</span>
-                  <span className="font-slab font-bold">{stufe.verkaufspreis}</span>
+                  <span className="font-slab font-bold">
+                    {formatiereBetrag(Math.round(verkaufspreis))}
+                  </span>
                 </div>
               </div>
             </div>

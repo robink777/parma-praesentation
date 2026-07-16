@@ -136,7 +136,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
         )}
         {activeId === "deepimmo" && <DeepImmo immobilie={daten.immobilie} />}
         {activeId === "kaeuferverhalten" && <Kaeuferverhalten />}
-        {activeId === "preis-des-wartens" && <PreisDesWartens />}
+        {activeId === "preis-des-wartens" && <PreisDesWartens immobilie={daten.immobilie} />}
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
         {activeId === "vergleich" && (
           <Vergleichswert
