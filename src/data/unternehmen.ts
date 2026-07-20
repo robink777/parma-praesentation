@@ -5,9 +5,10 @@ import { Kennzahl, Standort, TeamMitglied } from "@/types";
 // Unternehmen.tsx) — Fotos liegen lokal unter public/standorte/ (vom Nutzer bereitgestellt).
 // Jeder Standort zeigt auf ausdrücklichen Nutzerwunsch genau EIN Foto (kein Galerie-Raster mehr).
 //
-// Kreuzau und Jülich haben noch KEINE eigenen Standort-Fotos — bis echte Fotos vorliegen, zeigen
-// sie laut ausdrücklicher Nutzeranweisung übergangsweise je eines der drei Düren-Fotos als
-// Platzhalter. Sobald Fotos von Kreuzau/Jülich vorliegen, hier austauschen.
+// Kreuzau hat seit August 2026 ein eigenes Standort-Foto (kreuzau-1.jpg, vom Nutzer bereitgestellt
+// — Empfangs-/Loungebereich mit "Parma Immobilien"-Neonschrift an der Pflanzenwand), ersetzt den
+// vorherigen Düren-Platzhalter. Jülich hat weiterhin KEIN eigenes Foto — bis eines vorliegt, zeigt
+// es laut ausdrücklicher Nutzeranweisung übergangsweise eines der Düren-Fotos als Platzhalter.
 export const STANDORTE: Standort[] = [
   {
     name: "Düren",
@@ -15,7 +16,7 @@ export const STANDORTE: Standort[] = [
     hauptstandort: true,
     bilder: ["/standorte/dueren-1.jpg"],
   },
-  { name: "Kreuzau", adresse: "Hauptstraße 80, 52372 Kreuzau", bilder: ["/standorte/dueren-2.jpg"] },
+  { name: "Kreuzau", adresse: "Hauptstraße 80, 52372 Kreuzau", bilder: ["/standorte/kreuzau-1.jpg"] },
   { name: "Jülich", adresse: "Gereonstraße 1, 52428 Jülich", bilder: ["/standorte/dueren-3.jpg"] },
 ];
 
