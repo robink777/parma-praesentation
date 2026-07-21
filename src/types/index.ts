@@ -297,10 +297,9 @@ export interface MitarbeiterKennzahlen {
   // Zweittermin (30T und Jahr), Anzahl Akquise - Vertragstermin (30T und Jahr)") — für alle
   // übrigen Mitarbeiter bleiben diese sechs Felder null, um nicht für jeden der elf TEAM-
   // Mitglieder zusätzliche OnOffice-Kalenderabrufe auszulösen, die nur drei Personen betreffen.
-  // "Ersttermin"/"Zweittermin"/"Vertragstermin" bilden auf die echten OnOffice-Kalender-
-  // Terminarten "Kaltakquise"/"Beratung"/"Vertragstermin" ab (live geprüft, August 2026 — es gibt
-  // keine Terminarten, die wörtlich "Akquise - Ersttermin" o.ä. heißen; diese Zuordnung wurde mit
-  // dem Nutzer abgestimmt, siehe zaehleTermineNachArt/AKQUISE_TERMINARTEN in onoffice/estate.ts).
+  // "Ersttermin"/"Zweittermin"/"Vertragstermin" bilden auf die gleichnamigen OnOffice-Kalender-
+  // Terminarten "Akquise - Ersttermin"/"-Zweittermin"/"-Vertragstermin" ab (live geprüft, August
+  // 2026 — siehe zaehleTermineNachArt/AKQUISE_TERMINARTEN in onoffice/estate.ts).
   akquiseErsttermin30Tage: number | null;
   akquiseErsttermineJahr: number | null;
   akquiseZweittermin30Tage: number | null;

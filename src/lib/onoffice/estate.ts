@@ -1842,17 +1842,17 @@ export async function zaehleBesichtigungen(
 }
 
 // Bildet die drei vom Nutzer gewünschten Akquise-Kennzahlen ("Anzahl Akquise - Ersttermin/
-// -Zweittermin/-Vertragstermin", August 2026 Chat-Vorgabe) auf echte, live geprüfte
-// OnOffice-Kalender-Terminarten ab — es gibt KEINE Terminarten, die wörtlich "Akquise -
-// Ersttermin" o.ä. heißen (live gegen den vollen Terminarten-Bestand geprüft, August 2026: u.a.
-// Kaltakquise, Beratung, Vertragstermin, Besichtigung, Geschäftstermin, Objektaufnahme,
-// Telefontermin — keine "Akquise -"-Präfixe). Mit dem Nutzer abgestimmte Zuordnung: "Kaltakquise"
-// als Erstkontakt, "Beratung" als vertiefendes Zweitgespräch, "Vertragstermin" bleibt wie
-// benannt (Chat: "du kannst als 1., 2. und Vertrag als Reihenfolge nehmen").
+// -Zweittermin/-Vertragstermin", August 2026 Chat-Vorgabe) auf OnOffice-Kalender-Terminarten ab.
+// Ursprünglich (erster Live-Check, August 2026) gab es diese drei Terminarten noch nicht im
+// Account — provisorisch auf "Kaltakquise"/"Beratung"/"Vertragstermin" abgebildet. Der Nutzer hat
+// daraufhin in OnOffice die neuen, wörtlich passenden Terminarten angelegt ("wir haben die
+// Terminart geändert! schau bitte unter Terminart: Akquise - Ersttermin/-Zweittermin/
+// -Vertragstermin") — erneut live geprüft: alle drei existieren jetzt mit echten 2026er-Terminen
+// für Daniel/Robin/Axel (z.B. Daniel 58 Erst-, 50 Zweit-, 5 Vertragstermine 2026).
 export const AKQUISE_TERMINARTEN = {
-  ersttermin: "Kaltakquise",
-  zweittermin: "Beratung",
-  vertragstermin: "Vertragstermin",
+  ersttermin: "Akquise - Ersttermin",
+  zweittermin: "Akquise - Zweittermin",
+  vertragstermin: "Akquise - Vertragstermin",
 } as const;
 
 // Zählt Termine EINER Terminart eines Mitarbeiters im Zeitraum [von, bis] — dasselbe Muster wie
