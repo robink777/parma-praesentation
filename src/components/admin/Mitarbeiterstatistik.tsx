@@ -37,8 +37,35 @@ const OBJEKT_GRID_COLS = "grid-cols-[48px_minmax(0,1fr)_110px_110px_160px]";
 const KENNZAHLEN_GRID_COLS =
   "grid-cols-[28px_minmax(0,1.2fr)_110px_110px_90px_90px_100px_100px_100px_100px]";
 
+// Schlankere Spaltenraster für Vertrieb/Akquise/Setting (August 2026 Chat-Vorgabe: "die Option
+// einbauen dass man von 30T zu Jahr wechseln kann damit die Tabelle etwas schlanker ist") — statt
+// je einer eigenen Spalte für 30-Tage- UND Jahres-Wert zeigen diese drei Reiter nur EINE Spalte je
+// Kennzahl, deren Zeitraum über einen Umschalter (siehe ZeitraumSchalter unten) gemeinsam
+// gesteuert wird. "Weitere Mitarbeiter" ist davon bewusst ausgenommen (vom Nutzer nicht genannt)
+// und behält weiterhin KENNZAHLEN_GRID_COLS mit beiden Spalten nebeneinander.
+const KENNZAHLEN_GRID_COLS_STANDARD_SCHLANK =
+  "grid-cols-[28px_minmax(0,1.2fr)_110px_110px_100px_100px_100px_100px]";
+// Eine Spalte mehr als vorher für die neue Quote-Spalte (siehe akquiseQuoteErstZuZweit unten,
+// August 2026 Chat-Vorgabe: "gib die Prozentzahl also die Quote aus. Wie ist die Quote von 1.
+// Termin zu 2. Termin?").
+const KENNZAHLEN_GRID_COLS_AKQUISE_SCHLANK =
+  "grid-cols-[28px_minmax(0,1.2fr)_110px_110px_100px_100px_100px_100px]";
+
 function formatWert(n: number | null): string {
   return n === null ? "–" : zahlenformat.format(n);
+}
+
+// Quote 1. → 2. Termin, immer auf Basis der Jahreszahlen (Chat-Vorgabe: "bitte jeweils fürs Jahr
+// angeben") — unabhängig vom 30-Tage/Jahr-Umschalter, damit die Quote nicht durch die kleinen,
+// schwankungsanfälligen 30-Tage-Zahlen verzerrt wird. null, wenn im laufenden Jahr noch kein
+// Ersttermin stattfand (Division durch 0 wäre irreführend, kein "0%").
+function akquiseQuoteErstZuZweit(k: MitarbeiterKennzahlen): number | null {
+  if (!k.akquiseErsttermineJahr) return null;
+  return Math.round(((k.akquiseZweittermineJahr ?? 0) / k.akquiseErsttermineJahr) * 100);
+}
+
+function formatProzent(n: number | null): string {
+  return n === null ? "–" : `${zahlenformat.format(n)} %`;
 }
 
 function formatTage(n: number | null): string {
@@ -198,27 +225,52 @@ function aktuellesJahr(): number {
 // eigener Reiter mit anderen Kennzahlen (August 2026 Chat-Vorgabe: "Statt Termine 30T, Termine
 // Jahr, Besichtigung 30T und Besicht. Jahr. Auch aktive Kunden und Verkauf kann raus ...
 // stattdessen: Anzahl Akquise - Ersttermin/-Zweittermin/-Vertragstermin, jeweils 30T und Jahr").
-// Beide Modi haben dieselbe SpaltenANZAHL (8 Datenspalten nach Name), KENNZAHLEN_GRID_COLS bleibt
-// dadurch für beide gültig.
 type KennzahlenModus = "standard" | "akquise";
 
-function KennzahlenKopfzeile({ modus }: { modus: KennzahlenModus }) {
+// Zeitraum-Umschaltung für Vertrieb/Akquise/Setting (August 2026 Chat-Vorgabe: "die Option
+// einbauen dass man von 30T zu Jahr wechseln kann damit die Tabelle etwas schlanker ist") —
+// undefined = "Weitere Mitarbeiter"-Fall, zeigt weiterhin beide Zeitfenster nebeneinander.
+type Zeitraum = "30T" | "Jahr";
+
+function KennzahlenKopfzeile({ modus, zeitraum }: { modus: KennzahlenModus; zeitraum?: Zeitraum }) {
+  const gridCols = zeitraum
+    ? modus === "akquise"
+      ? KENNZAHLEN_GRID_COLS_AKQUISE_SCHLANK
+      : KENNZAHLEN_GRID_COLS_STANDARD_SCHLANK
+    : KENNZAHLEN_GRID_COLS;
+
   return (
-    <div
-      className={`grid ${KENNZAHLEN_GRID_COLS} items-end gap-xs border-b border-anthrazit/10 pb-xs`}
-    >
+    <div className={`grid ${gridCols} items-end gap-xs border-b border-anthrazit/10 pb-xs`}>
       <span aria-hidden="true" />
       <span className="label">Mitarbeiter</span>
       <span className="label text-left">Aktive Objekte</span>
       <span className="label text-left">Aufarbeitung</span>
       {modus === "akquise" ? (
+        zeitraum ? (
+          <>
+            <span className="label text-left">Erst</span>
+            <span className="label text-left">Zweit</span>
+            <span className="label text-left" title="Zweittermine Jahr ÷ Ersttermine Jahr">
+              Quote 1→2
+            </span>
+            <span className="label text-left">Vertrag</span>
+          </>
+        ) : (
+          <>
+            <span className="label text-left">Erst 30T</span>
+            <span className="label text-left">Erst Jahr</span>
+            <span className="label text-left">Zweit 30T</span>
+            <span className="label text-left">Zweit Jahr</span>
+            <span className="label text-left">Vertrag 30T</span>
+            <span className="label text-left">Vertrag Jahr</span>
+          </>
+        )
+      ) : zeitraum ? (
         <>
-          <span className="label text-left">Erst 30T</span>
-          <span className="label text-left">Erst Jahr</span>
-          <span className="label text-left">Zweit 30T</span>
-          <span className="label text-left">Zweit Jahr</span>
-          <span className="label text-left">Vertrag 30T</span>
-          <span className="label text-left">Vertrag Jahr</span>
+          <span className="label text-left">Termine</span>
+          <span className="label text-left">Besicht.</span>
+          <span className="label text-left">Kunden aktiv</span>
+          <span className="label text-left">Verkauft</span>
         </>
       ) : (
         <>
@@ -445,15 +497,22 @@ function KennzahlenZeile({
   mitglied,
   kennzahlen,
   modus,
+  zeitraum,
 }: {
   mitglied: TeamMitglied;
   kennzahlen?: MitarbeiterKennzahlen;
   modus: KennzahlenModus;
+  zeitraum?: Zeitraum;
 }) {
   const [offen, setOffen] = useState(false);
   const [wurdeGeoeffnet, setWurdeGeoeffnet] = useState(false);
 
   const k = kennzahlen ?? LEERE_KENNZAHLEN;
+  const gridCols = zeitraum
+    ? modus === "akquise"
+      ? KENNZAHLEN_GRID_COLS_AKQUISE_SCHLANK
+      : KENNZAHLEN_GRID_COLS_STANDARD_SCHLANK
+    : KENNZAHLEN_GRID_COLS;
 
   function umschalten() {
     setOffen((bisher) => !bisher);
@@ -462,7 +521,7 @@ function KennzahlenZeile({
 
   return (
     <div className="border-b border-anthrazit/10 last:border-b-0">
-      <div className={`grid ${KENNZAHLEN_GRID_COLS} items-center gap-xs py-sm`}>
+      <div className={`grid ${gridCols} items-center gap-xs py-sm`}>
         <button
           type="button"
           onClick={umschalten}
@@ -485,24 +544,64 @@ function KennzahlenZeile({
           {formatWert(k.objekteInAufarbeitung)}
         </span>
         {modus === "akquise" ? (
+          zeitraum ? (
+            <>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(
+                  zeitraum === "30T" ? k.akquiseErsttermin30Tage : k.akquiseErsttermineJahr
+                )}
+              </span>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(
+                  zeitraum === "30T" ? k.akquiseZweittermin30Tage : k.akquiseZweittermineJahr
+                )}
+              </span>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatProzent(akquiseQuoteErstZuZweit(k))}
+              </span>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(
+                  zeitraum === "30T"
+                    ? k.akquiseVertragstermin30Tage
+                    : k.akquiseVertragstermineJahr
+                )}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(k.akquiseErsttermin30Tage)}
+              </span>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(k.akquiseErsttermineJahr)}
+              </span>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(k.akquiseZweittermin30Tage)}
+              </span>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(k.akquiseZweittermineJahr)}
+              </span>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(k.akquiseVertragstermin30Tage)}
+              </span>
+              <span className="text-left font-mono text-sm text-anthrazit">
+                {formatWert(k.akquiseVertragstermineJahr)}
+              </span>
+            </>
+          )
+        ) : zeitraum ? (
           <>
             <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.akquiseErsttermin30Tage)}
+              {formatWert(zeitraum === "30T" ? k.termine30Tage : k.termineJahr)}
             </span>
             <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.akquiseErsttermineJahr)}
+              {formatWert(zeitraum === "30T" ? k.besichtigungen30Tage : k.besichtigungenJahr)}
             </span>
             <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.akquiseZweittermin30Tage)}
+              {formatWert(k.kundenAktiv)}
             </span>
             <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.akquiseZweittermineJahr)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.akquiseVertragstermin30Tage)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.akquiseVertragstermineJahr)}
+              {formatWert(k.verkaufteObjekteJahr)}
             </span>
           </>
         ) : (
@@ -546,24 +645,31 @@ function MitarbeiterTabelle({
   mitglieder,
   kennzahlen,
   modus = "standard",
+  zeitraum,
 }: {
   titel: string;
   mitglieder: TeamMitglied[];
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   modus?: KennzahlenModus;
+  zeitraum?: Zeitraum;
 }) {
+  // Schlankere Mindestbreite bei aktivem Zeitraum-Umschalter — die Tabelle hat dann zwei bis drei
+  // Datenspalten weniger (siehe KENNZAHLEN_GRID_COLS_STANDARD_SCHLANK/_AKQUISE_SCHLANK oben).
+  const minBreite = zeitraum ? "min-w-[820px]" : "min-w-[1010px]";
+
   return (
     <Card>
       <h3 className="mb-sm font-slab text-lg font-bold text-anthrazit">{titel}</h3>
       <div className="overflow-x-auto">
-        <div className="flex min-w-[1010px] flex-col">
-          <KennzahlenKopfzeile modus={modus} />
+        <div className={`flex ${minBreite} flex-col`}>
+          <KennzahlenKopfzeile modus={modus} zeitraum={zeitraum} />
           {mitglieder.map((mitglied) => (
             <KennzahlenZeile
               key={mitglied.name}
               mitglied={mitglied}
               kennzahlen={kennzahlen?.[mitglied.name]}
               modus={modus}
+              zeitraum={zeitraum}
             />
           ))}
         </div>
@@ -613,6 +719,39 @@ function MitarbeiterReiterleiste({
   );
 }
 
+// Umschalter zwischen "30 Tage" und "Jahr" für Vertrieb/Akquise/Setting (August 2026
+// Chat-Vorgabe: "die Option einbauen dass man von 30T zu Jahr wechseln kann damit die Tabelle
+// etwas schlanker ist") — EIN gemeinsamer Umschalter statt je einem pro Tabelle, da ohnehin immer
+// nur eine der drei Tabellen gleichzeitig sichtbar ist (siehe MitarbeiterReiterleiste oben).
+function ZeitraumSchalter({
+  aktiv,
+  onSelect,
+}: {
+  aktiv: Zeitraum;
+  onSelect: (zeitraum: Zeitraum) => void;
+}) {
+  const optionen: { id: Zeitraum; label: string }[] = [
+    { id: "30T", label: "30 Tage" },
+    { id: "Jahr", label: "Jahr" },
+  ];
+  return (
+    <div className="mb-sm inline-flex rounded-md border-2 border-asche bg-reinweiss p-[2px]">
+      {optionen.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => onSelect(option.id)}
+          className={`rounded-sm px-sm py-[2px] text-small font-medium transition-colors ${
+            aktiv === option.id ? "bg-walnuss text-reinweiss" : "text-anthrazit/60 hover:text-anthrazit"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Grundgerüst der Mitarbeiterstatistik: Zeigt die bestehende TEAM-Liste (data/unternehmen.ts,
 // NICHT alle Live-OnOffice-Nutzer — auf ausdrücklichen Nutzerwunsch, siehe Chat), aufgeteilt in
 // vier Reiter ("Vertrieb"/"Akquise"/"Setting"/"Weitere Mitarbeiter", siehe teileTeamAuf/
@@ -645,6 +784,7 @@ export function Mitarbeiterstatistik({
   const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
   const [abschnitt, setAbschnitt] = useState("uebersicht");
   const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>("vertrieb");
+  const [zeitraum, setZeitraum] = useState<Zeitraum>("Jahr");
 
   return (
     <div className="flex h-screen w-screen">
@@ -667,8 +807,19 @@ export function Mitarbeiterstatistik({
               Akquise übernimmt.
             </p>
             <MitarbeiterReiterleiste aktiv={mitarbeiterReiter} onSelect={setMitarbeiterReiter} />
+            {/* Zeitraum-Umschalter nur für Vertrieb/Akquise/Setting (Chat-Vorgabe nennt explizit
+                nur diese drei) — "Weitere Mitarbeiter" bleibt unverändert bei beiden Spalten
+                nebeneinander. */}
+            {mitarbeiterReiter !== "weitere" && (
+              <ZeitraumSchalter aktiv={zeitraum} onSelect={setZeitraum} />
+            )}
             {mitarbeiterReiter === "vertrieb" && (
-              <MitarbeiterTabelle titel="Vertrieb" mitglieder={vertrieb} kennzahlen={kennzahlen} />
+              <MitarbeiterTabelle
+                titel="Vertrieb"
+                mitglieder={vertrieb}
+                kennzahlen={kennzahlen}
+                zeitraum={zeitraum}
+              />
             )}
             {mitarbeiterReiter === "akquise" && (
               <MitarbeiterTabelle
@@ -676,10 +827,16 @@ export function Mitarbeiterstatistik({
                 mitglieder={akquise}
                 kennzahlen={kennzahlen}
                 modus="akquise"
+                zeitraum={zeitraum}
               />
             )}
             {mitarbeiterReiter === "setting" && (
-              <MitarbeiterTabelle titel="Setting" mitglieder={setting} kennzahlen={kennzahlen} />
+              <MitarbeiterTabelle
+                titel="Setting"
+                mitglieder={setting}
+                kennzahlen={kennzahlen}
+                zeitraum={zeitraum}
+              />
             )}
             {mitarbeiterReiter === "weitere" && (
               <MitarbeiterTabelle
