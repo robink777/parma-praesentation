@@ -5,11 +5,13 @@ import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { Kontrolle } from "./Kontrolle";
+import { Leadquellen } from "./Leadquellen";
 import { AKQUISE_NAMEN, SETTING_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unternehmen";
 import { Icon } from "@/components/icons/Icon";
 import { formatiereBetrag } from "@/lib/berechnung";
 import {
   KontrollObjekt,
+  LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
   MitarbeiterObjekt,
   ObjektGesamtKennzahlen,
@@ -776,10 +778,12 @@ export function Mitarbeiterstatistik({
   kennzahlen,
   gesamtKennzahlen,
   kontrollObjekte,
+  leadquellenKennzahlen,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
   kontrollObjekte?: KontrollObjekt[];
+  leadquellenKennzahlen?: LeadquellenKennzahlen;
 }) {
   const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
   const [abschnitt, setAbschnitt] = useState("uebersicht");
@@ -845,6 +849,11 @@ export function Mitarbeiterstatistik({
                 kennzahlen={kennzahlen}
               />
             )}
+          </SectionShell>
+        )}
+        {abschnitt === "leadquellen" && (
+          <SectionShell label="Admin-Bereich" title="Leadquellen">
+            <Leadquellen kennzahlen={leadquellenKennzahlen} />
           </SectionShell>
         )}
         {abschnitt === "kontrolle" && (

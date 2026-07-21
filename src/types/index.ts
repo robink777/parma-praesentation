@@ -399,6 +399,30 @@ export interface KontrollObjekt {
   probleme: string[];
 }
 
+// Unternehmensweite Lead-Herkunft-Übersicht für die "Leadquellen"-Seite im Admin-Bereich (siehe
+// ladeLeadquellenKennzahlen in onoffice/estate.ts, Chat-Vorgabe August 2026: "wo kommen die
+// Leads" / "Mach zwischen Mitarbeiter und Kontrolle bitte noch eine Kachel mit Leadquellen").
+// Der Nutzer wies selbst darauf hin, dass diese Auswertung nur so gut ist wie die zugrunde
+// liegende Datenpflege (Eigentümer korrekt am Objekt verknüpft, Herkunft an der Adresse
+// gepflegt) — objekteOhneEigentuemer/eigentuemerOhneHerkunft machen genau diese Lücke sichtbar,
+// statt sie stillschweigend in der Verteilung verschwinden zu lassen.
+export interface LeadquellenKennzahlen {
+  objekteGesamt: number;
+  // Objekte ohne jede verknüpfte Eigentümer-Adresse (OnOffice-Relation estate→address, Typ
+  // "owner") — für diese Objekte kann keine Herkunft ermittelt werden, ganz unabhängig davon,
+  // ob die Herkunft an einer Adresse gepflegt wäre.
+  objekteOhneEigentuemer: number;
+  // Anzahl unterschiedlicher Eigentümer-Adressen über alle Objekte hinweg (eine Adresse kann
+  // Eigentümer mehrerer Objekte sein, wird dann nur einmal gezählt).
+  eigentuemerGesamt: number;
+  // Davon ohne jede Angabe im Feld "Herkunft Kontakt".
+  eigentuemerOhneHerkunft: number;
+  // Verteilung der tatsächlich gepflegten Herkunft-Werte, absteigend nach Häufigkeit. Ein
+  // Eigentümer mit mehreren Herkunft-Angaben (Mehrfachauswahl-Feld) zählt bei jeder seiner
+  // Angaben mit.
+  herkunftVerteilung: { label: string; anzahl: number }[];
+}
+
 export interface Standort {
   name: string;
   adresse?: string;

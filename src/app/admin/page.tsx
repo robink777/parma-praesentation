@@ -4,8 +4,13 @@ import {
   ladeMitarbeiterKennzahlen,
   ladeObjektGesamtKennzahlen,
 } from "@/lib/onoffice/mitarbeiterstatistik";
-import { ladeKontrollObjekte } from "@/lib/onoffice/estate";
-import { KontrollObjekt, MitarbeiterKennzahlen, ObjektGesamtKennzahlen } from "@/types";
+import { ladeKontrollObjekte, ladeLeadquellenKennzahlen } from "@/lib/onoffice/estate";
+import {
+  KontrollObjekt,
+  LeadquellenKennzahlen,
+  MitarbeiterKennzahlen,
+  ObjektGesamtKennzahlen,
+} from "@/types";
 
 // Admin-Bereich, zusätzlich zur App-weiten Anmeldung durch ein zweites, separates Passwort
 // geschützt (siehe middleware.ts, lib/auth.ts, admin/login/page.tsx). Zeigt die
@@ -25,36 +30,43 @@ export default async function AdminPage() {
   let kennzahlen: Record<string, MitarbeiterKennzahlen> | undefined;
   let gesamtKennzahlen: ObjektGesamtKennzahlen | undefined;
   let kontrollObjekte: KontrollObjekt[] | undefined;
+  let leadquellenKennzahlen: LeadquellenKennzahlen | undefined;
 
   if (ONOFFICE_MODE === "live") {
-    // Alle drei Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
+    // Alle vier Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
     // voneinander, ein sequenzielles await würde die Ladezeit der Seite unnötig verlängern.
     // Trotzdem einzeln abgesichert (separate try/catch statt einem gemeinsamen um das
     // Promise.all) — schlägt einer der Abrufe fehl, sollen die übrigen trotzdem angezeigt werden
     // (analog zum bestehenden Muster der einzelnen .catch(() => null) in ladeMitarbeiterKennzahlen).
-    const [kennzahlenErgebnis, gesamtKennzahlenErgebnis, kontrollErgebnis] = await Promise.all([
-      ladeMitarbeiterKennzahlen().catch((error) => {
-        console.error(
-          "Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:",
-          error
-        );
-        return undefined;
-      }),
-      ladeObjektGesamtKennzahlen().catch((error) => {
-        console.error(
-          "Live-Abruf der unternehmensweiten Objekt-Gesamtkennzahlen aus OnOffice fehlgeschlagen:",
-          error
-        );
-        return undefined;
-      }),
-      ladeKontrollObjekte().catch((error) => {
-        console.error("Live-Abruf der Kontrollobjekte aus OnOffice fehlgeschlagen:", error);
-        return undefined;
-      }),
-    ]);
+    const [kennzahlenErgebnis, gesamtKennzahlenErgebnis, kontrollErgebnis, leadquellenErgebnis] =
+      await Promise.all([
+        ladeMitarbeiterKennzahlen().catch((error) => {
+          console.error(
+            "Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:",
+            error
+          );
+          return undefined;
+        }),
+        ladeObjektGesamtKennzahlen().catch((error) => {
+          console.error(
+            "Live-Abruf der unternehmensweiten Objekt-Gesamtkennzahlen aus OnOffice fehlgeschlagen:",
+            error
+          );
+          return undefined;
+        }),
+        ladeKontrollObjekte().catch((error) => {
+          console.error("Live-Abruf der Kontrollobjekte aus OnOffice fehlgeschlagen:", error);
+          return undefined;
+        }),
+        ladeLeadquellenKennzahlen().catch((error) => {
+          console.error("Live-Abruf der Leadquellen aus OnOffice fehlgeschlagen:", error);
+          return undefined;
+        }),
+      ]);
     kennzahlen = kennzahlenErgebnis;
     gesamtKennzahlen = gesamtKennzahlenErgebnis;
     kontrollObjekte = kontrollErgebnis;
+    leadquellenKennzahlen = leadquellenErgebnis;
   }
 
   // Kein SectionShell-Wrapper mehr — Mitarbeiterstatistik baut seit August 2026 ihr eigenes
@@ -65,6 +77,7 @@ export default async function AdminPage() {
       kennzahlen={kennzahlen}
       gesamtKennzahlen={gesamtKennzahlen}
       kontrollObjekte={kontrollObjekte}
+      leadquellenKennzahlen={leadquellenKennzahlen}
     />
   );
 }

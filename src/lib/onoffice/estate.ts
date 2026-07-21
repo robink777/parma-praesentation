@@ -1,4 +1,13 @@
-import { Betreuer, Immobilie, Interessent, KontrollObjekt, Kunde, MitarbeiterObjekt, ObjektDokument } from "@/types";
+import {
+  Betreuer,
+  Immobilie,
+  Interessent,
+  KontrollObjekt,
+  Kunde,
+  LeadquellenKennzahlen,
+  MitarbeiterObjekt,
+  ObjektDokument,
+} from "@/types";
 import { TEAM } from "@/data/unternehmen";
 import { distanzZwischenPlzKm } from "@/lib/geo";
 import { callOnOfficeApi } from "./client";
@@ -1758,6 +1767,202 @@ export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
   }
 
   return ergebnis;
+}
+
+function chunkArray<T>(werte: T[], groesse: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < werte.length; i += groesse) {
+    chunks.push(werte.slice(i, i + groesse));
+  }
+  return chunks;
+}
+
+async function ladeAlleKaufEstateIdsSeite(offset: number): Promise<string[]> {
+  const result = await callOnOfficeApi<{ id: string }>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id"],
+        filter: { vermarktungsart: [{ op: "=", val: "kauf" }] },
+        listlimit: GESAMT_OBJEKT_LISTLIMIT,
+        listoffset: offset,
+      },
+    },
+  ]);
+  const records = result?.response?.results?.[0]?.data?.records || [];
+  // String(...) bewusst statt "r.id" direkt zu übernehmen — OnOffice liefert IDs je nach Abruf
+  // mal als JSON-String, mal als JSON-Zahl (die "string"-Typannotation oben ist nur eine
+  // Behauptung, kein Laufzeit-Zwang). Ohne diese Koerzierung passten die IDs weiter unten beim
+  // Map-Lookup gegen eigentuemerNachEstate (Schlüssel garantiert String, da aus Object.entries
+  // eines JSON-Objekts) nicht zusammen — live beobachtet: dadurch schlug JEDE Zuordnung fehl und
+  // objekteOhneEigentuemer zeigte fälschlich 100% statt der echten Quote.
+  return records.map((r) => String(r.id));
+}
+
+// Klartext-Zuordnung für "Herkunft Kontakt" (Adress-Feld, Live-Feldkatalog geprüft, August
+// 2026) — für die "Leadquellen"-Seite im Admin-Bereich (Chat-Vorgabe: "wo kommen die Leads").
+// Bewusst nur die aktuell im Feldkatalog hinterlegten Auswahlwerte; herkunftLabel() unten fällt
+// für ältere/inzwischen aus dem Katalog entfernte Werte (live beobachtet: "Kunde-hat-angerufen",
+// "Sonstiges" — beide noch in Bestandsdaten vorhanden, aber nicht mehr im aktuellen Katalog) auf
+// eine lesbare Version des rohen Schlüssels zurück, statt sie stillschweigend zu verschlucken.
+const HERKUNFT_LABELS: Record<string, string> = {
+  "1aimmobilienmarkt_system": "1A Immobilienmarkt",
+  indMulti3148Select6554: "Aktive Akquise",
+  "Aushang-im-Ladenlokal": "Aushang",
+  bottimmo_system: "BOTTIMMO",
+  webseite_system: "eigene Webseite (alt)",
+  indMulti2076Select5890: "Facebook",
+  indMulti3148Select6566: "Facebook-Ads",
+  Flyer: "Flyer",
+  "Freund/Privatkontakt": "Freund/Privatkontakt",
+  indMulti3148Select6570: "Google-Ads",
+  "eigene-Homepage": "Homepage",
+  bvfi_system: "IMAG Immobilienmakler AG – Offmarket Place",
+  immobilie_1_system: "immobilie1 AG",
+  immobilienscout24_system: "Immobilienscout 24",
+  immonet_system: "Immonet",
+  immowelt_system: "Immowelt",
+  indMulti3148Select6558: "Immowelt-Lead",
+  IMV: "IMV",
+  indMulti3148Select6552: "Instagram",
+  indMulti3148Select6568: "Instagram-Ads",
+  Internetrecherche: "Internetrecherche",
+  ebay_system: "Kleinanzeigen",
+  Ladenlokal: "Ladenlokal",
+  indMulti3148Select6560: "Lead",
+  indMulti3148Select6562: "Messe",
+  neubaukompass: "Neubaukompass",
+  indMulti3148Select6544: "Offline",
+  indMulti3148Select6546: "Online",
+  indMulti3148Select6564: "Online Ads",
+  indMulti3450Select6682: "Persönliche Empfehlung",
+  portal_system: "Portale",
+  indMulti3148Select6556: "Postmarketing",
+  indMulti3148Select6548: "SocialMedia",
+  Tippgeber: "Tippgeber",
+  "Veranstaltung/Seminar": "Veranstaltung/Seminar",
+  Bauschild: "Verkaufsschild",
+  indMulti3148Select6550: "WhatsApp",
+  wp_mitgliederbereich_system: "WP-Mitgliederbereich",
+  Zeitungsanzeige: "Zeitungsanzeige / Pressearbeit",
+};
+
+function herkunftLabel(rohschluessel: string): string {
+  if (HERKUNFT_LABELS[rohschluessel]) return HERKUNFT_LABELS[rohschluessel];
+  const lesbar = rohschluessel.replace(/[-_]/g, " ").trim();
+  return lesbar.charAt(0).toUpperCase() + lesbar.slice(1);
+}
+
+// Lädt die unternehmensweite Lead-Herkunft-Übersicht (Chat-Vorgabe August 2026: "wieviele leads
+// reinkommen übers mailing ... wo kommen die Leads") — bewusst OHNE Vorfestlegung auf eine
+// einzelne "Mailing"-Quelle (der Nutzer hatte die genaue Zuordnung noch nicht final entschieden):
+// stattdessen die VOLLE Verteilung über alle gepflegten Herkunft-Werte, damit die Auswertung
+// unabhängig von dieser noch offenen Detailfrage nutzbar ist.
+//
+// Zweistufiger Abruf: 1. Eigentümer-Adress-IDs je Objekt über die estate→address-"owner"-Relation
+// (resourcetype "idsfromrelation", siehe ladeEigentuemerAddressIds oben — hier aber für ALLE
+// Objekte auf einmal statt nur eines, live geprüft: ein einziger Aufruf mit vielen parentids
+// liefert einen Datensatz mit allen Zuordnungen zugleich, kein Abruf pro Objekt nötig).
+// 2. "HerkunftKontakt" je gefundener Eigentümer-Adresse (resourcetype "address", recordids).
+// Beide Schritte in ONOFFICE_MAX_LISTLIMIT-Chunks aufgeteilt (defensiv, falls es ein
+// serverseitiges Limit für sehr viele IDs auf einmal gibt).
+//
+// Macht zugleich sichtbar, WARUM die Auswertung unvollständig sein kann (Chat-Vorgabe: "Kann man
+// das nicht irgendwie kontrollieren?"): objekteOhneEigentuemer (keine Eigentümer-Relation
+// hinterlegt) und eigentuemerOhneHerkunft (Adresse vorhanden, aber Herkunft-Feld leer) werden
+// getrennt ausgewiesen statt in der Verteilung unsichtbar zu verschwinden.
+export async function ladeLeadquellenKennzahlen(): Promise<LeadquellenKennzahlen> {
+  const estateIds: string[] = [];
+  let offset = 0;
+  for (;;) {
+    const seite = await ladeAlleKaufEstateIdsSeite(offset);
+    estateIds.push(...seite);
+    if (seite.length < GESAMT_OBJEKT_LISTLIMIT) break;
+    offset += GESAMT_OBJEKT_LISTLIMIT;
+  }
+
+  const eigentuemerNachEstate = new Map<string, string[]>();
+  for (const chunk of chunkArray(estateIds.map(Number), ONOFFICE_MAX_LISTLIMIT)) {
+    const relResult = await callOnOfficeApi<{ elements: Record<string, string[]> }>([
+      {
+        actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:get",
+        resourcetype: "idsfromrelation",
+        resourceid: "",
+        identifier: "",
+        cacheable: false,
+        parameters: {
+          relationtype: "urn:onoffice-de-ns:smart:2.5:relationTypes:estate:address:owner",
+          parentids: chunk,
+        },
+      },
+    ]);
+    const elements = relResult?.response?.results?.[0]?.data?.records?.[0]?.elements || {};
+    for (const [estateId, adressIds] of Object.entries(elements)) {
+      eigentuemerNachEstate.set(estateId, adressIds);
+    }
+  }
+
+  const objekteOhneEigentuemer = estateIds.filter(
+    (id) => (eigentuemerNachEstate.get(id) ?? []).length === 0
+  ).length;
+
+  const alleEigentuemerIds = Array.from(new Set(Array.from(eigentuemerNachEstate.values()).flat()));
+
+  const herkunftRoh = new Map<string, string>();
+  for (const chunk of chunkArray(alleEigentuemerIds.map(Number), ONOFFICE_MAX_LISTLIMIT)) {
+    if (chunk.length === 0) continue;
+    const result = await callOnOfficeApi<{ id: string; elements: { HerkunftKontakt?: string } }>([
+      {
+        actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+        resourcetype: "address",
+        resourceid: "",
+        identifier: "",
+        cacheable: false,
+        parameters: {
+          data: ["HerkunftKontakt"],
+          recordids: chunk,
+          listlimit: chunk.length,
+        },
+      },
+    ]);
+    const records = result?.response?.results?.[0]?.data?.records || [];
+    for (const record of records) {
+      herkunftRoh.set(String(record.id), record.elements.HerkunftKontakt || "");
+    }
+  }
+
+  let eigentuemerOhneHerkunft = 0;
+  const verteilung = new Map<string, number>();
+  for (const adressId of alleEigentuemerIds) {
+    const werte = (herkunftRoh.get(String(adressId)) || "")
+      .split("|")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (werte.length === 0) {
+      eigentuemerOhneHerkunft += 1;
+      continue;
+    }
+    for (const wert of werte) {
+      const label = herkunftLabel(wert);
+      verteilung.set(label, (verteilung.get(label) ?? 0) + 1);
+    }
+  }
+
+  const herkunftVerteilung = Array.from(verteilung.entries())
+    .map(([label, anzahl]) => ({ label, anzahl }))
+    .sort((a, b) => b.anzahl - a.anzahl);
+
+  return {
+    objekteGesamt: estateIds.length,
+    objekteOhneEigentuemer,
+    eigentuemerGesamt: alleEigentuemerIds.length,
+    eigentuemerOhneHerkunft,
+    herkunftVerteilung,
+  };
 }
 
 // Terminarten, die NICHT in die "Termine"-Kennzahl (Parameter 3 von 5) einfließen — reine
