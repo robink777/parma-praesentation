@@ -140,3 +140,27 @@ export const TEAM: TeamMitglied[] = [
     benutzername: "Dawid",
   },
 ];
+
+// Reiter-Zuordnung der Mitarbeiterstatistik im Admin-Bereich (siehe Mitarbeiterstatistik.tsx,
+// onoffice/mitarbeiterstatistik.ts) — August 2026 Chat-Vorgabe: "ich brauche bei Mitarbeiter
+// neben Vertrieb noch zwei weitere Reiter mit unterschiedlichen Angaben. Akquise (Daniel, Robin,
+// Axel) und Setting (Sarah, Kathi)". Bewusst hier (statt lokal in der jeweiligen Komponente/dem
+// jeweiligen Lader) definiert: sowohl die UI (welche Tabelle zeigt wen) als auch der
+// OnOffice-Lader (wer bekommt die zusätzlichen Akquise-Kennzahlen berechnet, siehe
+// ladeMitarbeiterKennzahlen) müssen dieselbe Zuordnung verwenden. Axel Wehmeier bewusst in BEIDEN
+// Listen (Vertrieb UND Akquise) — laut Chat-Vorgabe nicht aus Vertrieb entfernt, sondern
+// zusätzlich für Akquise vorgesehen. Alle TEAM-Mitglieder, die in keiner der drei Listen stehen,
+// landen weiterhin in "Weitere Mitarbeiter" (siehe teileTeamAuf in Mitarbeiterstatistik.tsx).
+export const VERTRIEB_NAMEN = [
+  "Vanessa Krifft",
+  "Jacqueline Henot",
+  "Kira Woldt",
+  "Dawid Parma",
+  "Axel Wehmeier",
+  "Stanimira Georgieva",
+];
+
+export const AKQUISE_NAMEN = ["Daniel Parma", "Robin Kolbe", "Axel Wehmeier"];
+
+// "Kathi" = Katharina Becker (siehe TEAM oben).
+export const SETTING_NAMEN = ["Sarah Barth", "Katharina Becker"];

@@ -1,6 +1,7 @@
-import { TEAM } from "@/data/unternehmen";
+import { AKQUISE_NAMEN, TEAM } from "@/data/unternehmen";
 import { MitarbeiterKennzahlen, MitarbeiterObjekt, ObjektGesamtKennzahlen } from "@/types";
 import {
+  AKQUISE_TERMINARTEN,
   ladeAlleAktivenObjekte,
   ladeAlleObjekteInAufarbeitung,
   ladeAlleVerkauftenObjekte,
@@ -11,6 +12,7 @@ import {
   zaehleBesichtigungen,
   zaehleObjekteInAufarbeitung,
   zaehleTermine,
+  zaehleTermineNachArt,
   zaehleVerkaufteObjekteFuerMitarbeiter,
 } from "./estate";
 
@@ -89,6 +91,10 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
     TEAM.map(async (mitglied) => {
       const nutzerNr = ladeNutzerNrFuerMitarbeiter(mitglied.name);
       const benutzername = ladeBenutzernameFuerMitarbeiter(mitglied.name);
+      // Nur für die drei Akquise-Reiter-Mitglieder abgerufen (siehe AKQUISE_NAMEN in
+      // data/unternehmen.ts) — sonst würden für alle elf TEAM-Mitglieder sechs zusätzliche
+      // OnOffice-Kalenderabrufe ausgelöst, obwohl die Kennzahl nur drei Personen betrifft.
+      const istAkquise = AKQUISE_NAMEN.includes(mitglied.name);
 
       const [
         aktiveObjekte,
@@ -99,6 +105,12 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         besichtigungenJahr,
         kundenAktiv,
         verkaufteObjekteJahr,
+        akquiseErsttermin30Tage,
+        akquiseErsttermineJahr,
+        akquiseZweittermin30Tage,
+        akquiseZweittermineJahr,
+        akquiseVertragstermin30Tage,
+        akquiseVertragstermineJahr,
       ] = await Promise.all([
         nutzerNr ? zaehleAktiveObjekte(nutzerNr).catch(() => null) : Promise.resolve(null),
         nutzerNr
@@ -124,6 +136,39 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
               () => null
             )
           : Promise.resolve(null),
+        nutzerNr && istAkquise
+          ? zaehleTermineNachArt(nutzerNr, von30Tage, bis30Tage, AKQUISE_TERMINARTEN.ersttermin).catch(
+              () => null
+            )
+          : Promise.resolve(null),
+        nutzerNr && istAkquise
+          ? zaehleTermineNachArt(nutzerNr, vonJahr, bisJahr, AKQUISE_TERMINARTEN.ersttermin).catch(
+              () => null
+            )
+          : Promise.resolve(null),
+        nutzerNr && istAkquise
+          ? zaehleTermineNachArt(nutzerNr, von30Tage, bis30Tage, AKQUISE_TERMINARTEN.zweittermin).catch(
+              () => null
+            )
+          : Promise.resolve(null),
+        nutzerNr && istAkquise
+          ? zaehleTermineNachArt(nutzerNr, vonJahr, bisJahr, AKQUISE_TERMINARTEN.zweittermin).catch(
+              () => null
+            )
+          : Promise.resolve(null),
+        nutzerNr && istAkquise
+          ? zaehleTermineNachArt(
+              nutzerNr,
+              von30Tage,
+              bis30Tage,
+              AKQUISE_TERMINARTEN.vertragstermin
+            ).catch(() => null)
+          : Promise.resolve(null),
+        nutzerNr && istAkquise
+          ? zaehleTermineNachArt(nutzerNr, vonJahr, bisJahr, AKQUISE_TERMINARTEN.vertragstermin).catch(
+              () => null
+            )
+          : Promise.resolve(null),
       ]);
 
       const kennzahlen: MitarbeiterKennzahlen = {
@@ -135,6 +180,12 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         besichtigungenJahr,
         kundenAktiv,
         verkaufteObjekteJahr,
+        akquiseErsttermin30Tage,
+        akquiseErsttermineJahr,
+        akquiseZweittermin30Tage,
+        akquiseZweittermineJahr,
+        akquiseVertragstermin30Tage,
+        akquiseVertragstermineJahr,
       };
 
       return [mitglied.name, kennzahlen] as const;

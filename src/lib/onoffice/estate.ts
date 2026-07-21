@@ -1841,6 +1841,53 @@ export async function zaehleBesichtigungen(
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
+// Bildet die drei vom Nutzer gewünschten Akquise-Kennzahlen ("Anzahl Akquise - Ersttermin/
+// -Zweittermin/-Vertragstermin", August 2026 Chat-Vorgabe) auf echte, live geprüfte
+// OnOffice-Kalender-Terminarten ab — es gibt KEINE Terminarten, die wörtlich "Akquise -
+// Ersttermin" o.ä. heißen (live gegen den vollen Terminarten-Bestand geprüft, August 2026: u.a.
+// Kaltakquise, Beratung, Vertragstermin, Besichtigung, Geschäftstermin, Objektaufnahme,
+// Telefontermin — keine "Akquise -"-Präfixe). Mit dem Nutzer abgestimmte Zuordnung: "Kaltakquise"
+// als Erstkontakt, "Beratung" als vertiefendes Zweitgespräch, "Vertragstermin" bleibt wie
+// benannt (Chat: "du kannst als 1., 2. und Vertrag als Reihenfolge nehmen").
+export const AKQUISE_TERMINARTEN = {
+  ersttermin: "Kaltakquise",
+  zweittermin: "Beratung",
+  vertragstermin: "Vertragstermin",
+} as const;
+
+// Zählt Termine EINER Terminart eines Mitarbeiters im Zeitraum [von, bis] — dasselbe Muster wie
+// zaehleTermine/zaehleBesichtigungen oben (resourcetype "calendar", datestart/dateend/users),
+// hier mit "art ="-Filter auf genau eine Terminart statt einer Liste. Generisch statt dreier
+// fast identischer Einzelfunktionen, da AKQUISE_TERMINARTEN oben bereits die drei benötigten
+// Werte liefert.
+export async function zaehleTermineNachArt(
+  nutzerNr: string,
+  von: string,
+  bis: string,
+  art: string
+): Promise<number> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "calendar",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id"],
+        listlimit: 1,
+        datestart: von,
+        dateend: bis,
+        users: [Number(nutzerNr)],
+        filter: {
+          art: [{ op: "=", val: art }],
+        },
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
 // Zählt Kunden (Adressen) eines Mitarbeiters mit Adressstatus "Aktiv" (Parameter 5 von 5, siehe
 // Mitarbeiterstatistik.tsx) — reiner Absolut-Snapshot ohne Zeitraum (wie zaehleAktiveObjekte/
 // zaehleObjekteInAufarbeitung oben, siehe Nutzerentscheidung im Chat: kein 30-Tage-/Jahres-Paar

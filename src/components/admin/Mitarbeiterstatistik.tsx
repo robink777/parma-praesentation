@@ -5,7 +5,7 @@ import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { Kontrolle } from "./Kontrolle";
-import { TEAM } from "@/data/unternehmen";
+import { AKQUISE_NAMEN, SETTING_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unternehmen";
 import { Icon } from "@/components/icons/Icon";
 import { formatiereBetrag } from "@/lib/berechnung";
 import {
@@ -66,26 +66,29 @@ function DatenFehltHinweis({ titel }: { titel: string }) {
   );
 }
 
-// Namen der Vertriebs-Mitarbeiter (Chat-Vorgabe: "1. Liste Vertrieb. hier Vanessa, Jacqueline,
-// Kira, Dawid, Axel, Stanimira") — alle übrigen TEAM-Mitglieder (data/unternehmen.ts) landen in
-// der zweiten Liste (siehe teileTeamAuf unten). Exakte Schreibweise wie in TEAM ("Dawid Parma",
-// nicht "David Parma", siehe Kommentar dort).
-const VERTRIEB_NAMEN = [
-  "Vanessa Krifft",
-  "Jacqueline Henot",
-  "Kira Woldt",
-  "Dawid Parma",
-  "Axel Wehmeier",
-  "Stanimira Georgieva",
-];
-
-// Teilt TEAM in die beiden Chat-Vorgabe-Listen auf, jeweils in der bestehenden TEAM-Reihenfolge
-// (data/unternehmen.ts) statt der Nennreihenfolge aus dem Chat — konsistent mit der übrigen,
-// unveränderten Mitarbeiterreihenfolge.
-function teileTeamAuf(): { vertrieb: TeamMitglied[]; weitere: TeamMitglied[] } {
+// Teilt TEAM in die vier Reiter-Listen auf (VERTRIEB_NAMEN/AKQUISE_NAMEN/SETTING_NAMEN, siehe
+// data/unternehmen.ts, August 2026 Chat-Vorgabe: "ich brauche bei Mitarbeiter neben Vertrieb noch
+// zwei weitere Reiter ... Akquise (Daniel, Robin, Axel) und Setting (Sarah, Kathi). Alle anderen
+// Mitarbeiter können als 'weitere Mitarbeiter' gelistet bleiben"), jeweils in der bestehenden
+// TEAM-Reihenfolge statt der Nennreihenfolge aus dem Chat. Axel Wehmeier taucht bewusst sowohl in
+// vertrieb als auch in akquise auf (siehe Kommentar bei AKQUISE_NAMEN) — "weitere" enthält jeden,
+// der in KEINER der drei Listen steht.
+function teileTeamAuf(): {
+  vertrieb: TeamMitglied[];
+  akquise: TeamMitglied[];
+  setting: TeamMitglied[];
+  weitere: TeamMitglied[];
+} {
   const vertrieb = TEAM.filter((m) => VERTRIEB_NAMEN.includes(m.name));
-  const weitere = TEAM.filter((m) => !VERTRIEB_NAMEN.includes(m.name));
-  return { vertrieb, weitere };
+  const akquise = TEAM.filter((m) => AKQUISE_NAMEN.includes(m.name));
+  const setting = TEAM.filter((m) => SETTING_NAMEN.includes(m.name));
+  const weitere = TEAM.filter(
+    (m) =>
+      !VERTRIEB_NAMEN.includes(m.name) &&
+      !AKQUISE_NAMEN.includes(m.name) &&
+      !SETTING_NAMEN.includes(m.name)
+  );
+  return { vertrieb, akquise, setting, weitere };
 }
 
 // Vier Infoboxen mit unternehmensweiten Summen über der Mitarbeitertabelle (Chat-Vorgabe: "Häuser
@@ -191,7 +194,15 @@ function aktuellesJahr(): number {
   return new Date().getFullYear();
 }
 
-function KennzahlenKopfzeile() {
+// "standard" = Vertrieb/Setting/Weitere Mitarbeiter (unverändertes Spaltenschema), "akquise" =
+// eigener Reiter mit anderen Kennzahlen (August 2026 Chat-Vorgabe: "Statt Termine 30T, Termine
+// Jahr, Besichtigung 30T und Besicht. Jahr. Auch aktive Kunden und Verkauf kann raus ...
+// stattdessen: Anzahl Akquise - Ersttermin/-Zweittermin/-Vertragstermin, jeweils 30T und Jahr").
+// Beide Modi haben dieselbe SpaltenANZAHL (8 Datenspalten nach Name), KENNZAHLEN_GRID_COLS bleibt
+// dadurch für beide gültig.
+type KennzahlenModus = "standard" | "akquise";
+
+function KennzahlenKopfzeile({ modus }: { modus: KennzahlenModus }) {
   return (
     <div
       className={`grid ${KENNZAHLEN_GRID_COLS} items-end gap-xs border-b border-anthrazit/10 pb-xs`}
@@ -200,12 +211,25 @@ function KennzahlenKopfzeile() {
       <span className="label">Mitarbeiter</span>
       <span className="label text-left">Aktive Objekte</span>
       <span className="label text-left">Aufarbeitung</span>
-      <span className="label text-left">Termine 30T</span>
-      <span className="label text-left">Termine Jahr</span>
-      <span className="label text-left">Besicht. 30T</span>
-      <span className="label text-left">Besicht. Jahr</span>
-      <span className="label text-left">Kunden aktiv</span>
-      <span className="label text-left">Verkauft</span>
+      {modus === "akquise" ? (
+        <>
+          <span className="label text-left">Erst 30T</span>
+          <span className="label text-left">Erst Jahr</span>
+          <span className="label text-left">Zweit 30T</span>
+          <span className="label text-left">Zweit Jahr</span>
+          <span className="label text-left">Vertrag 30T</span>
+          <span className="label text-left">Vertrag Jahr</span>
+        </>
+      ) : (
+        <>
+          <span className="label text-left">Termine 30T</span>
+          <span className="label text-left">Termine Jahr</span>
+          <span className="label text-left">Besicht. 30T</span>
+          <span className="label text-left">Besicht. Jahr</span>
+          <span className="label text-left">Kunden aktiv</span>
+          <span className="label text-left">Verkauft</span>
+        </>
+      )}
     </div>
   );
 }
@@ -400,26 +424,36 @@ function MitarbeiterObjekte({ name }: { name: string }) {
   );
 }
 
+const LEERE_KENNZAHLEN: MitarbeiterKennzahlen = {
+  aktiveObjekte: null,
+  objekteInAufarbeitung: null,
+  termine30Tage: null,
+  termineJahr: null,
+  besichtigungen30Tage: null,
+  besichtigungenJahr: null,
+  kundenAktiv: null,
+  verkaufteObjekteJahr: null,
+  akquiseErsttermin30Tage: null,
+  akquiseErsttermineJahr: null,
+  akquiseZweittermin30Tage: null,
+  akquiseZweittermineJahr: null,
+  akquiseVertragstermin30Tage: null,
+  akquiseVertragstermineJahr: null,
+};
+
 function KennzahlenZeile({
   mitglied,
   kennzahlen,
+  modus,
 }: {
   mitglied: TeamMitglied;
   kennzahlen?: MitarbeiterKennzahlen;
+  modus: KennzahlenModus;
 }) {
   const [offen, setOffen] = useState(false);
   const [wurdeGeoeffnet, setWurdeGeoeffnet] = useState(false);
 
-  const k = kennzahlen ?? {
-    aktiveObjekte: null,
-    objekteInAufarbeitung: null,
-    termine30Tage: null,
-    termineJahr: null,
-    besichtigungen30Tage: null,
-    besichtigungenJahr: null,
-    kundenAktiv: null,
-    verkaufteObjekteJahr: null,
-  };
+  const k = kennzahlen ?? LEERE_KENNZAHLEN;
 
   function umschalten() {
     setOffen((bisher) => !bisher);
@@ -450,24 +484,49 @@ function KennzahlenZeile({
         <span className="text-left font-mono text-sm text-anthrazit">
           {formatWert(k.objekteInAufarbeitung)}
         </span>
-        <span className="text-left font-mono text-sm text-anthrazit">
-          {formatWert(k.termine30Tage)}
-        </span>
-        <span className="text-left font-mono text-sm text-anthrazit">
-          {formatWert(k.termineJahr)}
-        </span>
-        <span className="text-left font-mono text-sm text-anthrazit">
-          {formatWert(k.besichtigungen30Tage)}
-        </span>
-        <span className="text-left font-mono text-sm text-anthrazit">
-          {formatWert(k.besichtigungenJahr)}
-        </span>
-        <span className="text-left font-mono text-sm text-anthrazit">
-          {formatWert(k.kundenAktiv)}
-        </span>
-        <span className="text-left font-mono text-sm text-anthrazit">
-          {formatWert(k.verkaufteObjekteJahr)}
-        </span>
+        {modus === "akquise" ? (
+          <>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.akquiseErsttermin30Tage)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.akquiseErsttermineJahr)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.akquiseZweittermin30Tage)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.akquiseZweittermineJahr)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.akquiseVertragstermin30Tage)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.akquiseVertragstermineJahr)}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.termine30Tage)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.termineJahr)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.besichtigungen30Tage)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.besichtigungenJahr)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.kundenAktiv)}
+            </span>
+            <span className="text-left font-mono text-sm text-anthrazit">
+              {formatWert(k.verkaufteObjekteJahr)}
+            </span>
+          </>
+        )}
       </div>
       {wurdeGeoeffnet && (
         <div className={`border-t border-anthrazit/5 pl-8 ${offen ? "block" : "hidden"}`}>
@@ -478,29 +537,33 @@ function KennzahlenZeile({
   );
 }
 
-// Eine der beiden Chat-Vorgabe-Listen ("Vertrieb" / "Weitere Mitarbeiter", siehe teileTeamAuf
-// oben) als eigene Karte mit eigener Kopfzeile — dieselbe Tabellenstruktur wie vorher, nur pro
-// Liste einzeln gerendert statt einmal für das gesamte TEAM zusammen.
+// Eine der vier Reiter-Listen (Vertrieb/Akquise/Setting/Weitere Mitarbeiter, siehe teileTeamAuf
+// oben) als eigene Karte mit eigener Kopfzeile — dieselbe Tabellenstruktur für alle vier, nur
+// "modus" schaltet zwischen dem Standard-Spaltenschema und dem Akquise-Spaltenschema um (siehe
+// KennzahlenKopfzeile/KennzahlenZeile oben).
 function MitarbeiterTabelle({
   titel,
   mitglieder,
   kennzahlen,
+  modus = "standard",
 }: {
   titel: string;
   mitglieder: TeamMitglied[];
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
+  modus?: KennzahlenModus;
 }) {
   return (
     <Card>
       <h3 className="mb-sm font-slab text-lg font-bold text-anthrazit">{titel}</h3>
       <div className="overflow-x-auto">
         <div className="flex min-w-[1010px] flex-col">
-          <KennzahlenKopfzeile />
+          <KennzahlenKopfzeile modus={modus} />
           {mitglieder.map((mitglied) => (
             <KennzahlenZeile
               key={mitglied.name}
               mitglied={mitglied}
               kennzahlen={kennzahlen?.[mitglied.name]}
+              modus={modus}
             />
           ))}
         </div>
@@ -509,20 +572,64 @@ function MitarbeiterTabelle({
   );
 }
 
+// Die vier Reiter innerhalb des "Mitarbeiter"-Abschnitts (August 2026 Chat-Vorgabe: "ich brauche
+// bei Mitarbeiter neben Vertrieb noch zwei weitere Reiter ... Akquise ... und Setting ... Alle
+// anderen Mitarbeiter können als 'weitere Mitarbeiter' gelistet bleiben") — bewusst als
+// Reiterleiste statt vier gestapelter Tabellen, damit die kleineren Gruppen (Akquise: 3, Setting:
+// 2, Weitere: 1) nicht zwischen der großen Vertriebstabelle verloren gehen.
+type MitarbeiterReiter = "vertrieb" | "akquise" | "setting" | "weitere";
+
+const MITARBEITER_REITER: { id: MitarbeiterReiter; label: string }[] = [
+  { id: "vertrieb", label: "Vertrieb" },
+  { id: "akquise", label: "Akquise" },
+  { id: "setting", label: "Setting" },
+  { id: "weitere", label: "Weitere Mitarbeiter" },
+];
+
+function MitarbeiterReiterleiste({
+  aktiv,
+  onSelect,
+}: {
+  aktiv: MitarbeiterReiter;
+  onSelect: (reiter: MitarbeiterReiter) => void;
+}) {
+  return (
+    <div className="mb-lg flex flex-wrap gap-xs border-b border-anthrazit/10">
+      {MITARBEITER_REITER.map((reiter) => (
+        <button
+          key={reiter.id}
+          type="button"
+          onClick={() => onSelect(reiter.id)}
+          className={`border-b-2 px-md py-xs text-small font-medium transition-colors ${
+            aktiv === reiter.id
+              ? "border-messing text-anthrazit"
+              : "border-transparent text-anthrazit/50 hover:text-anthrazit"
+          }`}
+        >
+          {reiter.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Grundgerüst der Mitarbeiterstatistik: Zeigt die bestehende TEAM-Liste (data/unternehmen.ts,
 // NICHT alle Live-OnOffice-Nutzer — auf ausdrücklichen Nutzerwunsch, siehe Chat), aufgeteilt in
-// zwei Listen ("Vertrieb" und "Weitere Mitarbeiter", siehe teileTeamAuf/VERTRIEB_NAMEN oben,
-// Chat-Vorgabe), jeweils mit den fünf vereinbarten Auslastungs-Kennzahlen. Die unternehmensweiten
-// Infoboxen (siehe Infoboxen oben, Chat-Vorgabe) und die Mitarbeiter-Tabellen liegen in getrennten,
-// per Sidebar wählbaren Abschnitten (ADMIN_NAV_ITEMS, siehe admin/adminNav.ts) statt einer
-// einzigen langen Scroll-Seite — dieselbe Sidebar-Komponente wie in der Kundenpräsentation
-// (components/layout/Sidebar.tsx), auf Chat-Vorgabe hin: "ich hätte gerne in der Statistik ein
-// identisches Layout wie bei der Präsentation". Eine "Kontrolle"-Seite je Status (Datenqualität,
-// siehe Chat) kommt als weiterer ADMIN_NAV_ITEMS-Eintrag dazu, sobald sie gebaut ist. Die
-// Kennzahlen selbst werden erst in den nächsten Schritten einzeln aus OnOffice geladen (siehe
-// MitarbeiterKennzahlen in types/index.ts) — bis dahin zeigt jede Zelle bewusst "–" statt einer
-// erfundenen Zahl (kennzahlen-Prop optional, fehlt hier vollständig). Die übergebende Seite
-// (app/admin/page.tsx) reicht die Kennzahlen später als Map "Name → MitarbeiterKennzahlen" durch.
+// vier Reiter ("Vertrieb"/"Akquise"/"Setting"/"Weitere Mitarbeiter", siehe teileTeamAuf/
+// VERTRIEB_NAMEN/AKQUISE_NAMEN/SETTING_NAMEN in data/unternehmen.ts). Vertrieb/Setting/Weitere
+// Mitarbeiter zeigen dieselben fünf Auslastungs-Kennzahlen, Akquise zeigt stattdessen die drei
+// Akquise-Terminarten (siehe KennzahlenKopfzeile/KennzahlenZeile, modus="akquise"). Die
+// unternehmensweiten Infoboxen (siehe Infoboxen oben, Chat-Vorgabe) und die Mitarbeiter-Tabellen
+// liegen in getrennten, per Sidebar wählbaren Abschnitten (ADMIN_NAV_ITEMS, siehe
+// admin/adminNav.ts) statt einer einzigen langen Scroll-Seite — dieselbe Sidebar-Komponente wie
+// in der Kundenpräsentation (components/layout/Sidebar.tsx), auf Chat-Vorgabe hin: "ich hätte
+// gerne in der Statistik ein identisches Layout wie bei der Präsentation". Eine
+// "Kontrolle"-Seite je Status (Datenqualität, siehe Chat) kommt als weiterer
+// ADMIN_NAV_ITEMS-Eintrag dazu, sobald sie gebaut ist. Die Kennzahlen selbst werden erst in den
+// nächsten Schritten einzeln aus OnOffice geladen (siehe MitarbeiterKennzahlen in
+// types/index.ts) — bis dahin zeigt jede Zelle bewusst "–" statt einer erfundenen Zahl
+// (kennzahlen-Prop optional, fehlt hier vollständig). Die übergebende Seite (app/admin/page.tsx)
+// reicht die Kennzahlen später als Map "Name → MitarbeiterKennzahlen" durch.
 //
 // Client-Komponente (siehe Chat-Vorgabe: Auf-/Zuklapp-Button je Mitarbeiter mit Objektliste) —
 // jede Zeile lädt ihre Objektliste erst bei Bedarf nach, siehe MitarbeiterObjekte oben.
@@ -535,8 +642,9 @@ export function Mitarbeiterstatistik({
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
   kontrollObjekte?: KontrollObjekt[];
 }) {
-  const { vertrieb, weitere } = teileTeamAuf();
+  const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
   const [abschnitt, setAbschnitt] = useState("uebersicht");
+  const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>("vertrieb");
 
   return (
     <div className="flex h-screen w-screen">
@@ -558,10 +666,28 @@ export function Mitarbeiterstatistik({
               Auslastung des Teams als Entscheidungsgrundlage dafür, wer ein Objekt nach der
               Akquise übernimmt.
             </p>
-            <div className="flex flex-col gap-lg">
+            <MitarbeiterReiterleiste aktiv={mitarbeiterReiter} onSelect={setMitarbeiterReiter} />
+            {mitarbeiterReiter === "vertrieb" && (
               <MitarbeiterTabelle titel="Vertrieb" mitglieder={vertrieb} kennzahlen={kennzahlen} />
-              <MitarbeiterTabelle titel="Weitere Mitarbeiter" mitglieder={weitere} kennzahlen={kennzahlen} />
-            </div>
+            )}
+            {mitarbeiterReiter === "akquise" && (
+              <MitarbeiterTabelle
+                titel="Akquise"
+                mitglieder={akquise}
+                kennzahlen={kennzahlen}
+                modus="akquise"
+              />
+            )}
+            {mitarbeiterReiter === "setting" && (
+              <MitarbeiterTabelle titel="Setting" mitglieder={setting} kennzahlen={kennzahlen} />
+            )}
+            {mitarbeiterReiter === "weitere" && (
+              <MitarbeiterTabelle
+                titel="Weitere Mitarbeiter"
+                mitglieder={weitere}
+                kennzahlen={kennzahlen}
+              />
+            )}
           </SectionShell>
         )}
         {abschnitt === "kontrolle" && (

@@ -292,6 +292,21 @@ export interface MitarbeiterKennzahlen {
   // ("es jedes Jahr zurückgestellt wird", Chat-Vorgabe), ohne dass der Code jährlich angepasst
   // werden muss.
   verkaufteObjekteJahr: number | null;
+  // Nur für Mitarbeiter im Akquise-Reiter berechnet (siehe AKQUISE_NAMEN in data/unternehmen.ts,
+  // August 2026 Chat-Vorgabe: "Anzahl Akquise - Ersttermin (30T und Jahr), Anzahl Akquise -
+  // Zweittermin (30T und Jahr), Anzahl Akquise - Vertragstermin (30T und Jahr)") — für alle
+  // übrigen Mitarbeiter bleiben diese sechs Felder null, um nicht für jeden der elf TEAM-
+  // Mitglieder zusätzliche OnOffice-Kalenderabrufe auszulösen, die nur drei Personen betreffen.
+  // "Ersttermin"/"Zweittermin"/"Vertragstermin" bilden auf die echten OnOffice-Kalender-
+  // Terminarten "Kaltakquise"/"Beratung"/"Vertragstermin" ab (live geprüft, August 2026 — es gibt
+  // keine Terminarten, die wörtlich "Akquise - Ersttermin" o.ä. heißen; diese Zuordnung wurde mit
+  // dem Nutzer abgestimmt, siehe zaehleTermineNachArt/AKQUISE_TERMINARTEN in onoffice/estate.ts).
+  akquiseErsttermin30Tage: number | null;
+  akquiseErsttermineJahr: number | null;
+  akquiseZweittermin30Tage: number | null;
+  akquiseZweittermineJahr: number | null;
+  akquiseVertragstermin30Tage: number | null;
+  akquiseVertragstermineJahr: number | null;
 }
 
 // Einzelnes Objekt in der aufklappbaren Objektliste je Mitarbeiter (Admin-Bereich, siehe
