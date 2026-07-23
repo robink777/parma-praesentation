@@ -21,6 +21,10 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "vergleich", label: "Vergleichswert", icon: "compare" },
   { id: "leistungsversprechen", label: "Leistungsversprechen", icon: "check" },
   { id: "maklervertrag", label: "Maklervertrag", icon: "document" },
+  // Abschlusspunkt der Präsentation (Chat-Vorgabe Juli 2026: "Verabschiedungsfolie") — bewusst
+  // ganz am Ende, da sie thematisch den Termin abschließt und die passenden Ratgeber-Flyer erst
+  // nach dem Maklervertrag mitgegeben werden.
+  { id: "verabschiedung", label: "Verabschiedung", icon: "handshake" },
 ];
 
 // Reihenfolge + Sichtbarkeit EINES Navigationspunkts, wie sie der Berater/die Beraterin live

@@ -15,6 +15,7 @@ import { Dokumente } from "@/components/sections/Dokumente";
 import { Vergleichswert } from "@/components/sections/Vergleichswert";
 import { Leistungsversprechen } from "@/components/sections/Leistungsversprechen";
 import { Maklervertrag } from "@/components/sections/Maklervertrag";
+import { Verabschiedung } from "@/components/sections/Verabschiedung";
 import { waehleVorauswahl } from "@/lib/vergleichswert";
 
 // Anzahl der Vergleichsobjekt-Slots im Vergleichswert-Reiter (Juli 2026 Chat-Vorgabe: "Mache aus
@@ -158,6 +159,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
             gewaehltesPaket={gewaehltesPaket}
           />
         )}
+        {activeId === "verabschiedung" && <Verabschiedung />}
       </main>
     </div>
   );
