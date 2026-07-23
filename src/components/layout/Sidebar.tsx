@@ -12,12 +12,20 @@ import { NavItem, NavZustandEintrag, erstelleStandardNavZustand } from "./nav";
 // admin/adminNav.ts). Chat-Vorgabe August 2026: "ich hätte gerne in der Statistik ein identisches
 // Layout wie bei der Präsentation" — beide Bereiche teilen sich seitdem dieselbe Komponente statt
 // zweier optisch/funktional auseinanderlaufender Nachbauten.
+// Ein Eigentümer/Auftraggeber-Kontakt im "Präsentation für"-Block der Sidebar (siehe
+// kundenKontakte unten) — email/telefon optional, da in onOffice nicht für jede Person gepflegt.
+export interface SidebarKontakt {
+  name: string;
+  email?: string;
+  telefon?: string;
+}
+
 export function Sidebar({
   navItems,
   activeId,
   onSelect,
   logoHref = "/",
-  kundeNamen,
+  kundenKontakte,
 }: {
   navItems: NavItem[];
   activeId: string;
@@ -25,11 +33,11 @@ export function Sidebar({
   // Ziel des Logo-Klicks — Präsentation führt zurück zur Objektauswahl ("/"), der Admin-Bereich
   // übergibt stattdessen "/admin".
   logoHref?: string;
-  // Bei mehreren Eigentümern (Miteigentum, Erbengemeinschaft) eine Zeile pro Person (siehe
-  // PraesentationApp.tsx) — Array statt eines zusammengesetzten Strings, damit hier pro Name ein
-  // eigener <p> gerendert werden kann (untereinander statt in einem Fließtext-Satz). Im
-  // Admin-Bereich schlicht nicht übergeben, der Block dort bleibt dann ausgeblendet.
-  kundeNamen?: string[];
+  // Bei mehreren Eigentümern (Miteigentum, Erbengemeinschaft) ein Block pro Person (siehe
+  // PraesentationApp.tsx) — inkl. E-Mail/Telefon (Chat-Vorgabe: "blende die Mailadresse und
+  // Telefonnummer der Kunden in der dauerhaften Navi links ein"). Im Admin-Bereich schlicht nicht
+  // übergeben, der Block dort bleibt dann ausgeblendet.
+  kundenKontakte?: SidebarKontakt[];
 }) {
   const router = useRouter();
   // Eingeklappter Zustand ist bewusst lokaler Component-State (statt in PraesentationApp
@@ -164,7 +172,7 @@ export function Sidebar({
         </div>
 
         {bearbeitungsModus ? (
-          <div className="flex flex-1 flex-col overflow-y-auto">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <p className="label mb-xs px-sm">Navigation anpassen</p>
             <div className="flex flex-col gap-[2px]">
               {navZustand.map((eintrag, index) => {
@@ -227,7 +235,7 @@ export function Sidebar({
             </div>
           </div>
         ) : (
-          <nav className="flex flex-1 flex-col gap-xs overflow-y-auto">
+          <nav className="flex min-h-0 flex-1 flex-col gap-xs overflow-y-auto">
             {sichtbareNavItems.map((item) => {
               const active = item.id === activeId;
               return (
@@ -278,13 +286,32 @@ export function Sidebar({
           </button>
         </div>
 
-        {!bearbeitungsModus && !eingeklappt && kundeNamen && kundeNamen.length > 0 && (
-          <div className="mt-sm border-t border-sand pt-sm">
-            <p className="label">Präsentation für</p>
-            {kundeNamen.map((name, i) => (
-              <p key={i} className="font-slab text-lg text-anthrazit">
-                {name}
-              </p>
+        {/* max-h + overflow-y-auto statt frei wachsender Höhe: Bei mehreren Eigentümern
+            (Miteigentum/Erbengemeinschaft, bis zu 4 Personen à Name + E-Mail + Telefon, siehe
+            Chat-Vorgabe-Check "bis zu 4 Eigentümer") würde dieser Block sonst die Navigation
+            darüber zusammenstauchen oder unten aus der fest positionierten Sidebar herauslaufen,
+            da "aside" oben eine feste Höhe hat und nur "nav" selbst scrollt. Ein eigener
+            Scroll-Bereich hält den Block bei vielen Personen kompakt, ohne die Nav-Liste zu
+            verdrängen. */}
+        {!bearbeitungsModus && !eingeklappt && kundenKontakte && kundenKontakte.length > 0 && (
+          <div className="mt-sm max-h-[240px] shrink-0 overflow-y-auto border-t border-sand pt-sm">
+            <p className="label mb-xs">Präsentation für</p>
+            {kundenKontakte.map((kontakt, i) => (
+              <div key={i} className={i > 0 ? "mt-sm" : ""}>
+                <p className="truncate font-slab text-lg text-anthrazit">{kontakt.name}</p>
+                {kontakt.email && (
+                  <p className="flex items-center gap-xs text-small text-anthrazit/60">
+                    <Icon name="mail" size={12} className="shrink-0" />
+                    <span className="truncate">{kontakt.email}</span>
+                  </p>
+                )}
+                {kontakt.telefon && (
+                  <p className="flex items-center gap-xs text-small text-anthrazit/60">
+                    <Icon name="phone" size={12} className="shrink-0" />
+                    <span className="truncate">{kontakt.telefon}</span>
+                  </p>
+                )}
+              </div>
             ))}
           </div>
         )}

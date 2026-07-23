@@ -40,12 +40,17 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
   // dieser Komponente losläuft (useEffect unten).
   const [vorauswahlLaedt, setVorauswahlLaedt] = useState(true);
   // Sidebar zeigt bei mehreren Eigentümern (Miteigentum/Erbengemeinschaft) jede Person auf einer
-  // eigenen Zeile (siehe Sidebar.tsx) — bewusst nur Anrede + Nachname (kurz, passt auch bei
-  // mehreren Zeilen in die schmale Sidebar); der vollständige Name (inkl. Vorname) steht weiterhin
-  // auf der Begrüßungsseite, siehe Begruessung.tsx.
-  const kundeNamen = [daten.kunde, ...daten.weitereEigentuemer]
-    .map((k) => [k.anrede, k.nachname].filter(Boolean).join(" "))
-    .filter(Boolean);
+  // eigenen Zeile inkl. E-Mail/Telefon (siehe Sidebar.tsx, Chat-Vorgabe: "blende die Mailadresse
+  // und Telefonnummer der Kunden in der dauerhaften Navi links ein") — Name bewusst nur Anrede +
+  // Nachname (kurz, passt auch bei mehreren Personen in die schmale Sidebar); der vollständige
+  // Name (inkl. Vorname) steht weiterhin auf der Begrüßungsseite, siehe Begruessung.tsx.
+  const kundenKontakte = [daten.kunde, ...daten.weitereEigentuemer]
+    .map((k) => ({
+      name: [k.anrede, k.nachname].filter(Boolean).join(" "),
+      email: k.email,
+      telefon: k.telefon,
+    }))
+    .filter((k) => k.name);
 
   function referenzobjektAendern(index: number, objekt: Immobilie | null) {
     setReferenzobjekte((prev) => prev.map((o, i) => (i === index ? objekt : o)));
@@ -115,7 +120,7 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
 
   return (
     <div className="flex h-screen w-screen">
-      <Sidebar navItems={NAV_ITEMS} activeId={activeId} onSelect={setActiveId} kundeNamen={kundeNamen} />
+      <Sidebar navItems={NAV_ITEMS} activeId={activeId} onSelect={setActiveId} kundenKontakte={kundenKontakte} />
       <main className="flex-1 overflow-hidden bg-reinweiss">
         {activeId === "begruessung" && (
           <Begruessung kunde={daten.kunde} weitereEigentuemer={daten.weitereEigentuemer} />
