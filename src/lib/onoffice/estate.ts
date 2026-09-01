@@ -246,6 +246,12 @@ export interface PriceHubbleWerte {
   marktwertPH?: number;
   marktwertMinPH?: number;
   marktwertMaxPH?: number;
+  // Nicht selbst ein PriceHubble-Feld, sondern das OnOffice-Feld "Bewertungsdatum" (Technische
+  // Angaben > Allgemein, ind_2314_Feld_ObjTech171) — hier bewusst im selben Abruf mitgeladen
+  // (identischer resourcetype "estate"/derselbe Datensatz), um für dieses eine zusätzliche Feld
+  // keinen zweiten API-Roundtrip zu brauchen. Ersetzt den bislang festen Mock-Wert "13.05.2026"
+  // in § 5 des Maklervertrags (Chat-Vorgabe: "Der Wert soll bitte aus OnOffice gezogen werden").
+  stand?: string;
 }
 
 interface RawPriceHubbleRecord {
@@ -254,16 +260,28 @@ interface RawPriceHubbleRecord {
     MPPricehubblePrice?: number | string;
     MPPricehubbleMax?: number | string;
     MPPricehubbleMin?: number | string;
+    ind_2314_Feld_ObjTech171?: string;
   };
 }
 
-// Lädt die automatische PriceHubble-Marktwertschätzung eines Objekts. Live gegen den echten
-// Feldkatalog geprüft (resourcetype "fields", modules "estate", Juli 2026): Die drei Felder
-// sind eigenständige Estate-Datenfelder (nicht Teil von ESTATE_FIELDS in mapping.ts, da die
-// Bewertung im Code als eigenständiges Konzept behandelt wird, siehe Bewertung-Typ) —
-// gepflegt über eine PriceHubble-Anbindung in OnOffice, nicht manuell. Es existiert daneben
-// noch ein viertes Feld "MPPricehubbleConfidence" (Konfidenznote Gering/Mittel/Hoch), das auf
-// Kundenwunsch bewusst NICHT abgerufen/angezeigt wird — nur die drei Wertfelder.
+// OnOffice liefert Datumsfelder als ISO-String ("JJJJ-MM-TT"); "0000-00-00" steht für "nicht
+// gesetzt" (analog zur bestehenden Behandlung von verkauft_am, siehe zaehleVerkaufteObjekte
+// weiter unten in dieser Datei). Wandelt ins im Vertrag/PDF durchgängig verwendete TT.MM.JJJJ um.
+function formatiereOnOfficeDatum(datum?: string): string | undefined {
+  if (!datum || datum === "0000-00-00") return undefined;
+  const [jahr, monat, tag] = datum.split("-");
+  if (!jahr || !monat || !tag) return undefined;
+  return `${tag}.${monat}.${jahr}`;
+}
+
+// Lädt die automatische PriceHubble-Marktwertschätzung eines Objekts sowie das
+// Bewertungsdatum. Live gegen den echten Feldkatalog geprüft (resourcetype "fields", modules
+// "estate", Juli 2026): Die drei PriceHubble-Felder sind eigenständige Estate-Datenfelder
+// (nicht Teil von ESTATE_FIELDS in mapping.ts, da die Bewertung im Code als eigenständiges
+// Konzept behandelt wird, siehe Bewertung-Typ) — gepflegt über eine PriceHubble-Anbindung in
+// OnOffice, nicht manuell. Es existiert daneben noch ein viertes Feld
+// "MPPricehubbleConfidence" (Konfidenznote Gering/Mittel/Hoch), das auf Kundenwunsch bewusst
+// NICHT abgerufen/angezeigt wird — nur die drei Wertfelder plus das Bewertungsdatum.
 export async function ladePriceHubbleWerte(estateId: string): Promise<PriceHubbleWerte | null> {
   const result = await callOnOfficeApi<RawPriceHubbleRecord>([
     {
@@ -273,7 +291,7 @@ export async function ladePriceHubbleWerte(estateId: string): Promise<PriceHubbl
       identifier: "",
       cacheable: false,
       parameters: {
-        data: ["MPPricehubblePrice", "MPPricehubbleMax", "MPPricehubbleMin"],
+        data: ["MPPricehubblePrice", "MPPricehubbleMax", "MPPricehubbleMin", "ind_2314_Feld_ObjTech171"],
       },
     },
   ]);
@@ -286,6 +304,7 @@ export async function ladePriceHubbleWerte(estateId: string): Promise<PriceHubbl
     marktwertPH: el.MPPricehubblePrice !== undefined ? Number(el.MPPricehubblePrice) : undefined,
     marktwertMinPH: el.MPPricehubbleMin !== undefined ? Number(el.MPPricehubbleMin) : undefined,
     marktwertMaxPH: el.MPPricehubbleMax !== undefined ? Number(el.MPPricehubbleMax) : undefined,
+    stand: formatiereOnOfficeDatum(el.ind_2314_Feld_ObjTech171),
   };
 }
 

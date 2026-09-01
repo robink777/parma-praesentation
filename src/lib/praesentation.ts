@@ -38,9 +38,10 @@ export interface PraesentationsParams {
  * onoffice/config.ts) oder der Live-Abruf fehlschlägt, werden Demo-Daten verwendet.
  * Die übrige Bewertung (Sach-/Ertrags-/Vergleichswert) liegt aktuell als PDF vor und wird nicht
  * automatisch aus OnOffice berechnet — das folgt, sobald die nötigen Felder dort gepflegt sind.
- * Einzige Ausnahme: Die drei PriceHubble-Marktwertfelder (siehe ladePriceHubbleWerte) werden
- * bereits live aus OnOffice geladen und im Bewertung-Reiter angezeigt (seit Juli 2026, auf
- * Kundenwunsch — die übrigen Bewertungsfelder wurden dafür im Reiter ausgeblendet).
+ * Ausnahmen: Die drei PriceHubble-Marktwertfelder sowie das Bewertungsdatum (alle über
+ * ladePriceHubbleWerte) werden bereits live aus OnOffice geladen — die drei Marktwertfelder im
+ * Bewertung-Reiter (seit Juli 2026, auf Kundenwunsch — die übrigen Bewertungsfelder wurden dafür
+ * im Reiter ausgeblendet), das Bewertungsdatum in § 5 des Maklervertrags.
  *
  * estateId kann entweder die interne numerische OnOffice-ID sein (z.B. für manuelle
  * Test-Links) oder die öffentliche Objekt-UUID (der künftige Normalfall: Link direkt aus
@@ -147,9 +148,10 @@ export async function ladePraesentationsDaten(
           immobilie,
           // Die übrigen Bewertungsfelder (sachwert/ertragswert/etc.) bleiben MOCK_BEWERTUNG
           // (aktuell weiterhin manuell aus Sprengnetter gepflegt, siehe Bewertung-Typ) — nur
-          // die drei PriceHubble-Felder werden live überschrieben, sofern der Abruf
-          // erfolgreich war (priceHubbleWerte ist null, wenn ladePriceHubbleWerte
-          // fehlgeschlagen ist oder das Objekt keinen Datensatz zurückgibt).
+          // die drei PriceHubble-Felder und das Bewertungsdatum (stand) werden live
+          // überschrieben, sofern der Abruf erfolgreich war (priceHubbleWerte ist null, wenn
+          // ladePriceHubbleWerte fehlgeschlagen ist oder das Objekt keinen Datensatz
+          // zurückgibt — dann bleibt "stand" beim MOCK_BEWERTUNG-Wert).
           bewertung: { ...MOCK_BEWERTUNG, ...priceHubbleWerte },
           betreuer: betreuer || MOCK_BETREUER,
           // Bewusst KEIN Fallback auf einen Mock-Setter bei null (anders als beim Betreuer

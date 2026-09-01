@@ -15,6 +15,13 @@ import { Bewertung, Immobilie, Kunde, LeistungspaketId, MaklervertragDaten, Makl
 // Wandelt einen Kunde (aus onOffice bzw. manuell übergebene addressId) in eine Vertragspartei
 // fürs Formular um — gemeinsam genutzt für auftraggeber1 UND die automatische Vorbefüllung
 // weiterer Eigentümer unten (baueInitialdaten).
+// Deutsches Datumsformat (TT.MM.JJJJ) für die freien Text-Datumsfelder im Vertrag (§ 2
+// Auftragsdauer) — analog zu heute()/formatiereDatumDe in lib/pdf/MandatDokument.tsx, hier lokal
+// gehalten, da bislang kein gemeinsames Datums-Util existiert.
+function formatiereDatumDe(datum: Date): string {
+  return datum.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 function kundeZuPartei(kunde: Kunde): MaklervertragPartei {
   return {
     name: [kunde.anrede, kunde.vorname, kunde.nachname].filter(Boolean).join(" "),
@@ -42,6 +49,15 @@ function baueInitialdaten(
     .filter(Boolean)
     .join(", ");
 
+  // § 2 Auftragsdauer standardmäßig auf "heute bis in 3 Monaten" vorausgefüllt (Chat-Vorgabe:
+  // "immer vorausfüllen mit dem aktuellen Datum bei von: und dann in 3 Monaten das bis Datum") —
+  // deckt sich mit der in Leistungsversprechen genannten Standard-Vertragslaufzeit von drei
+  // Monaten (siehe data/leistungsversprechen.ts, § 09.02). Bleibt wie jedes andere Feld hier
+  // weiterhin frei überschreibbar, falls im Beratungstermin eine andere Laufzeit vereinbart wird.
+  const heuteDatum = new Date();
+  const in3Monaten = new Date(heuteDatum);
+  in3Monaten.setMonth(in3Monaten.getMonth() + 3);
+
   return {
     auftraggeber1: kundeZuPartei(kunde),
     // Automatisch vorbefüllt aus den laut onOffice zusätzlich hinterlegten Eigentümern (siehe
@@ -49,6 +65,8 @@ function baueInitialdaten(
     // Eigentümer bleibt das weiterhin eine leere Liste, genau wie zuvor.
     weitereAuftraggeber: weitereEigentuemer.slice(0, MAX_WEITERE_VORBEFUELLT).map(kundeZuPartei),
     objekt: immobilie.bezeichnung || objektAdresse,
+    auftragsdauerVon: formatiereDatumDe(heuteDatum),
+    auftragsdauerBis: formatiereDatumDe(in3Monaten),
     verkaufsobjektArt: immobilie.objektart,
     verkaufsobjektOrt: objektAdresse,
     startpreis: bewertung.empfohlenerAngebotspreis ?? immobilie.kaufpreis,
@@ -110,15 +128,31 @@ function Blank({
   // (siehe die "flex flex-wrap"-Absätze oben) den verbleibenden Platz einnehmen, erst dadurch
   // greift w-full auf dem Input tatsächlich.
   const istVollbreite = width === "w-full";
+
+  // Lokaler Editier-Puffer statt den Input direkt an "value" zu binden: Felder wie die
+  // Maklerprovision wandeln den getippten Text sofort über Number(...) in eine Zahl um (siehe
+  // onChange-Aufrufer unten in dieser Datei), was "value" bei jedem Tastendruck neu rendert.
+  // Ohne Puffer sprang das Feld bei einem Komma sofort auf den bereits geparsten Wert zurück
+  // (z.B. "3" nach Eingabe von "3,"), sodass ein Komma faktisch nicht eintippbar war (Chat-
+  // Vorgabe: "kann man im Eingabefeld kein Komma setzen"). Mit dem Puffer zeigt das Feld exakt
+  // den zuletzt getippten Text, bis es den Fokus verliert — erst dann wird wieder vom
+  // übergebenen "value" übernommen (z.B. nach einer Formatierung durch den Aufrufer).
+  const [entwurf, setEntwurf] = useState<string | null>(null);
+  const angezeigterWert = entwurf ?? (value ?? "");
+
   return (
     <span
       className={`inline-flex items-baseline gap-xs align-baseline ${istVollbreite ? "flex-1" : ""}`}
     >
       <input
         type="text"
-        value={value ?? ""}
+        value={angezeigterWert}
         placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          setEntwurf(e.target.value);
+          onChange(e.target.value);
+        }}
+        onBlur={() => setEntwurf(null)}
         className={`${INPUT_CLASS} ${width} px-xs py-[2px]`}
       />
       {suffix && <span className="text-anthrazit/70">{suffix}</span>}

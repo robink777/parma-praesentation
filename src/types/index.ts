@@ -129,6 +129,10 @@ export interface Bewertung {
   ertragswert?: number;
   vergleichswert?: number;
   empfohlenerAngebotspreis?: number;
+  // Live aus OnOffice geladen (Feld "Bewertungsdatum" unter Technische Angaben > Allgemein,
+  // ind_2314_Feld_ObjTech171, siehe ladePriceHubbleWerte in onoffice/estate.ts) — nicht mehr
+  // der frühere feste Mock-Wert. Wird u.a. in § 5 des Maklervertrags als "Wertermittlung vom"
+  // angezeigt (siehe Maklervertrag.tsx).
   stand?: string;
   pdfUrl?: string;
   berechnetAutomatisch: boolean;
@@ -143,8 +147,9 @@ export interface Bewertung {
   wertermittlung?: WertermittlungsDaten;
   // Automatische Marktwertschätzung von PriceHubble, live aus den OnOffice-Estate-Feldern
   // MPPricehubblePrice/-Min/-Max geladen (siehe ladePriceHubbleWerte in onoffice/estate.ts).
-  // Anders als die übrigen Felder oben (aktuell manuell aus Sprengnetter gepflegt) ist das
-  // hier die einzige tatsächlich live aus OnOffice geladene Bewertungsgröße.
+  // Anders als die übrigen Felder oben (aktuell manuell aus Sprengnetter gepflegt) sind das
+  // (zusammen mit "stand" oben) die einzigen tatsächlich live aus OnOffice geladenen
+  // Bewertungsgrößen.
   marktwertPH?: number;
   marktwertMinPH?: number;
   marktwertMaxPH?: number;
