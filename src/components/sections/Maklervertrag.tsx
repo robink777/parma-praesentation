@@ -22,6 +22,15 @@ function formatiereDatumDe(datum: Date): string {
   return datum.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+// Tausenderpunkt-Formatierung ohne Währungszeichen für die Anzeige im Startpreis-Feld (Chat-
+// Vorgabe: "genau wie bei Preis des Wartens (auch so ausgeschrieben 000.000)") — bewusst ohne
+// "€", da das Feld bereits ein eigenes €-Suffix daneben hat (siehe Blank-Aufruf für startpreis
+// weiter unten); anders als formatiereBetrag in lib/berechnung.ts (dort inkl. "€", genutzt in
+// PreisDesWartens.tsx), das hier doppelt anzeigen würde.
+function formatiereTausender(betrag: number): string {
+  return new Intl.NumberFormat("de-DE").format(betrag);
+}
+
 function kundeZuPartei(kunde: Kunde): MaklervertragPartei {
   return {
     name: [kunde.anrede, kunde.vorname, kunde.nachname].filter(Boolean).join(" "),
@@ -78,7 +87,13 @@ function baueInitialdaten(
     // Immobilie.objektart/-typ, mapping.ts).
     verkaufsobjektArt: [immobilie.objektart, immobilie.objekttyp].filter(Boolean).join(" · "),
     verkaufsobjektOrt: objektAdresse,
-    startpreis: bewertung.empfohlenerAngebotspreis ?? immobilie.kaufpreis,
+    // Direkt der Kaufpreis aus onOffice (Chat-Vorgabe: "Ich hätte hier gerne den Kaufpreis aus
+    // onoffice") — vorher stand hier "bewertung.empfohlenerAngebotspreis ?? immobilie.kaufpreis":
+    // empfohlenerAngebotspreis kommt (anders als der Anschein durch das ?? erweckte) aktuell
+    // noch nie live aus onOffice, sondern immer aus MOCK_BEWERTUNG (siehe lib/praesentation.ts,
+    // nur die drei PriceHubble-Felder und "stand" werden dort live überschrieben) — der Vorschlag
+    // stand deshalb bislang unabhängig vom Objekt immer fest auf 542.000 €.
+    startpreis: immobilie.kaufpreis,
     wertermittlungVom: bewertung.stand,
     keineMaengelBekannt: false,
   };
@@ -430,7 +445,7 @@ export function Maklervertrag({
         <p className="flex flex-wrap items-baseline gap-xs">
           <span>Der vereinbarte Startpreis beträgt</span>
           <Blank
-            value={daten.startpreis}
+            value={daten.startpreis !== undefined ? formatiereTausender(daten.startpreis) : undefined}
             onChange={(v) => update("startpreis", Number(v.replace(/\D/g, "")) || undefined)}
             suffix="€"
             width="w-32"
