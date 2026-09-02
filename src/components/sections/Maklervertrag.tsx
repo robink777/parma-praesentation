@@ -45,7 +45,10 @@ function baueInitialdaten(
   immobilie: Immobilie,
   bewertung: Bewertung
 ): MaklervertragDaten {
-  const objektAdresse = [immobilie.strasse, [immobilie.plz, immobilie.ort].filter(Boolean).join(" ")]
+  // Straße + Hausnummer als eine Zeile (analog zu formatAdresse in Objektdaten.tsx) — vorher
+  // fehlte die Hausnummer hier, obwohl sie als eigenes Feld vorliegt (siehe Immobilie.hausnummer).
+  const strasseZeile = [immobilie.strasse, immobilie.hausnummer].filter(Boolean).join(" ");
+  const objektAdresse = [strasseZeile, [immobilie.plz, immobilie.ort].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(", ");
 
@@ -64,10 +67,16 @@ function baueInitialdaten(
     // Praesentation.weitereEigentuemer, lib/praesentation.ts) — im Mock-Modus bzw. bei nur einem
     // Eigentümer bleibt das weiterhin eine leere Liste, genau wie zuvor.
     weitereAuftraggeber: weitereEigentuemer.slice(0, MAX_WEITERE_VORBEFUELLT).map(kundeZuPartei),
-    objekt: immobilie.bezeichnung || objektAdresse,
+    // Genaue Adresse statt Objekttitel (Chat-Vorgabe: "Hier hätte ich gerne die genaue Adresse")
+    // — Titel bleibt nur Fallback, falls die Adresse (noch) nicht vollständig gepflegt ist.
+    objekt: objektAdresse || immobilie.bezeichnung,
     auftragsdauerVon: formatiereDatumDe(heuteDatum),
     auftragsdauerBis: formatiereDatumDe(in3Monaten),
-    verkaufsobjektArt: immobilie.objektart,
+    // Objektart (grobe Kategorie, z.B. "Haus") UND Objekttyp (genauer, z.B.
+    // "Einfamilienhaus"/"Doppelhaushälfte") gemeinsam (Chat-Vorgabe: "hier hätte ich noch gerne
+    // den Objekttyp") — beide Felder sind in OnOffice unabhängig voneinander gepflegt (siehe
+    // Immobilie.objektart/-typ, mapping.ts).
+    verkaufsobjektArt: [immobilie.objektart, immobilie.objekttyp].filter(Boolean).join(" · "),
     verkaufsobjektOrt: objektAdresse,
     startpreis: bewertung.empfohlenerAngebotspreis ?? immobilie.kaufpreis,
     wertermittlungVom: bewertung.stand,
