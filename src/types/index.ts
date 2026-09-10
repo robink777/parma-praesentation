@@ -49,6 +49,12 @@ export interface Immobilie {
   // da es dort nicht angezeigt wird, aber trotzdem für alle Estate-Abrufe mitgeladen wird (ein
   // zusätzliches, ungenutztes Feld schadet nicht, siehe ESTATE_FIELDS in mapping.ts).
   verkauftAm?: string;
+  // Roher OnOffice-Status-2-Schlüssel (z.B. "verkauft", "aktive_vermarktung") — wie verkauftAm
+  // nur für die Referenzobjekt-Suche im Vergleichswert-Reiter relevant, dort um zwischen
+  // bereits verkauften und aktuell in Vermarktung befindlichen Vergleichsobjekten zu
+  // unterscheiden (Chat-Vorgabe September 2026: "auch die Immobilien ... die wir aktuell in
+  // der Vermarktung haben, nicht nur die Verkauften"). Siehe /api/onoffice/route.ts.
+  status2?: string;
   // Objektspezifischer Link zur DeepImmo-Plattform (OnOffice-Individualfeld
   // "DeepImmo-Link" unter "Technische Daten", Feldkatalog-Id ind_3450_Feld_ObjTech540 —
   // vom Kunden im Juli 2026 selbst angelegt, siehe DeepImmo.tsx). Wird pro Objekt manuell in

@@ -9,11 +9,13 @@ import { Immobilie } from "@/types";
 import { formatiereBetrag } from "@/lib/berechnung";
 
 // Kleine Trefferliste beim Fokussieren des leeren Suchfelds — analog zu ObjektAuswahl.tsx,
-// dort aber "zuletzt angelegt", hier (verkauft=1) "zuletzt verkauft".
+// dort aber "zuletzt angelegt", hier (vergleichspool=1) "zuletzt erstellt" aus dem Pool
+// verkaufter und aktiv vermarkteter Objekte.
 const NEUESTE_LIMIT = 10;
 // Hohes Limit für die eigentliche Freitextsuche, siehe Begründung in /api/onoffice/route.ts —
-// mit nur 232 verkauften Objekten insgesamt (Live-Account, Juli 2026) genügt hier deutlich
-// weniger als das dortige RAW_LISTLIMIT für den vollen "kauf"-Bestand.
+// mit nur 261 Objekten insgesamt im Vergleichspool (verkauft + aktiv vermarktet, Live-Account,
+// September 2026) genügt hier deutlich weniger als das dortige RAW_LISTLIMIT für den vollen
+// "kauf"-Bestand.
 const LISTLIMIT = 250;
 
 function berechneMittelwerte(objekte: Immobilie[]) {
@@ -79,11 +81,13 @@ function ReferenzobjektSlot({
     setLaden(true);
     setFehler(null);
     try {
-      // verkauft=1: Serverseitig auf status2=verkauft gefiltert (siehe /api/onoffice/route.ts) —
-      // die Suchmaske soll ausschließlich tatsächlich verkaufte Referenzobjekte anbieten.
+      // vergleichspool=1: Serverseitig auf status2 in [verkauft, aktive_vermarktung] gefiltert
+      // (siehe /api/onoffice/route.ts) — die Suchmaske soll sowohl bereits verkaufte als auch
+      // aktuell aktiv vermarktete Referenzobjekte anbieten (Chat-Vorgabe September 2026: "auch
+      // die Immobilien ... die wir aktuell in der Vermarktung haben, nicht nur die Verkauften").
       const params = query
-        ? new URLSearchParams({ limit: String(LISTLIMIT), suche: query, verkauft: "1" })
-        : new URLSearchParams({ limit: String(NEUESTE_LIMIT), neueste: "1", verkauft: "1" });
+        ? new URLSearchParams({ limit: String(LISTLIMIT), suche: query, vergleichspool: "1" })
+        : new URLSearchParams({ limit: String(NEUESTE_LIMIT), neueste: "1", vergleichspool: "1" });
 
       const res = await fetch(`/api/onoffice?${params}`);
       const data = await res.json();
@@ -140,11 +144,17 @@ function ReferenzobjektSlot({
           {!!objekt.baujahr && ` · Baujahr ${objekt.baujahr}`}
         </p>
         <p className="font-slab text-xl font-bold text-walnuss">{formatiereBetrag(objekt.kaufpreis)}</p>
-        {objekt.verkauftAm && (
+        {/* Unterscheidet für die Beraterin/den Berater auf einen Blick, ob der angezeigte
+            Kaufpreis ein tatsächlich erzielter Verkaufspreis oder ein aktueller Angebotspreis
+            ist — seit der Vergleichspool beides umfasst (Chat-Vorgabe September 2026), sonst
+            nicht mehr aus der Karte allein ersichtlich. */}
+        {objekt.verkauftAm ? (
           <p className="mt-xs text-small text-anthrazit/50">
             Verkauft am {new Date(objekt.verkauftAm).toLocaleDateString("de-DE")}
           </p>
-        )}
+        ) : objekt.status2 === "aktive_vermarktung" ? (
+          <p className="mt-xs text-small text-anthrazit/50">Aktuell in Vermarktung</p>
+        ) : null}
       </Card>
     );
   }
@@ -158,7 +168,7 @@ function ReferenzobjektSlot({
           value={suche}
           onChange={(e) => setSuche(e.target.value)}
           onFocus={handleFokus}
-          placeholder="Verkauftes Objekt suchen …"
+          placeholder="Vergleichsobjekt suchen …"
           className="w-full max-w-[220px] rounded-md border-2 border-asche bg-reinweiss px-sm py-xs text-center text-small text-anthrazit outline-none transition-colors placeholder:text-anthrazit/40 focus:border-messing"
         />
       </Card>
@@ -176,7 +186,7 @@ function ReferenzobjektSlot({
             </div>
           ) : ergebnisse.filter((o) => !ausgeschlosseneIds.includes(o.id)).length === 0 ? (
             <div className="py-lg text-center text-small text-anthrazit/50">
-              Keine verkauften Objekte gefunden.
+              Keine Vergleichsobjekte gefunden.
             </div>
           ) : (
             <ul>
@@ -215,14 +225,18 @@ function ReferenzobjektSlot({
   );
 }
 
-// Referenzobjekt-Auswahl: Der Berater/die Beraterin wählt bis zu sechs tatsächlich verkaufte
-// Vergleichsobjekte aus dem echten OnOffice-Bestand aus (Suchmaske gefiltert auf status2=verkauft,
-// siehe /api/onoffice/route.ts). Eine frühere automatische Ähnlichkeits-Bewertung gegen einen
-// festen Demo-Objektpool lieferte keine zum jeweiligen Kundenobjekt passenden Treffer und wurde
-// deshalb komplett ersetzt (Juli 2026) — die Auswahl war seitdem rein manuell.
+// Referenzobjekt-Auswahl: Der Berater/die Beraterin wählt bis zu sechs Vergleichsobjekte aus dem
+// echten OnOffice-Bestand aus (Suchmaske gefiltert auf status2 in [verkauft, aktive_vermarktung],
+// siehe /api/onoffice/route.ts) — bewusst nicht mehr nur tatsächlich verkaufte Objekte (Chat-
+// Vorgabe September 2026: "auch die Immobilien ... die wir aktuell in der Vermarktung haben,
+// nicht nur die Verkauften"), da bei manchen Objekttypen/Lagen zu wenige abgeschlossene Verkäufe
+// vorliegen, um allein daraus einen belastbaren Vergleich zu bilden. Eine frühere automatische
+// Ähnlichkeits-Bewertung gegen einen festen Demo-Objektpool lieferte keine zum jeweiligen
+// Kundenobjekt passenden Treffer und wurde deshalb komplett ersetzt (Juli 2026) — die Auswahl war
+// seitdem rein manuell.
 // Seit Juli 2026 gibt es zusätzlich wieder eine automatische VORAUSWAHL (siehe
 // lib/vergleichswert.ts, waehleVorauswahl, aufgerufen aus PraesentationApp.tsx): Sie arbeitet
-// diesmal gegen den echten verkauften Bestand statt eines Demo-Pools und nutzt eine explizit
+// gegen denselben echten Vergleichspool statt eines Demo-Pools und nutzt eine explizit
 // vorgegebene, kaskadierende Filterlogik (PLZ exakt → Wohnfläche/Baujahr/Kaufpreis mit Toleranz)
 // statt eines pauschalen Ähnlichkeits-Scores. Sie befüllt nur den leeren Ausgangszustand — die
 // hier implementierte manuelle Suche bleibt unverändert vollständig erhalten, jede Auswahl (ob
@@ -265,12 +279,12 @@ export function Vergleichswert({
   const zeigeLadeplatzhalter = vorauswahlLaedt && ausgewaehlt.length === 0;
 
   return (
-    <SectionShell label="Marktvergleich" title="Vergleichbare, verkaufte Objekte">
+    <SectionShell label="Marktvergleich" title="Vergleichbare Objekte">
       <p className="mb-lg max-w-[65ch] text-body text-anthrazit/80">
-        Wir haben bereits bis zu sechs passende, tatsächlich verkaufte Objekte vorausgewählt (nach
-        PLZ, Wohnfläche, Baujahr und Kaufpreis) — Sie können die Auswahl jederzeit anpassen oder
-        gegen ein anderes Objekt aus dem Bestand austauschen. Die Suchmaske zeigt ausschließlich
-        abgeschlossene Verkäufe, keine aktuell angebotenen Objekte.
+        Wir haben bereits bis zu sechs passende Objekte vorausgewählt (nach PLZ, Wohnfläche,
+        Baujahr und Kaufpreis) — Sie können die Auswahl jederzeit anpassen oder gegen ein anderes
+        Objekt aus dem Bestand austauschen. Die Suchmaske zeigt sowohl bereits verkaufte als auch
+        aktuell aktiv vermarktete Objekte.
       </p>
 
       {mittelwerte && (

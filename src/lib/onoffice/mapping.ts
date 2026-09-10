@@ -39,6 +39,10 @@ export interface RawEstateRecord {
     // benötigt (siehe Vergleichswert.tsx), der Einfachheit halber aber für alle Estate-Abrufe
     // mitgeladen statt eines separaten Feldsatzes nur für diesen einen Anwendungsfall.
     verkauft_am?: string;
+    // Roher Status-2-Schlüssel (siehe Immobilie.status2) — wie verkauft_am nur für die
+    // Referenzobjekt-Suche im Vergleichswert-Reiter benötigt, der Einfachheit halber aber für
+    // alle Estate-Abrufe mitgeladen.
+    status2?: string;
     // "DeepImmo-Link" — Individualfeld unter "Technische Daten", vom Kunden im Juli 2026 selbst
     // in OnOffice angelegt (resourcetype "fields" geprüft: ind_3450_Feld_ObjTech540, Freitext).
     // Wird objektspezifisch manuell gepflegt und ist deshalb bei den meisten Objekten (Stand
@@ -68,6 +72,7 @@ export const ESTATE_FIELDS = [
   "befeuerung",
   "objektbeschreibung",
   "verkauft_am",
+  "status2",
   "ind_3450_Feld_ObjTech540",
 ];
 
@@ -215,7 +220,13 @@ export function mapEstateRecord(record: RawEstateRecord): Immobilie {
     heizungsart: el.heizungsart && el.heizungsart.length > 0 ? labelListe(el.heizungsart, HEIZUNGSART_LABELS) : undefined,
     befeuerung: el.befeuerung && el.befeuerung.length > 0 ? labelListe(el.befeuerung, BEFEUERUNG_LABELS) : undefined,
     objektbeschreibung: el.objektbeschreibung,
-    verkauftAm: el.verkauft_am || undefined,
+    // "0000-00-00" ist OnOffices Platzhalter für "nicht gesetzt" (analog zur Behandlung von
+    // verkauft_am/auftragvon in estate.ts) — kommt seit der Erweiterung der Vergleichswert-
+    // Referenzobjektsuche um aktiv vermarktete (noch nicht verkaufte) Objekte häufiger vor und
+    // führte dort ohne diese Prüfung zu "Verkauft am Invalid Date" (new Date("0000-00-00")),
+    // siehe Vergleichswert.tsx.
+    verkauftAm: el.verkauft_am && el.verkauft_am !== "0000-00-00" ? el.verkauft_am : undefined,
+    status2: el.status2 || undefined,
     deepImmoLink: el.ind_3450_Feld_ObjTech540 || undefined,
   };
 }

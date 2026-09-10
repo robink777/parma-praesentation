@@ -1023,12 +1023,13 @@ export async function ladeBetreuerUndAlleMitarbeiter(
 // Zählt Objekte mit status2=verkauft für die "Verkaufte Objekte"-Kennzahl im "Über uns"-Reiter
 // (siehe Unternehmen.tsx). Bewusst listlimit: 1 statt der vollen Liste — es wird ausschließlich
 // meta.cntabsolute aus der Antwort gelesen, die einzelnen Datensätze werden nicht benötigt.
-// status2=verkauft ist dasselbe Feld/derselbe Wert, der bereits für die
-// Vergleichswert-Referenzobjektsuche verwendet wird (siehe route.ts, "nurVerkaufte"-Filter) —
-// dort zusätzlich mit vermarktungsart=kauf kombiniert, um verkaufte Vermietungsobjekte
-// auszuschließen. Für die reine Zählung "wie viele Objekte hat Parma insgesamt verkauft" ist das
-// bewusst NICHT gewünscht (ein Objekt bleibt verkauft, unabhängig von der Vermarktungsart) — live
-// gegen den Account geprüft, Juli 2026: 234 Objekte mit status2=verkauft.
+// status2=verkauft ist derselbe Feldwert, der auch Teil des Vergleichspool-Filters der
+// Vergleichswert-Referenzobjektsuche ist (siehe route.ts, "nurVergleichsobjekte"-Filter — dort
+// zusätzlich noch status2=aktive_vermarktung sowie vermarktungsart=kauf kombiniert). Für die
+// reine Zählung "wie viele Objekte hat Parma insgesamt verkauft" bleibt es bewusst NUR bei
+// status2=verkauft ohne die übrigen Einschränkungen (ein Objekt bleibt verkauft, unabhängig von
+// der Vermarktungsart) — live gegen den Account geprüft, Juli 2026: 234 Objekte mit
+// status2=verkauft.
 export async function zaehleVerkaufteObjekte(): Promise<number> {
   const result = await callOnOfficeApi([
     {

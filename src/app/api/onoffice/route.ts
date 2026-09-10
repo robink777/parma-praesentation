@@ -51,9 +51,12 @@ export async function GET(request: NextRequest) {
   // gezielt nur die zuletzt angelegten Objekte erscheinen.
   const neueste = searchParams.get("neueste") === "1";
   // Wird von der Referenzobjekt-Suche im Vergleichswert-Reiter gesetzt (siehe Vergleichswert.tsx)
-  // — dort sollen ausschließlich bereits verkaufte Objekte auswählbar sein, damit der
-  // Vergleichswert auf echten Verkaufspreisen statt aktueller Angebotspreise basiert.
-  const nurVerkaufte = searchParams.get("verkauft") === "1";
+  // — dort sollen ausschließlich als Vergleichsobjekt taugliche Objekte auswählbar sein: bereits
+  // verkaufte (echte Verkaufspreise) UND aktuell aktiv vermarktete (aktuelle Angebotspreise),
+  // siehe Filter unten. Chat-Vorgabe September 2026: "auch die Immobilien ... die wir aktuell in
+  // der Vermarktung haben, nicht nur die Verkauften" — vorher (bis dahin "nurVerkaufte") wurden
+  // ausschließlich verkaufte Objekte angeboten.
+  const nurVergleichsobjekte = searchParams.get("vergleichspool") === "1";
 
   if (ONOFFICE_MODE !== "live") {
     if (id) {
@@ -63,10 +66,11 @@ export async function GET(request: NextRequest) {
         : NextResponse.json({ error: "Immobilie nicht gefunden" }, { status: 404 });
     }
 
-    // Der Mock-Pool trägt keinen echten Verkaufsstatus — im Demo-Modus dient MOCK_VERGLEICHSPOOL
-    // (fiktive, aber plausible Referenzobjekte) unverändert auch als Ersatz für "verkaufte
-    // Objekte", damit die Referenzobjekt-Suche ohne Live-Zugang durchgängig testbar bleibt.
-    const pool = nurVerkaufte ? MOCK_VERGLEICHSPOOL : MOCK_OBJEKTE;
+    // Der Mock-Pool trägt keinen echten Verkaufs-/Vermarktungsstatus — im Demo-Modus dient
+    // MOCK_VERGLEICHSPOOL (fiktive, aber plausible Referenzobjekte) unverändert auch als Ersatz
+    // für den Vergleichspool (verkauft + aktiv vermarktet), damit die Referenzobjekt-Suche ohne
+    // Live-Zugang durchgängig testbar bleibt.
+    const pool = nurVergleichsobjekte ? MOCK_VERGLEICHSPOOL : MOCK_OBJEKTE;
     const suchbegriff = suche?.toLowerCase().trim();
     const gefiltert = suchbegriff ? pool.filter((i) => treffer(i, suchbegriff)) : pool;
 
@@ -95,26 +99,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(immobilie);
     }
 
-    // Filter für die Referenzobjekt-Suche (nurVerkaufte): status2=verkauft ist das einzige Feld,
-    // das ein Objekt eindeutig als tatsächlich verkauft markiert (Live-Feldkatalog geprüft, Juli
-    // 2026 — vermarktungsart unterscheidet nur Kauf/Miete/Pacht/Erbpacht, nicht den Abschlussstatus).
-    // Zusätzlich vermarktungsart=kauf, damit keine als "verkauft" markierten Vermietungsobjekte
-    // hineinrutschen (232 Objekte insgesamt mit status2=verkauft, gegen den Live-Account geprüft).
-    const filter = nurVerkaufte
-      ? { status2: [{ op: "=", val: "verkauft" }], vermarktungsart: [{ op: "=", val: "kauf" }] }
+    // Filter für die Referenzobjekt-Suche (nurVergleichsobjekte): status2 in [verkauft,
+    // aktive_vermarktung] deckt beide als Vergleichsobjekt tauglichen Zustände ab — tatsächlich
+    // verkauft (echter Verkaufspreis) ODER aktuell aktiv vermarktet (aktueller Angebotspreis),
+    // siehe permitted_values von status2 (Live-Feldkatalog geprüft, September 2026). Andere
+    // status2-Werte (z.B. "in_akquise", "reserviert", "vorbereitung") bleiben bewusst außen vor
+    // — dort ist noch kein belastbarer Markt-/Verkaufspreis vorhanden. Zusätzlich weiterhin
+    // vermarktungsart=kauf, damit keine Vermietungsobjekte hineinrutschen.
+    const filter = nurVergleichsobjekte
+      ? {
+          status2: [{ op: "in", val: ["verkauft", "aktive_vermarktung"] }],
+          vermarktungsart: [{ op: "=", val: "kauf" }],
+        }
       : { vermarktungsart: [{ op: "=", val: "kauf" }] };
 
-    // Klick auf die leere Suchleiste: gezielter, kleiner Abruf der zuletzt angelegten
-    // bzw. (nurVerkaufte) zuletzt verkauften Objekte. Bewusst ein eigener, direkter Abruf mit
-    // dem gewünschten limit (statt wie unten erst den vollen Bestand zu laden und zu kürzen) —
-    // ladeImmobilien() paginiert ohnehin nur, wenn limit über ONOFFICE_MAX_LISTLIMIT liegt, für
-    // die hier üblichen 10 Treffer genügt ein einzelner Request.
+    // Klick auf die leere Suchleiste: gezielter, kleiner Abruf der zuletzt angelegten Objekte.
+    // Bewusst ein eigener, direkter Abruf mit dem gewünschten limit (statt wie unten erst den
+    // vollen Bestand zu laden und zu kürzen) — ladeImmobilien() paginiert ohnehin nur, wenn
+    // limit über ONOFFICE_MAX_LISTLIMIT liegt, für die hier üblichen 10 Treffer genügt ein
+    // einzelner Request. Sortierung immer nach erstellt_am DESC (auch für den Vergleichspool):
+    // verkauft_am wäre bei aktiv vermarkteten, noch nicht verkauften Objekten leer und würde die
+    // Sortierung dieser Objekte untereinander unvorhersehbar machen.
     if (neueste) {
-      const immobilien = await ladeImmobilien(
-        limit,
-        filter,
-        nurVerkaufte ? { verkauft_am: "DESC" } : { erstellt_am: "DESC" }
-      );
+      const immobilien = await ladeImmobilien(limit, filter, { erstellt_am: "DESC" });
       return NextResponse.json(await mitTitelbildern(immobilien));
     }
 
@@ -126,9 +133,10 @@ export async function GET(request: NextRequest) {
     // 1500 statt vorher 500: Der Account hat aktuell 1023 Objekte mit vermarktungsart=kauf
     // (gegen den Live-Account geprüft) — mit 500 wäre rund die Hälfte des Bestands für die
     // Suche unsichtbar gewesen. 1500 lässt zusätzlich Luft für weiteres Wachstum. Für
-    // nurVerkaufte reichen die vollen 500 (ONOFFICE_MAX_LISTLIMIT) einer einzigen Seite, da nur
-    // 232 Objekte mit status2=verkauft existieren (gegen den Live-Account geprüft, Juli 2026).
-    const RAW_LISTLIMIT = nurVerkaufte ? 500 : 1500;
+    // nurVergleichsobjekte reichen die vollen 500 (ONOFFICE_MAX_LISTLIMIT) einer einzigen Seite:
+    // 261 Objekte mit status2 in [verkauft, aktive_vermarktung] UND vermarktungsart=kauf (gegen
+    // den Live-Account geprüft, September 2026).
+    const RAW_LISTLIMIT = nurVergleichsobjekte ? 500 : 1500;
     const immobilien = await ladeImmobilien(RAW_LISTLIMIT, filter);
 
     const suchbegriff = suche?.toLowerCase().trim();
