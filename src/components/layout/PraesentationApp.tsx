@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
-import { NAV_ITEMS } from "./nav";
+import { NAV_ITEMS, useNavZustand } from "./nav";
+import { Vorbereitungsmodus } from "./Vorbereitungsmodus";
 import { Immobilie, LeistungspaketId, Praesentation } from "@/types";
 import { Begruessung } from "@/components/sections/Begruessung";
 import { Kontaktperson } from "@/components/sections/Kontaktperson";
@@ -24,8 +25,25 @@ import { waehleVorauswahl } from "@/lib/vergleichswert";
 // synchron gehalten werden muss.
 const ANZAHL_REFERENZOBJEKTE = 6;
 
-export function PraesentationApp({ daten }: { daten: Praesentation }) {
+export function PraesentationApp({
+  daten,
+  readOnly = false,
+}: {
+  daten: Praesentation;
+  // Gesetzt für den geteilten, unveränderbaren Kunden-Link (siehe app/geteilt/page.tsx,
+  // lib/share.ts) — überspringt den Vorbereitungsmodus komplett (der Kunde sieht direkt das vom
+  // Berater/von der Beraterin fertig konfigurierte Ergebnis) und blendet die
+  // Bearbeitungsmöglichkeiten in der Sidebar aus (siehe bearbeitungErlaubt-Prop dort).
+  readOnly?: boolean;
+}) {
   const [activeId, setActiveId] = useState("begruessung");
+  // Vorbereitungsmodus (siehe Vorbereitungsmodus.tsx) steht der eigentlichen Präsentation
+  // voran, bis der Berater/die Beraterin "Präsentation starten" klickt — unabhängig davon, ob
+  // die Präsentation über die Objektauswahl oder einen direkten OnOffice-Link (estateId in der
+  // URL) aufgerufen wurde. Im readOnly-Modus (geteilter Kunden-Link) entfällt dieser Schritt
+  // komplett, da die Konfiguration dort bereits feststeht.
+  const [praesentationGestartet, setPraesentationGestartet] = useState(readOnly);
+  const { navZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(NAV_ITEMS);
   const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>();
   // Referenzobjekte im Vergleichswert-Reiter (siehe Vergleichswert.tsx) — hier (statt lokal im
   // Reiter selbst) gehalten, damit die Auswahl beim Wechsel zwischen Reitern erhalten bleibt,
@@ -83,6 +101,14 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
   // `prev.every(...)`-Check unten verhindert ohnehin ein doppeltes Anwenden des Vorschlags, falls
   // beide Durchläufe tatsächlich abschließen sollten.
   useEffect(() => {
+    // Im readOnly-Modus (geteilter Kunden-Link) bringt initialConfig bereits eine feststehende
+    // Auswahl mit (siehe lib/share.ts) — die automatische Vorauswahl soll diese nicht
+    // überschreiben, der Ladezustand wird sofort beendet.
+    if (readOnly) {
+      setVorauswahlLaedt(false);
+      return;
+    }
+
     let abgebrochen = false;
 
     async function ladeVorauswahl() {
@@ -119,9 +145,38 @@ export function PraesentationApp({ daten }: { daten: Praesentation }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (!praesentationGestartet) {
+    return (
+      <Vorbereitungsmodus
+        titel={daten.immobilie.bezeichnung}
+        kundenNamen={kundenKontakte.map((k) => k.name)}
+        immobilie={daten.immobilie}
+        referenzobjekte={referenzobjekte}
+        onReferenzobjektAendern={referenzobjektAendern}
+        vorauswahlLaedt={vorauswahlLaedt}
+        navItems={NAV_ITEMS}
+        navZustand={navZustand}
+        onVerschieben={verschieben}
+        onUmschalten={umschalten}
+        onZuruecksetzen={zuruecksetzen}
+        onStart={() => setPraesentationGestartet(true)}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen">
-      <Sidebar navItems={NAV_ITEMS} activeId={activeId} onSelect={setActiveId} kundenKontakte={kundenKontakte} />
+      <Sidebar
+        navItems={NAV_ITEMS}
+        activeId={activeId}
+        onSelect={setActiveId}
+        kundenKontakte={kundenKontakte}
+        navZustand={navZustand}
+        onVerschieben={verschieben}
+        onUmschalten={umschalten}
+        onZuruecksetzen={zuruecksetzen}
+        bearbeitungErlaubt={!readOnly}
+      />
       <main className="flex-1 overflow-hidden bg-reinweiss">
         {activeId === "begruessung" && (
           <Begruessung kunde={daten.kunde} weitereEigentuemer={daten.weitereEigentuemer} />

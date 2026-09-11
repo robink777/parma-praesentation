@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { IconName } from "@/components/icons/Icon";
 
 export interface NavItem {
@@ -51,4 +52,42 @@ export interface NavZustandEintrag {
 // components/admin/adminNav.ts).
 export function erstelleStandardNavZustand(navItems: NavItem[]): NavZustandEintrag[] {
   return navItems.map((item) => ({ id: item.id, sichtbar: true }));
+}
+
+// Hochgehobene Variante der früher in Sidebar.tsx lokalen navZustand-Logik (Reihenfolge/
+// Sichtbarkeit) — als Hook statt reinem lokalem State, damit sowohl PraesentationApp.tsx (dort
+// jetzt zusätzlich vom vorgeschalteten Vorbereitungsmodus genutzt, siehe Vorbereitungsmodus.tsx,
+// und für die "Präsentation teilen"-Konfiguration relevant, siehe lib/share.ts) als auch
+// Mitarbeiterstatistik.tsx (Admin-Bereich, unverändertes Verhalten) dieselbe Logik verwenden,
+// ohne sie zu duplizieren. Sidebar.tsx selbst hält den navZustand seitdem nicht mehr lokal,
+// sondern bekommt ihn (und die Handler) als kontrollierte Props von der jeweiligen Elternseite.
+export function useNavZustand(navItems: NavItem[]) {
+  const [navZustand, setNavZustand] = useState<NavZustandEintrag[]>(() =>
+    erstelleStandardNavZustand(navItems)
+  );
+
+  const verschieben = (index: number, richtung: -1 | 1) => {
+    setNavZustand((prev) => {
+      const ziel = index + richtung;
+      if (ziel < 0 || ziel >= prev.length) return prev;
+      const kopie = [...prev];
+      [kopie[index], kopie[ziel]] = [kopie[ziel], kopie[index]];
+      return kopie;
+    });
+  };
+
+  // Mindestens ein Punkt muss sichtbar bleiben — sonst hätte die Präsentation keine erreichbare
+  // Seite mehr und activeId liefe ins Leere.
+  const umschalten = (id: string) => {
+    setNavZustand((prev) => {
+      const sichtbareAnzahl = prev.filter((e) => e.sichtbar).length;
+      return prev.map((e) =>
+        e.id === id && !(e.sichtbar && sichtbareAnzahl <= 1) ? { ...e, sichtbar: !e.sichtbar } : e
+      );
+    });
+  };
+
+  const zuruecksetzen = () => setNavZustand(erstelleStandardNavZustand(navItems));
+
+  return { navZustand, setNavZustand, verschieben, umschalten, zuruecksetzen };
 }

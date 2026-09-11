@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { useNavZustand } from "@/components/layout/nav";
 import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { Kontrolle } from "./Kontrolle";
 import { Leadquellen } from "./Leadquellen";
@@ -789,6 +790,10 @@ export function Mitarbeiterstatistik({
   const [abschnitt, setAbschnitt] = useState("uebersicht");
   const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>("vertrieb");
   const [zeitraum, setZeitraum] = useState<Zeitraum>("Jahr");
+  // navZustand liegt seit der Extraktion des Vorbereitungsmodus (Kundenpräsentation, siehe
+  // PraesentationApp.tsx) als geteilter Hook statt als Sidebar-internem State vor (nav.ts,
+  // useNavZustand) — hier unverändert nur lokal für den Admin-Bereich genutzt.
+  const { navZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(ADMIN_NAV_ITEMS);
 
   return (
     <div className="flex h-screen w-screen">
@@ -797,7 +802,15 @@ export function Mitarbeiterstatistik({
           (siehe app/admin/layout.tsx, AdminSessionWaechter: meldet die Admin-Session beim
           Verlassen des Layouts automatisch ab). Ersetzt den früheren separaten
           "Zurück zur Startseite"-Link in app/admin/page.tsx. */}
-      <Sidebar navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
+      <Sidebar
+        navItems={ADMIN_NAV_ITEMS}
+        activeId={abschnitt}
+        onSelect={setAbschnitt}
+        navZustand={navZustand}
+        onVerschieben={verschieben}
+        onUmschalten={umschalten}
+        onZuruecksetzen={zuruecksetzen}
+      />
       <main className="flex-1 overflow-hidden bg-reinweiss">
         {abschnitt === "uebersicht" && (
           <SectionShell label="Admin-Bereich" title="Auf einen Blick">

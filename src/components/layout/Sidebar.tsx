@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
-import { NavItem, NavZustandEintrag, erstelleStandardNavZustand } from "./nav";
+import { NavItem, NavZustandEintrag } from "./nav";
+import { NavZustandBearbeiten } from "./NavZustandBearbeiten";
 
 // Wiederverwendbare Sidebar-Chrome (Logo, Ein-/Ausklappen, Bearbeitungsmodus für Reihenfolge/
 // Sichtbarkeit) — genutzt sowohl von der Kundenpräsentation (PraesentationApp.tsx, NAV_ITEMS aus
@@ -26,6 +27,15 @@ export function Sidebar({
   onSelect,
   logoHref = "/",
   kundenKontakte,
+  navZustand,
+  onVerschieben,
+  onUmschalten,
+  onZuruecksetzen,
+  // Blendet das Zahnrad (Bearbeitungsmodus-Zugang) aus — für den geteilten, unveränderbaren
+  // Kunden-Link (siehe PraesentationApp.tsx readOnly-Prop, lib/share.ts): Der Kunde soll die
+  // vom Berater/von der Beraterin im Vorbereitungsmodus getroffene Auswahl nicht mehr ändern
+  // können.
+  bearbeitungErlaubt = true,
 }: {
   navItems: NavItem[];
   activeId: string;
@@ -38,6 +48,15 @@ export function Sidebar({
   // Telefonnummer der Kunden in der dauerhaften Navi links ein"). Im Admin-Bereich schlicht nicht
   // übergeben, der Block dort bleibt dann ausgeblendet.
   kundenKontakte?: SidebarKontakt[];
+  // Reihenfolge + Sichtbarkeit der Navigationspunkte — seit dem Vorbereitungsmodus (siehe
+  // Vorbereitungsmodus.tsx) kontrollierter Zustand der jeweiligen Elternseite (useNavZustand-
+  // Hook, siehe nav.ts) statt lokalem State hier, damit Vorbereitungsmodus und Sidebar dieselbe
+  // Auswahl teilen.
+  navZustand: NavZustandEintrag[];
+  onVerschieben: (index: number, richtung: -1 | 1) => void;
+  onUmschalten: (id: string) => void;
+  onZuruecksetzen: () => void;
+  bearbeitungErlaubt?: boolean;
 }) {
   const router = useRouter();
   // Eingeklappter Zustand ist bewusst lokaler Component-State (statt in PraesentationApp
@@ -49,16 +68,6 @@ export function Sidebar({
   // Breite wegzunehmen (siehe Mobile-Bug: Sidebar verschmälerte den Content auf < 100px).
   const [mobilOffen, setMobilOffen] = useState(false);
 
-  // Reihenfolge + Sichtbarkeit der Navigationspunkte, live während der Präsentation anpassbar
-  // (Chat-Vorgabe: "die Möglichkeit die Reihenfolge der Navigation live bei jedem Objekt
-  // anzupassen und einzelne Punkte ein und auszublenden je nach Kunde"). Bewusst lokaler
-  // Component-State ohne Persistierung (kein localStorage/Backend) — die Sidebar mountet pro
-  // Präsentation/Objekt frisch (siehe app/page.tsx), der Zustand startet dadurch automatisch
-  // wieder beim Default (alle Punkte sichtbar, Reihenfolge aus navItems), ohne dass eine
-  // Anpassung für Kunde A versehentlich bei Kunde B weiterlebt.
-  const [navZustand, setNavZustand] = useState<NavZustandEintrag[]>(() =>
-    erstelleStandardNavZustand(navItems)
-  );
   const [bearbeitungsModus, setBearbeitungsModus] = useState(false);
 
   const handleSelect = (id: string) => {
@@ -73,29 +82,6 @@ export function Sidebar({
     if (!bearbeitungsModus && eingeklappt) setEingeklappt(false);
     setBearbeitungsModus((v) => !v);
   };
-
-  const verschieben = (index: number, richtung: -1 | 1) => {
-    setNavZustand((prev) => {
-      const ziel = index + richtung;
-      if (ziel < 0 || ziel >= prev.length) return prev;
-      const kopie = [...prev];
-      [kopie[index], kopie[ziel]] = [kopie[ziel], kopie[index]];
-      return kopie;
-    });
-  };
-
-  // Mindestens ein Punkt muss sichtbar bleiben — sonst hätte die Präsentation keine erreichbare
-  // Seite mehr und activeId liefe ins Leere.
-  const umschalten = (id: string) => {
-    setNavZustand((prev) => {
-      const sichtbareAnzahl = prev.filter((e) => e.sichtbar).length;
-      return prev.map((e) =>
-        e.id === id && !(e.sichtbar && sichtbareAnzahl <= 1) ? { ...e, sichtbar: !e.sichtbar } : e
-      );
-    });
-  };
-
-  const zuruecksetzen = () => setNavZustand(erstelleStandardNavZustand(navItems));
 
   // Springt automatisch auf den ersten sichtbaren Punkt, falls der gerade aktive Punkt während
   // der Bearbeitung ausgeblendet wird — sonst zeigt der Content-Bereich weiter eine Seite, die
@@ -171,68 +157,17 @@ export function Sidebar({
           </button>
         </div>
 
-        {bearbeitungsModus ? (
+        {bearbeitungsModus && bearbeitungErlaubt ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <p className="label mb-xs px-sm">Navigation anpassen</p>
-            <div className="flex flex-col gap-[2px]">
-              {navZustand.map((eintrag, index) => {
-                const item = navItems.find((i) => i.id === eintrag.id);
-                if (!item) return null;
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-xs rounded-md px-sm py-xs ${
-                      eintrag.sichtbar ? "text-walnuss" : "text-walnuss/40"
-                    }`}
-                  >
-                    <Icon name={item.icon} size={16} className="shrink-0" />
-                    <span className="flex-1 truncate text-[13px]">{item.label}</span>
-                    <button
-                      type="button"
-                      onClick={() => verschieben(index, -1)}
-                      disabled={index === 0}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-reinweiss/60 disabled:opacity-20"
-                      title="Nach oben verschieben"
-                    >
-                      <Icon name="chevronUp" size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => verschieben(index, 1)}
-                      disabled={index === navZustand.length - 1}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-reinweiss/60 disabled:opacity-20"
-                      title="Nach unten verschieben"
-                    >
-                      <Icon name="chevronDown" size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => umschalten(item.id)}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm hover:bg-reinweiss/60"
-                      title={eintrag.sichtbar ? "Ausblenden" : "Einblenden"}
-                    >
-                      <Icon name={eintrag.sichtbar ? "eye" : "eyeOff"} size={14} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-sm flex items-center justify-between gap-xs border-t border-sand px-sm pt-sm">
-              <button
-                type="button"
-                onClick={zuruecksetzen}
-                className="text-[13px] text-walnuss/60 underline-offset-2 hover:text-walnuss hover:underline"
-              >
-                Zurücksetzen
-              </button>
-              <button
-                type="button"
-                onClick={() => setBearbeitungsModus(false)}
-                className="rounded-md bg-walnuss px-sm py-xs text-[13px] font-medium text-reinweiss transition-colors hover:bg-anthrazit"
-              >
-                Fertig
-              </button>
-            </div>
+            <NavZustandBearbeiten
+              navItems={navItems}
+              navZustand={navZustand}
+              onVerschieben={onVerschieben}
+              onUmschalten={onUmschalten}
+              onZuruecksetzen={onZuruecksetzen}
+              onFertig={() => setBearbeitungsModus(false)}
+            />
           </div>
         ) : (
           <nav className="flex min-h-0 flex-1 flex-col gap-xs overflow-y-auto">
@@ -274,16 +209,18 @@ export function Sidebar({
           >
             <Icon name={eingeklappt ? "chevronRight" : "chevronLeft"} size={18} />
           </button>
-          <button
-            type="button"
-            onClick={toggleBearbeitungsModus}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-reinweiss/60 ${
-              bearbeitungsModus ? "bg-reinweiss text-walnuss" : "text-walnuss/60 hover:text-walnuss"
-            }`}
-            title={bearbeitungsModus ? "Bearbeitung schließen" : "Navigation anpassen"}
-          >
-            <Icon name="settings" size={18} />
-          </button>
+          {bearbeitungErlaubt && (
+            <button
+              type="button"
+              onClick={toggleBearbeitungsModus}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-reinweiss/60 ${
+                bearbeitungsModus ? "bg-reinweiss text-walnuss" : "text-walnuss/60 hover:text-walnuss"
+              }`}
+              title={bearbeitungsModus ? "Bearbeitung schließen" : "Navigation anpassen"}
+            >
+              <Icon name="settings" size={18} />
+            </button>
+          )}
         </div>
 
         {/* max-h + overflow-y-auto statt frei wachsender Höhe: Bei mehreren Eigentümern
