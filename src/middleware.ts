@@ -4,6 +4,7 @@ import {
   istGueltigesAdminSessionToken,
   istGueltigesSessionToken,
   SESSION_COOKIE_NAME,
+  shareSignaturIstGueltig,
 } from "@/lib/auth";
 
 // Schützt die komplette App (Seiten UND API-Routen) hinter dem einen gemeinsamen Passwort aus
@@ -21,6 +22,35 @@ import {
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const istApiPfad = request.nextUrl.pathname.startsWith("/api/");
+
+  // Geteilter, unveränderbarer Kunden-Präsentationslink (siehe lib/share.ts, app/geteilt/
+  // page.tsx, Chat-Vorgabe September 2026: "Präsentation teilen") — der Kunde kennt das interne
+  // App-Passwort nicht. /geteilt selbst immer durchlassen: Die Seite prüft die Signatur (d/sig-
+  // Query-Parameter) selbst noch einmal und zeigt bei Ungültigkeit eine eigene, kundenfreundliche
+  // "Link ungültig"-Meldung statt der internen Login-Seite, die der Kunde nicht kennt.
+  if (request.nextUrl.pathname === "/geteilt") {
+    return NextResponse.next();
+  }
+
+  // Die vom geteilten Link herunterladbaren PDF-Dokumente (siehe app/api/pdf/*) sind dagegen
+  // reine API-Routen ohne Seiten-Fallback — hier direkt entscheiden: entweder die normale
+  // Session (Berater/in ruft die Vorschau selbst auf) oder ein gültiges d/sig-Paar (Kunde ohne
+  // Login). Bewusst auf dieses eine Pfad-Präfix beschränkt (nicht global) — ein gültiges d/sig-
+  // Paar soll nicht versehentlich auch andere geschützte Routen wie /api/onoffice oder /admin
+  // öffnen.
+  if (request.nextUrl.pathname.startsWith("/api/pdf/")) {
+    const hatSession = await istGueltigesSessionToken(token);
+    const hatShareZugriff =
+      hatSession ||
+      (await shareSignaturIstGueltig(
+        request.nextUrl.searchParams.get("d") ?? "",
+        request.nextUrl.searchParams.get("sig")
+      ));
+    if (!hatShareZugriff) {
+      return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
 
   if (!(await istGueltigesSessionToken(token))) {
     // API-Routen bekommen bei fehlendem/ungültigem Login bewusst einen 401 statt einer

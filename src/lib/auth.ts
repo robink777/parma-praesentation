@@ -80,6 +80,28 @@ export async function istGueltigesSessionToken(token: string | undefined): Promi
   return zeitkonstantGleich(signatur, erwarteteSignatur);
 }
 
+// Signatur für den geteilten, unveränderbaren Kunden-Präsentationslink (siehe lib/share.ts,
+// app/geteilt/page.tsx, Chat-Vorgabe September 2026: "Die geteilte Präsentation müsste
+// unveränderbar sein"). Anders als die Session-Tokens oben KEIN Cookie, sondern Teil der
+// URL selbst: Der Link enthält die vom Berater/von der Beraterin getroffene Konfiguration
+// (ausgewählte Vergleichsobjekte, Navigationspunkte, siehe PraesentationConfig in lib/share.ts)
+// als Base64url-kodierte Payload plus diese Signatur — die Middleware lässt Requests mit
+// gültiger Signatur ohne das reguläre APP_PASSWORD durch (siehe middleware.ts), ohne dass der
+// Kunde das interne Team-Passwort kennen muss. Gleiches HMAC-Schema wie oben, eigenes
+// Nachrichten-Präfix ("parma-share:" statt "parma-session:"), AUTH_SECRET wiederverwendet.
+// Bewusst ohne Ablaufzeitstempel (anders als die Session-Tokens) — ein einmal geteilter Link
+// soll nicht von selbst ungültig werden, solange der Berater/die Beraterin ihn nicht durch einen
+// neuen ersetzt.
+export async function erzeugeShareSignatur(payload: string): Promise<string> {
+  return hmac(`parma-share:${payload}`);
+}
+
+export async function shareSignaturIstGueltig(payload: string, signatur: string | null): Promise<boolean> {
+  if (!signatur) return false;
+  const erwarteteSignatur = await erzeugeShareSignatur(payload);
+  return zeitkonstantGleich(signatur, erwarteteSignatur);
+}
+
 // Zweite, unabhängige Zugriffssperre für den Admin-Bereich (Mitarbeiterstatistik, siehe
 // app/admin/*) — bewusst ein GANZ EIGENES Passwort (Umgebungsvariable ADMIN_PASSWORD) und ein
 // eigenes Session-Cookie, damit nicht jede Person mit App-weitem Zugriff (siehe oben) automatisch

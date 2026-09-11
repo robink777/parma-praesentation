@@ -5,6 +5,7 @@ import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
 import { MAKLER_KONTAKT } from "@/data/makler";
 import { LEISTUNGSPAKETE } from "@/data/leistungsversprechen";
+import { NavZustandEintrag } from "@/components/layout/nav";
 import { Bewertung, Immobilie, Kunde, LeistungspaketId, MaklervertragDaten, MaklervertragPartei } from "@/types";
 
 // Baut die Erstbefüllung des Formulars aus den vorhandenen Präsentationsdaten (Kunde,
@@ -219,6 +220,9 @@ export function Maklervertrag({
   immobilie,
   bewertung,
   gewaehltesPaket,
+  referenzobjekte,
+  navZustand,
+  readOnly = false,
 }: {
   kunde: Kunde;
   // Zusätzliche Eigentümer/innen desselben Objekts (siehe Praesentation.weitereEigentuemer) —
@@ -228,13 +232,23 @@ export function Maklervertrag({
   immobilie: Immobilie;
   bewertung: Bewertung;
   gewaehltesPaket?: LeistungspaketId;
+  // Für "Präsentation teilen" unten (siehe praesentationTeilen) — die im Vorbereitungsmodus
+  // bzw. währenddessen live angepasste Auswahl (siehe PraesentationApp.tsx), die der Share-Link
+  // exakt reproduzieren muss.
+  referenzobjekte: (Immobilie | null)[];
+  navZustand: NavZustandEintrag[];
+  // Geteilter, unveränderbarer Kunden-Link (siehe PraesentationApp.tsx, lib/share.ts) — das
+  // Formular wird komplett schreibgeschützt (siehe <fieldset disabled> unten) und "Präsentation
+  // teilen" entfällt (ein geteilter Link soll nicht seinerseits weiterteilbar sein).
+  readOnly?: boolean;
 }) {
   const [daten, setDaten] = useState<MaklervertragDaten>(() =>
     baueInitialdaten(kunde, weitereEigentuemer, immobilie, bewertung)
   );
-  const [mandatErteilt, setMandatErteilt] = useState(false);
-  const [pdfWirdErstellt, setPdfWirdErstellt] = useState(false);
-  const [pdfFehler, setPdfFehler] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareWirdErstellt, setShareWirdErstellt] = useState(false);
+  const [shareFehler, setShareFehler] = useState<string | null>(null);
+  const [linkKopiert, setLinkKopiert] = useState(false);
 
   function update<K extends keyof MaklervertragDaten>(key: K, value: MaklervertragDaten[K]) {
     setDaten((d) => ({ ...d, [key]: value }));
@@ -272,51 +286,66 @@ export function Maklervertrag({
     }));
   }
 
-  // Erstellt bei "Mandat erteilen" automatisch das PDF (Leistungsversprechen mit gewähltem
-  // Paket + vollständiger Maklervertrag mit allen Kunden- und Objektdaten) über die
-  // serverseitige Rendering-Route und stößt direkt den Download an — ohne Zwischenschritt für
-  // den Berater/die Beraterin im Kundentermin.
-  async function mandatErteilen() {
-    setPdfFehler(null);
-    setPdfWirdErstellt(true);
+  // Erzeugt den unveränderbaren, signierten Präsentations-Link (Chat-Vorgabe September 2026:
+  // "Die jetzige Funktion 'Mandat erteilen' macht so keinen Sinn ... An der Stelle würde es Sinn
+  // machen die ganze Präsentation zu teilen") — ersetzt den bisherigen PDF-Download an dieser
+  // Stelle. Einzelne Dokumente (Maklervertrag, Leistungsversprechen, Datenschutz,
+  // Gesamtpräsentation) lassen sich stattdessen auf der Verabschiedungsseite herunterladen,
+  // sowohl hier live als auch im geteilten Link selbst (siehe Verabschiedung.tsx).
+  async function praesentationTeilen() {
+    setShareFehler(null);
+    setShareWirdErstellt(true);
     try {
-      const res = await fetch("/api/mandat-pdf", {
+      const res = await fetch("/api/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kunde, immobilie, bewertung, daten, gewaehltesPaket }),
+        body: JSON.stringify({
+          estateId: immobilie.id,
+          referenzobjektIds: referenzobjekte.filter((o): o is Immobilie => o !== null).map((o) => o.id),
+          navZustand,
+          gewaehltesPaket,
+        }),
       });
 
       if (!res.ok) {
         const fehlerdaten = await res.json().catch(() => null);
-        throw new Error(fehlerdaten?.error || "PDF konnte nicht erstellt werden");
+        throw new Error(fehlerdaten?.error || "Link konnte nicht erstellt werden");
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const nachname = kunde.nachname?.replace(/[^a-zA-Z0-9äöüÄÖÜß-]+/g, "_") || "Kunde";
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `Mandat_${nachname}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-
-      setMandatErteilt(true);
+      const { url } = await res.json();
+      setShareLink(url);
     } catch (error) {
-      setPdfFehler(error instanceof Error ? error.message : "PDF konnte nicht erstellt werden");
+      setShareFehler(error instanceof Error ? error.message : "Link konnte nicht erstellt werden");
     } finally {
-      setPdfWirdErstellt(false);
+      setShareWirdErstellt(false);
+    }
+  }
+
+  async function linkKopieren() {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setLinkKopiert(true);
+      setTimeout(() => setLinkKopiert(false), 2000);
+    } catch {
+      // Clipboard-API kann in manchen Kontexten fehlschlagen (z.B. kein sicherer Kontext) — der
+      // Link steht als Text ohnehin sichtbar im Feld, notfalls manuell markierbar.
     }
   }
 
   return (
     <SectionShell label="Vertrag" title="Maklervertrag">
       <p className="mb-lg w-full text-body text-anthrazit/80">
-        Die Vertragsdaten sind aus Ihren Objekt- und Kundendaten vorausgefüllt. Alle Felder
-        lassen sich hier direkt im Gespräch anpassen und ergänzen.
+        {readOnly
+          ? "Diese Vertragsdaten wurden im Beratungstermin gemeinsam festgelegt."
+          : "Die Vertragsdaten sind aus Ihren Objekt- und Kundendaten vorausgefüllt. Alle Felder lassen sich hier direkt im Gespräch anpassen und ergänzen."}
       </p>
 
+      {/* Schreibgeschützt im geteilten Kunden-Link (readOnly) — <fieldset disabled> deaktiviert
+          mit einem einzigen Attribut alle enthaltenen Formularelemente (input/textarea/button),
+          statt jedes der zahlreichen Felder in § 1–12 einzeln bedingt zu rendern. Randlos
+          gestylt, damit vom nativen <fieldset> optisch nichts zu sehen ist. */}
+      <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
       {/* Vertragsparteien */}
       <div className="mb-md grid grid-cols-1 gap-sm md:grid-cols-2">
         <Card>
@@ -620,27 +649,46 @@ export function Maklervertrag({
           <div className="border-t border-asche pt-xs text-small text-anthrazit/70">Maklerin/Makler</div>
         </div>
       </Card>
+      </fieldset>
 
-      {mandatErteilt ? (
-        <p className="flex items-center gap-sm text-body font-medium text-anthrazit">
-          <Icon name="check" size={20} className="text-messing" />
-          Mandat erteilt — das PDF wurde erstellt und heruntergeladen.
-        </p>
+      {!readOnly && (shareLink ? (
+        <div className="rounded-md bg-stein p-md">
+          <p className="mb-sm flex items-center gap-sm text-body font-medium text-anthrazit">
+            <Icon name="check" size={20} className="text-messing" />
+            Präsentation freigegeben — der Kunde kann diesen Link unveränderbar öffnen.
+          </p>
+          <div className="flex flex-wrap items-center gap-sm">
+            <input
+              type="text"
+              readOnly
+              value={shareLink}
+              onFocus={(e) => e.target.select()}
+              className="min-w-0 flex-1 rounded-sm border border-asche bg-reinweiss px-sm py-xs text-small text-anthrazit outline-none"
+            />
+            <button
+              type="button"
+              onClick={linkKopieren}
+              className="shrink-0 rounded-md bg-walnuss px-md py-xs text-small font-medium text-reinweiss transition-colors hover:bg-anthrazit"
+            >
+              {linkKopiert ? "Kopiert!" : "Link kopieren"}
+            </button>
+          </div>
+        </div>
       ) : (
         <>
           <button
-            onClick={mandatErteilen}
-            disabled={pdfWirdErstellt}
+            onClick={praesentationTeilen}
+            disabled={shareWirdErstellt}
             className="flex items-center gap-sm rounded-md bg-messing px-lg py-sm font-medium text-reinweiss disabled:opacity-60"
           >
-            {pdfWirdErstellt && (
+            {shareWirdErstellt && (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-reinweiss/40 border-t-reinweiss" />
             )}
-            {pdfWirdErstellt ? "PDF wird erstellt …" : "Mandat erteilen"}
+            {shareWirdErstellt ? "Link wird erstellt …" : "Präsentation teilen"}
           </button>
-          {pdfFehler && <p className="mt-sm text-small text-anthrazit/80">Fehler: {pdfFehler}</p>}
+          {shareFehler && <p className="mt-sm text-small text-anthrazit/80">Fehler: {shareFehler}</p>}
         </>
-      )}
+      ))}
     </SectionShell>
   );
 }

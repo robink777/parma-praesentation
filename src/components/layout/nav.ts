@@ -61,9 +61,12 @@ export function erstelleStandardNavZustand(navItems: NavItem[]): NavZustandEintr
 // Mitarbeiterstatistik.tsx (Admin-Bereich, unverändertes Verhalten) dieselbe Logik verwenden,
 // ohne sie zu duplizieren. Sidebar.tsx selbst hält den navZustand seitdem nicht mehr lokal,
 // sondern bekommt ihn (und die Handler) als kontrollierte Props von der jeweiligen Elternseite.
-export function useNavZustand(navItems: NavItem[]) {
-  const [navZustand, setNavZustand] = useState<NavZustandEintrag[]>(() =>
-    erstelleStandardNavZustand(navItems)
+// "initial" überschreibt den Default (alle Punkte sichtbar) — genutzt vom geteilten Kunden-Link
+// (siehe app/geteilt/page.tsx, PraesentationApp.tsx), der genau die im Vorbereitungsmodus
+// getroffene Auswahl reproduzieren muss statt wieder bei "alles sichtbar" zu starten.
+export function useNavZustand(navItems: NavItem[], initial?: NavZustandEintrag[]) {
+  const [navZustand, setNavZustand] = useState<NavZustandEintrag[]>(
+    () => initial ?? erstelleStandardNavZustand(navItems)
   );
 
   const verschieben = (index: number, richtung: -1 | 1) => {

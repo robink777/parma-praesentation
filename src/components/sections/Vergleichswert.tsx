@@ -41,11 +41,16 @@ function ReferenzobjektSlot({
   ausgeschlosseneIds,
   onAuswaehlen,
   onEntfernen,
+  readOnly = false,
 }: {
   objekt: Immobilie | null;
   ausgeschlosseneIds: string[];
   onAuswaehlen: (objekt: Immobilie) => void;
   onEntfernen: () => void;
+  // Geteilter Kunden-Link (siehe PraesentationApp.tsx, lib/share.ts) — die Auswahl ist dort
+  // unveränderbar, das "Entfernen"-Icon entfällt. Leere Slots erscheinen im readOnly-Modus
+  // ohnehin nicht (siehe Vergleichswert-Export unten), daher betrifft das nur gefüllte Karten.
+  readOnly?: boolean;
 }) {
   const [suche, setSuche] = useState("");
   const [ergebnisse, setErgebnisse] = useState<Immobilie[]>([]);
@@ -124,14 +129,16 @@ function ReferenzobjektSlot({
   if (objekt) {
     return (
       <Card className="relative">
-        <button
-          type="button"
-          onClick={onEntfernen}
-          aria-label="Referenzobjekt entfernen"
-          className="absolute right-sm top-sm rounded-full bg-reinweiss p-xs text-anthrazit/50 transition-colors hover:text-anthrazit"
-        >
-          <Icon name="close" size={16} />
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={onEntfernen}
+            aria-label="Referenzobjekt entfernen"
+            className="absolute right-sm top-sm rounded-full bg-reinweiss p-xs text-anthrazit/50 transition-colors hover:text-anthrazit"
+          >
+            <Icon name="close" size={16} />
+          </button>
+        )}
         <PropertyImage
           src={objekt.bildUrl}
           alt={objekt.bezeichnung}
@@ -248,6 +255,7 @@ export function Vergleichswert({
   referenzobjekte,
   onReferenzobjektAendern,
   vorauswahlLaedt,
+  readOnly = false,
 }: {
   // Das zu bewertende Kundenobjekt selbst (nicht Teil der Vergleichsobjekte) — wird für die
   // Hochrechnung unten gebraucht (Juli 2026 Chat-Vorgabe: "rechne den durchschnittlichen €/m2
@@ -260,6 +268,11 @@ export function Vergleichswert({
   // kompakte Größe) statt der leeren Suchmasken gezeigt — vorher gab es hier gar keine visuelle
   // Rückmeldung, dass im Hintergrund noch etwas lädt.
   vorauswahlLaedt: boolean;
+  // Geteilter, unveränderbarer Kunden-Link (siehe PraesentationApp.tsx, lib/share.ts) — leere
+  // Slots (Suchmaske) entfallen komplett, gefüllte Karten verlieren ihr "Entfernen"-Icon (siehe
+  // ReferenzobjektSlot). Diese Sektion wird nicht nur im Vergleichswert-Reiter, sondern auch
+  // unverändert im Vorbereitungsmodus eingebettet (dort nie readOnly).
+  readOnly?: boolean;
 }) {
   const ausgewaehlt = referenzobjekte.filter((o): o is Immobilie => o !== null);
   const mittelwerte = ausgewaehlt.length > 0 ? berechneMittelwerte(ausgewaehlt) : null;
@@ -281,10 +294,9 @@ export function Vergleichswert({
   return (
     <SectionShell label="Marktvergleich" title="Vergleichbare Objekte">
       <p className="mb-lg max-w-[65ch] text-body text-anthrazit/80">
-        Wir haben bereits bis zu sechs passende Objekte vorausgewählt (nach PLZ, Wohnfläche,
-        Baujahr und Kaufpreis) — Sie können die Auswahl jederzeit anpassen oder gegen ein anderes
-        Objekt aus dem Bestand austauschen. Die Suchmaske zeigt sowohl bereits verkaufte als auch
-        aktuell aktiv vermarktete Objekte.
+        {readOnly
+          ? "Diese Objekte wurden für den Vergleich mit Ihrer Immobilie ausgewählt (nach PLZ, Wohnfläche, Baujahr und Kaufpreis)."
+          : "Wir haben bereits bis zu sechs passende Objekte vorausgewählt (nach PLZ, Wohnfläche, Baujahr und Kaufpreis) — Sie können die Auswahl jederzeit anpassen oder gegen ein anderes Objekt aus dem Bestand austauschen. Die Suchmaske zeigt sowohl bereits verkaufte als auch aktuell aktiv vermarktete Objekte."}
       </p>
 
       {mittelwerte && (
@@ -347,15 +359,23 @@ export function Vergleichswert({
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-sm md:grid-cols-3">
-          {referenzobjekte.map((objekt, index) => (
-            <ReferenzobjektSlot
-              key={index}
-              objekt={objekt}
-              ausgeschlosseneIds={ausgewaehlteIds}
-              onAuswaehlen={(objekt) => onReferenzobjektAendern(index, objekt)}
-              onEntfernen={() => onReferenzobjektAendern(index, null)}
-            />
-          ))}
+          {referenzobjekte
+            .map((objekt, index) => ({ objekt, index }))
+            // Im geteilten Kunden-Link keine leeren Suchmasken zeigen — nichts, was der Kunde
+            // dort noch befüllen könnte. Index bleibt dabei der aus dem ursprünglichen Array
+            // (siehe .map oben), damit onAuswaehlen/onEntfernen weiterhin den richtigen Slot in
+            // referenzobjekte (PraesentationApp.tsx) träfen, falls sie doch aufgerufen würden.
+            .filter(({ objekt }) => !readOnly || objekt !== null)
+            .map(({ objekt, index }) => (
+              <ReferenzobjektSlot
+                key={index}
+                objekt={objekt}
+                ausgeschlosseneIds={ausgewaehlteIds}
+                onAuswaehlen={(objekt) => onReferenzobjektAendern(index, objekt)}
+                onEntfernen={() => onReferenzobjektAendern(index, null)}
+                readOnly={readOnly}
+              />
+            ))}
         </div>
       )}
     </SectionShell>

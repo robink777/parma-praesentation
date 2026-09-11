@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
-import { NAV_ITEMS, useNavZustand } from "./nav";
+import { NAV_ITEMS, NavZustandEintrag, useNavZustand } from "./nav";
 import { Vorbereitungsmodus } from "./Vorbereitungsmodus";
 import { Immobilie, LeistungspaketId, Praesentation } from "@/types";
 import { Begruessung } from "@/components/sections/Begruessung";
@@ -28,6 +28,9 @@ const ANZAHL_REFERENZOBJEKTE = 6;
 export function PraesentationApp({
   daten,
   readOnly = false,
+  initialeReferenzobjekte,
+  initialerNavZustand,
+  initialesPaket,
 }: {
   daten: Praesentation;
   // Gesetzt für den geteilten, unveränderbaren Kunden-Link (siehe app/geteilt/page.tsx,
@@ -35,6 +38,14 @@ export function PraesentationApp({
   // Berater/von der Beraterin fertig konfigurierte Ergebnis) und blendet die
   // Bearbeitungsmöglichkeiten in der Sidebar aus (siehe bearbeitungErlaubt-Prop dort).
   readOnly?: boolean;
+  // Die drei folgenden Props kommen ausschließlich vom geteilten Kunden-Link (siehe
+  // app/geteilt/page.tsx) — dort bereits zu vollständigen Immobilie-Objekten aufgelöst
+  // (ladeImmobilieById je referenzobjektIds-Eintrag aus der PraesentationConfig, siehe
+  // lib/share.ts) bzw. 1:1 aus der Konfiguration übernommen, damit der Kunde exakt die im
+  // Vorbereitungsmodus getroffene Auswahl sieht statt wieder beim Default zu starten.
+  initialeReferenzobjekte?: (Immobilie | null)[];
+  initialerNavZustand?: NavZustandEintrag[];
+  initialesPaket?: LeistungspaketId;
 }) {
   const [activeId, setActiveId] = useState("begruessung");
   // Vorbereitungsmodus (siehe Vorbereitungsmodus.tsx) steht der eigentlichen Präsentation
@@ -43,14 +54,18 @@ export function PraesentationApp({
   // URL) aufgerufen wurde. Im readOnly-Modus (geteilter Kunden-Link) entfällt dieser Schritt
   // komplett, da die Konfiguration dort bereits feststeht.
   const [praesentationGestartet, setPraesentationGestartet] = useState(readOnly);
-  const { navZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(NAV_ITEMS);
-  const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>();
+  const { navZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(NAV_ITEMS, initialerNavZustand);
+  const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>(initialesPaket);
   // Referenzobjekte im Vergleichswert-Reiter (siehe Vergleichswert.tsx) — hier (statt lokal im
   // Reiter selbst) gehalten, damit die Auswahl beim Wechsel zwischen Reitern erhalten bleibt,
   // analog zu gewaehltesPaket oben. Wird beim ersten Laden automatisch vorbefüllt (siehe
   // useEffect unten), bleibt danach aber genau wie vorher vollständig manuell anpassbar/austauschbar.
-  const [referenzobjekte, setReferenzobjekte] = useState<(Immobilie | null)[]>(
-    Array(ANZAHL_REFERENZOBJEKTE).fill(null)
+  // Auf ANZAHL_REFERENZOBJEKTE aufgefüllt, falls initialeReferenzobjekte (geteilter Link) weniger
+  // Einträge hat, als es Slots gibt.
+  const [referenzobjekte, setReferenzobjekte] = useState<(Immobilie | null)[]>(() =>
+    initialeReferenzobjekte
+      ? [...initialeReferenzobjekte, ...Array(ANZAHL_REFERENZOBJEKTE).fill(null)].slice(0, ANZAHL_REFERENZOBJEKTE)
+      : Array(ANZAHL_REFERENZOBJEKTE).fill(null)
   );
   // Zeigt an, ob der Vorauswahl-Abruf unten noch läuft — damit der Vergleichswert-Reiter
   // währenddessen einen (kleinen) Ladezustand statt einfach nichts anzeigt, siehe
@@ -206,6 +221,7 @@ export function PraesentationApp({
             referenzobjekte={referenzobjekte}
             onReferenzobjektAendern={referenzobjektAendern}
             vorauswahlLaedt={vorauswahlLaedt}
+            readOnly={readOnly}
           />
         )}
         {activeId === "leistungsversprechen" && (
@@ -218,6 +234,9 @@ export function PraesentationApp({
             immobilie={daten.immobilie}
             bewertung={daten.bewertung}
             gewaehltesPaket={gewaehltesPaket}
+            referenzobjekte={referenzobjekte}
+            navZustand={navZustand}
+            readOnly={readOnly}
           />
         )}
         {activeId === "verabschiedung" && <Verabschiedung />}
