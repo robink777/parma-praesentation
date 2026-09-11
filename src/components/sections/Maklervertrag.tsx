@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
 import { MAKLER_KONTAKT } from "@/data/makler";
@@ -17,7 +17,7 @@ import { Bewertung, Immobilie, Kunde, LeistungspaketId, MaklervertragDaten, Makl
 // fürs Formular um — gemeinsam genutzt für auftraggeber1 UND die automatische Vorbefüllung
 // weiterer Eigentümer unten (baueInitialdaten).
 // Deutsches Datumsformat (TT.MM.JJJJ) für die freien Text-Datumsfelder im Vertrag (§ 2
-// Auftragsdauer) — analog zu heute()/formatiereDatumDe in lib/pdf/MandatDokument.tsx, hier lokal
+// Auftragsdauer) — analog zu heute() in lib/pdf/bausteine.tsx, hier lokal
 // gehalten, da bislang kein gemeinsames Datums-Util existiert.
 function formatiereDatumDe(datum: Date): string {
   return datum.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -49,7 +49,7 @@ function kundeZuPartei(kunde: Kunde): MaklervertragPartei {
 // hinzufügen" ergänzen, siehe auch die Warnmeldung dazu weiter unten in der Komponente.
 const MAX_WEITERE_VORBEFUELLT = 3;
 
-function baueInitialdaten(
+export function baueInitialdaten(
   kunde: Kunde,
   weitereEigentuemer: Kunde[],
   immobilie: Immobilie,
@@ -215,36 +215,37 @@ function ParteiFelder({
 }
 
 export function Maklervertrag({
-  kunde,
-  weitereEigentuemer = [],
   immobilie,
-  bewertung,
   gewaehltesPaket,
   referenzobjekte,
   navZustand,
+  daten,
+  onDatenChange,
   readOnly = false,
 }: {
-  kunde: Kunde;
-  // Zusätzliche Eigentümer/innen desselben Objekts (siehe Praesentation.weitereEigentuemer) —
-  // werden unten automatisch als weitere Auftraggeber vorbefüllt statt manuell eingetippt
-  // werden zu müssen.
-  weitereEigentuemer?: Kunde[];
+  // Nur noch für immobilie.id (Share-Link, siehe praesentationTeilen) benötigt — kunde/
+  // weitereEigentuemer/bewertung werden nicht mehr hier, sondern von PraesentationApp.tsx
+  // gebraucht (siehe baueInitialdaten dort), das "daten" unten bereits fertig vorausgefüllt
+  // liefert.
   immobilie: Immobilie;
-  bewertung: Bewertung;
   gewaehltesPaket?: LeistungspaketId;
   // Für "Präsentation teilen" unten (siehe praesentationTeilen) — die im Vorbereitungsmodus
   // bzw. währenddessen live angepasste Auswahl (siehe PraesentationApp.tsx), die der Share-Link
   // exakt reproduzieren muss.
   referenzobjekte: (Immobilie | null)[];
   navZustand: NavZustandEintrag[];
+  // Liegt seit "Präsentation teilen" (siehe praesentationTeilen unten) in PraesentationApp.tsx
+  // statt lokal hier — damit sowohl der Share-Link als auch die PDF-Downloads auf der
+  // Verabschiedungsseite (siehe Verabschiedung.tsx) exakt die im Beratungstermin eingegebenen
+  // Vertragsdaten verwenden, statt sie aus den Objektdaten neu zu erraten.
+  daten: MaklervertragDaten;
+  onDatenChange: Dispatch<SetStateAction<MaklervertragDaten>>;
   // Geteilter, unveränderbarer Kunden-Link (siehe PraesentationApp.tsx, lib/share.ts) — das
   // Formular wird komplett schreibgeschützt (siehe <fieldset disabled> unten) und "Präsentation
   // teilen" entfällt (ein geteilter Link soll nicht seinerseits weiterteilbar sein).
   readOnly?: boolean;
 }) {
-  const [daten, setDaten] = useState<MaklervertragDaten>(() =>
-    baueInitialdaten(kunde, weitereEigentuemer, immobilie, bewertung)
-  );
+  const setDaten = onDatenChange;
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [shareWirdErstellt, setShareWirdErstellt] = useState(false);
   const [shareFehler, setShareFehler] = useState<string | null>(null);
@@ -304,6 +305,7 @@ export function Maklervertrag({
           referenzobjektIds: referenzobjekte.filter((o): o is Immobilie => o !== null).map((o) => o.id),
           navZustand,
           gewaehltesPaket,
+          maklervertragDaten: daten,
         }),
       });
 

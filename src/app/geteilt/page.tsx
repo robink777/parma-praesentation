@@ -67,6 +67,8 @@ export default async function GeteiltPage({
       initialeReferenzobjekte={referenzobjekte}
       initialerNavZustand={config.navZustand}
       initialesPaket={config.gewaehltesPaket}
+      initialesMaklervertragDaten={config.maklervertragDaten}
+      shareParams={{ d: params.d!, sig: params.sig! }}
     />
   );
 }

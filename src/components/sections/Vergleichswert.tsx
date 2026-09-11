@@ -7,6 +7,7 @@ import { PropertyImage } from "@/components/PropertyImage";
 import { ParmaLoader } from "@/components/ParmaLoader";
 import { Immobilie } from "@/types";
 import { formatiereBetrag } from "@/lib/berechnung";
+import { berechneMittelwerte } from "@/lib/vergleichswert";
 
 // Kleine Trefferliste beim Fokussieren des leeren Suchfelds — analog zu ObjektAuswahl.tsx,
 // dort aber "zuletzt angelegt", hier (vergleichspool=1) "zuletzt erstellt" aus dem Pool
@@ -17,24 +18,6 @@ const NEUESTE_LIMIT = 10;
 // September 2026) genügt hier deutlich weniger als das dortige RAW_LISTLIMIT für den vollen
 // "kauf"-Bestand.
 const LISTLIMIT = 250;
-
-function berechneMittelwerte(objekte: Immobilie[]) {
-  const kaufpreise = objekte.map((o) => o.kaufpreis).filter((p) => p > 0);
-  const kaufpreis = kaufpreise.length ? kaufpreise.reduce((a, b) => a + b, 0) / kaufpreise.length : undefined;
-
-  const flaechen = objekte.map((o) => o.wohnflaeche).filter((f): f is number => !!f);
-  const wohnflaeche = flaechen.length ? flaechen.reduce((a, b) => a + b, 0) / flaechen.length : undefined;
-
-  // Preis/m² je Objekt einzeln berechnen und davon den Mittelwert bilden (statt Summe der
-  // Preise durch Summe der Flächen) — sonst würde ein einzelnes großes Objekt den Wert
-  // überproportional dominieren.
-  const preiseProM2 = objekte
-    .filter((o) => o.kaufpreis > 0 && o.wohnflaeche)
-    .map((o) => o.kaufpreis / o.wohnflaeche!);
-  const preisProM2 = preiseProM2.length ? preiseProM2.reduce((a, b) => a + b, 0) / preiseProM2.length : undefined;
-
-  return { kaufpreis, wohnflaeche, preisProM2 };
-}
 
 function ReferenzobjektSlot({
   objekt,

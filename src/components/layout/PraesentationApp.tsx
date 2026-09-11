@@ -15,9 +15,10 @@ import { PreisDesWartens } from "@/components/sections/PreisDesWartens";
 import { Dokumente } from "@/components/sections/Dokumente";
 import { Vergleichswert } from "@/components/sections/Vergleichswert";
 import { Leistungsversprechen } from "@/components/sections/Leistungsversprechen";
-import { Maklervertrag } from "@/components/sections/Maklervertrag";
+import { Maklervertrag, baueInitialdaten } from "@/components/sections/Maklervertrag";
 import { Verabschiedung } from "@/components/sections/Verabschiedung";
 import { waehleVorauswahl } from "@/lib/vergleichswert";
+import { MaklervertragDaten } from "@/types";
 
 // Anzahl der Vergleichsobjekt-Slots im Vergleichswert-Reiter (Juli 2026 Chat-Vorgabe: "Mache aus
 // den 3 Vergleichsobjekten bitte 6") — eine einzige Stelle statt eines an mehreren Stellen
@@ -31,14 +32,20 @@ export function PraesentationApp({
   initialeReferenzobjekte,
   initialerNavZustand,
   initialesPaket,
+  initialesMaklervertragDaten,
+  shareParams,
 }: {
   daten: Praesentation;
+  // Nur im geteilten Kunden-Link gesetzt (siehe app/geteilt/page.tsx) — an Verabschiedung.tsx
+  // weitergereicht, damit die dortigen PDF-Downloads auch ohne Session-Cookie funktionieren
+  // (siehe middleware.ts).
+  shareParams?: { d: string; sig: string };
   // Gesetzt für den geteilten, unveränderbaren Kunden-Link (siehe app/geteilt/page.tsx,
   // lib/share.ts) — überspringt den Vorbereitungsmodus komplett (der Kunde sieht direkt das vom
   // Berater/von der Beraterin fertig konfigurierte Ergebnis) und blendet die
   // Bearbeitungsmöglichkeiten in der Sidebar aus (siehe bearbeitungErlaubt-Prop dort).
   readOnly?: boolean;
-  // Die drei folgenden Props kommen ausschließlich vom geteilten Kunden-Link (siehe
+  // Die folgenden Props kommen ausschließlich vom geteilten Kunden-Link (siehe
   // app/geteilt/page.tsx) — dort bereits zu vollständigen Immobilie-Objekten aufgelöst
   // (ladeImmobilieById je referenzobjektIds-Eintrag aus der PraesentationConfig, siehe
   // lib/share.ts) bzw. 1:1 aus der Konfiguration übernommen, damit der Kunde exakt die im
@@ -46,6 +53,7 @@ export function PraesentationApp({
   initialeReferenzobjekte?: (Immobilie | null)[];
   initialerNavZustand?: NavZustandEintrag[];
   initialesPaket?: LeistungspaketId;
+  initialesMaklervertragDaten?: MaklervertragDaten;
 }) {
   const [activeId, setActiveId] = useState("begruessung");
   // Vorbereitungsmodus (siehe Vorbereitungsmodus.tsx) steht der eigentlichen Präsentation
@@ -56,6 +64,18 @@ export function PraesentationApp({
   const [praesentationGestartet, setPraesentationGestartet] = useState(readOnly);
   const { navZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(NAV_ITEMS, initialerNavZustand);
   const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>(initialesPaket);
+  // Maklervertrag-Formulardaten liegen seit "Präsentation teilen" (siehe Maklervertrag.tsx)
+  // hier statt lokal im Reiter selbst — damit sowohl der Share-Link (praesentationTeilen) als
+  // auch die PDF-Downloads auf der Verabschiedungsseite (Verabschiedung.tsx) exakt die im
+  // Beratungstermin eingegebenen/bearbeiteten Werte verwenden, nicht erneut die automatischen
+  // Standardwerte (baueInitialdaten). Im geteilten Link kommt initialesMaklervertragDaten aus
+  // der Konfiguration (siehe app/geteilt/page.tsx); live wird es wie zuvor aus den Objekt-/
+  // Kundendaten vorausgefüllt.
+  const [maklervertragDaten, setMaklervertragDaten] = useState<MaklervertragDaten>(
+    () =>
+      initialesMaklervertragDaten ??
+      baueInitialdaten(daten.kunde, daten.weitereEigentuemer, daten.immobilie, daten.bewertung)
+  );
   // Referenzobjekte im Vergleichswert-Reiter (siehe Vergleichswert.tsx) — hier (statt lokal im
   // Reiter selbst) gehalten, damit die Auswahl beim Wechsel zwischen Reitern erhalten bleibt,
   // analog zu gewaehltesPaket oben. Wird beim ersten Laden automatisch vorbefüllt (siehe
@@ -229,17 +249,28 @@ export function PraesentationApp({
         )}
         {activeId === "maklervertrag" && (
           <Maklervertrag
+            immobilie={daten.immobilie}
+            gewaehltesPaket={gewaehltesPaket}
+            referenzobjekte={referenzobjekte}
+            navZustand={navZustand}
+            daten={maklervertragDaten}
+            onDatenChange={setMaklervertragDaten}
+            readOnly={readOnly}
+          />
+        )}
+        {activeId === "verabschiedung" && (
+          <Verabschiedung
             kunde={daten.kunde}
             weitereEigentuemer={daten.weitereEigentuemer}
             immobilie={daten.immobilie}
             bewertung={daten.bewertung}
+            betreuer={daten.betreuer}
+            daten={maklervertragDaten}
             gewaehltesPaket={gewaehltesPaket}
-            referenzobjekte={referenzobjekte}
-            navZustand={navZustand}
-            readOnly={readOnly}
+            referenzobjekte={referenzobjekte.filter((o): o is Immobilie => o !== null)}
+            shareParams={shareParams}
           />
         )}
-        {activeId === "verabschiedung" && <Verabschiedung />}
       </main>
     </div>
   );

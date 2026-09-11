@@ -1,290 +1,31 @@
-import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
-import path from "path";
-import fs from "fs";
-import {
-  Bewertung,
-  Immobilie,
-  Kunde,
-  LeistungspaketId,
-  MaklervertragDaten,
-} from "@/types";
-import {
-  LEISTUNGSKATEGORIEN,
-  LEISTUNGSPAKETE,
-  LEISTUNGS_KENNZAHLEN,
-  RAHMENBEDINGUNGEN,
-} from "@/data/leistungsversprechen";
+import { Document, Page, View, Text, Image } from "@react-pdf/renderer";
+import { Bewertung, Immobilie, Kunde, LeistungspaketId, MaklervertragDaten } from "@/types";
+import { LEISTUNGSPAKETE } from "@/data/leistungsversprechen";
 import { MAKLER_KONTAKT } from "@/data/makler";
-import { DATENSCHUTZ_SEKTIONEN, RechtsSektion } from "@/data/rechtstexte";
+import {
+  FARBE,
+  styles,
+  ladeLogo,
+  Fusszeile,
+  AbschnittsTitel,
+  Zeile,
+  Formularzeile,
+  formatiereBetragPdf,
+  heute,
+} from "./bausteine";
 
-// Farbwerte 1:1 aus der Parma-CI-Referenz (Abschnitt 3 · Farbsystem) — siehe parma-design-Skill.
-// Walnuss ausschließlich für Text/Linien, Messing sparsam als Einzelakzent pro Seite,
-// Stein/Reinweiß tragen die Flächen.
-const FARBE = {
-  walnuss: "#503F3D",
-  messing: "#CB8E49",
-  stein: "#F2F1ED",
-  reinweiss: "#FCFCFB",
-  anthrazit: "#2A2624",
-  asche: "#A9A29A",
-  sand: "#E1D6C1",
-};
-
-// Reihenfolge der vier Dokumentteile im PDF (Chat-Vorgabe): Maklervertrag, Widerruf,
-// Leistungsversprechen, Datenschutz. Wird auf dem Deckblatt als Inhaltsübersicht angezeigt.
+// Eigenständiges Dokument "Maklervertrag + Widerruf" (Chat-Vorgabe September 2026: "Maklervertrag
+// + Widerruf, Leistungsversprechen, Datenschutz — also 3 Dokumente") — vorher Teil des einen,
+// alle vier Bestandteile bündelnden MandatDokument.tsx. Leistungsversprechen und Datenschutz
+// sind jetzt eigenständige Dokumente (siehe LeistungsversprechenDokument.tsx,
+// DatenschutzDokument.tsx), bleiben inhaltlich im Vertragstext (§ 10) aber weiterhin als "Anlage
+// 1"/"Anlage 2" referenziert, da sie dem Kunden gemeinsam mit diesem Dokument übergeben werden.
 const DOKUMENTTEILE = [
   { titel: "Maklervertrag", anlage: undefined },
   { titel: "Widerrufsbelehrung", anlage: "Anlage 2" },
-  { titel: "Leistungsversprechen", anlage: undefined },
-  { titel: "Datenschutzerklärung", anlage: "Anlage 1" },
 ];
 
-// Logo wird serverseitig direkt von der Festplatte gelesen (kein Netzwerk-Roundtrip beim
-// PDF-Rendern nötig) — react-pdf akzeptiert dafür einen Buffer.
-function ladeLogo(): Buffer | undefined {
-  try {
-    return fs.readFileSync(path.join(process.cwd(), "public/logos/immobilien-quer.png"));
-  } catch {
-    return undefined;
-  }
-}
-
-const styles = StyleSheet.create({
-  page: {
-    paddingTop: "28mm",
-    paddingBottom: "22mm",
-    paddingLeft: "22mm",
-    paddingRight: "22mm",
-    fontFamily: "Helvetica",
-    fontSize: 9.5,
-    color: FARBE.anthrazit,
-    backgroundColor: FARBE.reinweiss,
-  },
-  logo: { width: 130, marginBottom: 22 },
-  label: {
-    fontFamily: "Courier",
-    fontSize: 7.5,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    color: FARBE.messing,
-    marginBottom: 4,
-  },
-  h1: {
-    fontFamily: "Times-Bold",
-    fontSize: 23,
-    color: FARBE.walnuss,
-    marginBottom: 16,
-  },
-  // Zweistufiger Abschnittstitel (kleiner Messing-Kicker + große Walnuss-Überschrift), analog zum
-  // Label/H1-Paar auf dem Deckblatt — ersetzt die vorherigen einzeiligen "§ N Titel"-Überschriften,
-  // um den reinen Fließtextseiten der Vertrags-/Rechtstexte mehr Struktur zu geben (Chat-Vorgabe
-  // "Bearbeite die Optik").
-  kicker: {
-    fontFamily: "Courier",
-    fontSize: 7,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    color: FARBE.messing,
-    marginTop: 16,
-  },
-  h2: {
-    fontFamily: "Times-Bold",
-    fontSize: 14,
-    color: FARBE.walnuss,
-    marginTop: 2,
-    marginBottom: 7,
-    paddingBottom: 4,
-    borderBottom: `1pt solid ${FARBE.asche}`,
-  },
-  h3: {
-    fontFamily: "Times-Bold",
-    fontSize: 11,
-    color: FARBE.walnuss,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  text: { fontSize: 9.5, lineHeight: 1.48, color: FARBE.anthrazit },
-  absatz: { fontSize: 9.5, lineHeight: 1.48, color: FARBE.anthrazit, marginBottom: 6 },
-  small: { fontSize: 8, lineHeight: 1.4, color: FARBE.anthrazit },
-  rechtsLabel: {
-    fontSize: 8.5,
-    lineHeight: 1.4,
-    color: FARBE.walnuss,
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 2,
-  },
-  zeile: {
-    flexDirection: "row",
-    paddingVertical: 3,
-    borderBottom: `0.5pt solid ${FARBE.sand}`,
-  },
-  zeileLabel: { width: "38%", fontSize: 8.5, color: FARBE.anthrazit, opacity: 0.65 },
-  zeileWert: { width: "62%", fontSize: 9, color: FARBE.anthrazit },
-  card: {
-    backgroundColor: FARBE.stein,
-    padding: 10,
-    borderRadius: 3,
-    marginBottom: 8,
-  },
-  paketCard: {
-    flex: 1,
-    padding: 8,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  paketAktiv: {
-    backgroundColor: FARBE.stein,
-    border: `1.5pt solid ${FARBE.messing}`,
-  },
-  paketInaktiv: {
-    backgroundColor: FARBE.stein,
-    border: `1pt solid transparent`,
-  },
-  badge: {
-    fontFamily: "Courier",
-    fontSize: 6.5,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    color: FARBE.reinweiss,
-    backgroundColor: FARBE.messing,
-    borderRadius: 2,
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    alignSelf: "flex-start",
-    marginBottom: 4,
-  },
-  tabelleZeile: { flexDirection: "row", borderBottom: `0.5pt solid ${FARBE.sand}` },
-  tabelleKopf: {
-    flexDirection: "row",
-    backgroundColor: FARBE.stein,
-    paddingVertical: 3,
-  },
-  tabelleZelleLabel: { width: "46%", fontSize: 7.5, padding: 3 },
-  tabelleZelleSpalte: { width: "18%", fontSize: 7.5, padding: 3, textAlign: "center" },
-  footer: {
-    position: "absolute",
-    bottom: "10mm",
-    left: "22mm",
-    right: "22mm",
-    fontSize: 7,
-    color: FARBE.asche,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderTop: `0.5pt solid ${FARBE.sand}`,
-    paddingTop: 4,
-  },
-  unterschriftFeld: {
-    width: "48%",
-    borderTop: `0.5pt solid ${FARBE.asche}`,
-    paddingTop: 4,
-  },
-  formularFeld: { marginBottom: 9 },
-  formularLinie: { borderBottom: `0.75pt solid ${FARBE.asche}`, height: 13, marginTop: 2 },
-});
-
-function Fusszeile({ titel }: { titel: string }) {
-  return (
-    <View style={styles.footer} fixed>
-      <Text>Parma Immobilien · {titel}</Text>
-      <Text render={({ pageNumber, totalPages }) => `Seite ${pageNumber} von ${totalPages}`} />
-    </View>
-  );
-}
-
-function AbschnittsTitel({ kicker, titel }: { kicker: string; titel: string }) {
-  return (
-    <>
-      <Text style={styles.kicker}>{kicker}</Text>
-      <Text style={styles.h2}>{titel}</Text>
-    </>
-  );
-}
-
-function Zeile({ label, wert }: { label: string; wert?: string | number | null }) {
-  if (wert === undefined || wert === null || wert === "") return null;
-  return (
-    <View style={styles.zeile}>
-      <Text style={styles.zeileLabel}>{label}</Text>
-      <Text style={styles.zeileWert}>{String(wert)}</Text>
-    </View>
-  );
-}
-
-// Beschriftetes, leeres Schreibfeld für das Muster-Widerrufsformular — eine Unterstreichung statt
-// eines vorausgefüllten Werts, da der Kunde dieses Formular nur im Widerrufsfall eigenhändig
-// ausfüllt (Formularinhalt ist unabhängig von den beim Vertragsschluss erfassten Stammdaten).
-function Formularzeile({ label }: { label: string }) {
-  return (
-    <View style={styles.formularFeld}>
-      <Text style={styles.small}>{label}</Text>
-      <View style={styles.formularLinie} />
-    </View>
-  );
-}
-
-// Rendert die Absatz-/Listen-Bausteine einer Datenschutz-Sektion (siehe data/rechtstexte.ts).
-function RechtsBloecke({ sektion }: { sektion: RechtsSektion }) {
-  return (
-    <>
-      {sektion.bloecke.map((block, i) => {
-        if (block.art === "label") {
-          return (
-            <Text key={i} style={styles.rechtsLabel}>
-              {block.text}
-            </Text>
-          );
-        }
-        if (block.art === "liste") {
-          return (
-            <View key={i} style={{ marginBottom: 6 }}>
-              {block.items.map((item) => (
-                <Text key={item} style={{ ...styles.text, marginBottom: 2 }}>
-                  · {item}
-                </Text>
-              ))}
-            </View>
-          );
-        }
-        return (
-          <Text key={i} style={styles.absatz}>
-            {block.text}
-          </Text>
-        );
-      })}
-    </>
-  );
-}
-
-function formatiereBetragPdf(betrag?: number): string | undefined {
-  if (betrag === undefined || betrag === null) return undefined;
-  return new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(betrag);
-}
-
-function heute(): string {
-  return new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-const LEISTUNGS_SPALTEN: { id: LeistungspaketId; label: string }[] = [
-  { id: "basis", label: "Basis" },
-  { id: "komfort", label: "Komfort" },
-  { id: "premium", label: "Premium" },
-];
-
-// Helvetica (Standard-14-PDF-Font, WinAnsi-Encoding) enthält kein Häkchen-Glyph (✓, U+2713) —
-// react-pdf rendert das Zeichen dann unsichtbar/leer. Deshalb hier ein ASCII-sicheres "X" statt
-// eines Unicode-Symbols, damit "ja" in der Leistungen-Tabelle tatsächlich sichtbar ist.
-function StatusZeichen({ status }: { status: "ja" | "nein" | "optional" }) {
-  if (status === "ja") return <Text style={{ fontFamily: "Helvetica-Bold", color: FARBE.messing }}>X</Text>;
-  if (status === "optional") return <Text style={{ fontSize: 6.5 }}>optional</Text>;
-  return <Text>–</Text>;
-}
-
-export interface MandatDokumentProps {
+export interface MaklervertragWiderrufDokumentProps {
   kunde: Kunde;
   immobilie: Immobilie;
   bewertung: Bewertung;
@@ -292,7 +33,13 @@ export interface MandatDokumentProps {
   gewaehltesPaket?: LeistungspaketId;
 }
 
-export function MandatDokument({ kunde, immobilie, bewertung, daten, gewaehltesPaket }: MandatDokumentProps) {
+export function MaklervertragWiderrufDokument({
+  kunde,
+  immobilie,
+  bewertung,
+  daten,
+  gewaehltesPaket,
+}: MaklervertragWiderrufDokumentProps) {
   const logo = ladeLogo();
   const kundeName = [kunde.anrede, kunde.vorname, kunde.nachname].filter(Boolean).join(" ");
   const kundeAdresse = [kunde.strasse, [kunde.plz, kunde.ort].filter(Boolean).join(" ")]
@@ -312,7 +59,7 @@ export function MandatDokument({ kunde, immobilie, bewertung, daten, gewaehltesP
   );
 
   return (
-    <Document title={`Mandat ${kundeName || "Parma Immobilien"}`.trim()}>
+    <Document title={`Maklervertrag ${kundeName || "Parma Immobilien"}`.trim()}>
       {/* ── Teil 1: Maklervertrag ───────────────────────────────────────────────── */}
 
       {/* Deckblatt */}
@@ -348,8 +95,6 @@ export function MandatDokument({ kunde, immobilie, bewertung, daten, gewaehltesP
           </View>
         )}
 
-        {/* Inhaltsübersicht: füllt den unteren Teil des Deckblatts bewusst mit Orientierung statt
-            Leerraum — sinnvoll geworden, seit dieses PDF vier vollständige Dokumente bündelt. */}
         <View style={{ marginTop: "auto", paddingTop: 24, borderTop: `0.5pt solid ${FARBE.sand}` }}>
           <Text style={styles.label}>Inhalt dieses Dokuments</Text>
           {DOKUMENTTEILE.map((teil, i) => (
@@ -664,8 +409,9 @@ export function MandatDokument({ kunde, immobilie, bewertung, daten, gewaehltesP
         </View>
         <View style={{ marginTop: 40, paddingTop: 16, borderTop: `0.5pt solid ${FARBE.sand}` }}>
           <Text style={styles.small}>
-            Die als Anlage 1 und Anlage 2 beigefügte Datenschutzerklärung sowie Widerrufsbelehrung
-            sind Bestandteil dieses Maklervertrags (siehe § 10).
+            Die als Anlage 1 (Datenschutzerklärung, separates Dokument) und Anlage 2
+            (Widerrufsbelehrung, nachfolgend) genannten Unterlagen sind Bestandteil dieses
+            Maklervertrags (siehe § 10).
           </Text>
         </View>
         <Fusszeile titel="Maklervertrag" />
@@ -813,121 +559,6 @@ export function MandatDokument({ kunde, immobilie, bewertung, daten, gewaehltesP
           ))}
         </View>
         <Fusszeile titel="Widerrufsbelehrung" />
-      </Page>
-
-      {/* ── Teil 3: Leistungsversprechen ────────────────────────────────────────── */}
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.label}>Leistungsversprechen</Text>
-        <Text style={styles.h1}>Unser Leistungsversprechen</Text>
-
-        <View style={{ flexDirection: "row", marginBottom: 12 }}>
-          {LEISTUNGS_KENNZAHLEN.map((k) => (
-            <View key={k.label} style={{ ...styles.card, flex: 1, marginRight: 6, textAlign: "center" }}>
-              <Text style={{ ...styles.h3, marginTop: 0, textAlign: "center" }}>{k.wert}</Text>
-              <Text style={{ ...styles.small, textAlign: "center" }}>{k.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        <Text style={styles.h2}>Unsere Pakete</Text>
-        <View style={{ flexDirection: "row", marginBottom: 8 }}>
-          {LEISTUNGSPAKETE.map((paket) => {
-            const aktiv = paket.id === gewaehltesPaket;
-            return (
-              <View
-                key={paket.id}
-                style={[styles.paketCard, aktiv ? styles.paketAktiv : styles.paketInaktiv]}
-              >
-                {aktiv && <Text style={styles.badge}>Ausgewählt</Text>}
-                <Text style={{ ...styles.h3, marginTop: 0 }}>{paket.name}</Text>
-                <Text style={styles.small}>{paket.beschreibung}</Text>
-                <Text style={{ ...styles.h3, color: FARBE.walnuss }}>
-                  {paket.provisionProzent.toLocaleString("de-DE")} %
-                </Text>
-                {paket.highlights.map((h) => (
-                  <Text key={h} style={{ ...styles.small, marginBottom: 2 }}>
-                    · {h}
-                  </Text>
-                ))}
-              </View>
-            );
-          })}
-        </View>
-
-        <Text style={styles.h2}>Rahmenbedingungen</Text>
-        {RAHMENBEDINGUNGEN.map((r) => (
-          <View key={r.nummer} style={{ marginBottom: 4 }}>
-            <Text style={{ ...styles.text, fontFamily: "Helvetica-Bold" }}>
-              § {r.nummer} · {r.titel}
-            </Text>
-            <Text style={styles.small}>{r.text}</Text>
-          </View>
-        ))}
-        <Fusszeile titel="Leistungsversprechen" />
-      </Page>
-
-      {/* Leistungen im Detail */}
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.label}>Leistungsversprechen</Text>
-        <Text style={styles.h2}>Leistungen im Detail</Text>
-        <View style={styles.tabelleKopf}>
-          <Text style={styles.tabelleZelleLabel}>Leistung</Text>
-          {LEISTUNGS_SPALTEN.map((s) => (
-            <Text
-              key={s.id}
-              style={{
-                ...styles.tabelleZelleSpalte,
-                fontFamily: s.id === gewaehltesPaket ? "Helvetica-Bold" : "Helvetica",
-                color: s.id === gewaehltesPaket ? FARBE.walnuss : FARBE.anthrazit,
-              }}
-            >
-              {s.label}
-            </Text>
-          ))}
-        </View>
-        {LEISTUNGSKATEGORIEN.map((kategorie) => (
-          <View key={kategorie.nummer} wrap={false}>
-            <Text style={{ ...styles.small, fontFamily: "Courier", marginTop: 6, marginBottom: 2 }}>
-              § {kategorie.nummer} {kategorie.titel}
-            </Text>
-            {kategorie.positionen.map((pos) => (
-              <View key={pos.bezeichnung} style={styles.tabelleZeile}>
-                <Text style={styles.tabelleZelleLabel}>{pos.bezeichnung}</Text>
-                {LEISTUNGS_SPALTEN.map((s) => (
-                  <Text key={s.id} style={styles.tabelleZelleSpalte}>
-                    <StatusZeichen status={pos[s.id]} />
-                  </Text>
-                ))}
-              </View>
-            ))}
-          </View>
-        ))}
-        <Fusszeile titel="Leistungsversprechen" />
-      </Page>
-
-      {/* ── Teil 4: Datenschutz ─────────────────────────────────────────────────── */}
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.label}>Anlage 1 · Datenschutz</Text>
-        <Text style={styles.h1}>Datenschutzerklärung</Text>
-
-        <AbschnittsTitel kicker="§ 1" titel="Verantwortlicher" />
-        <View style={{ ...styles.card, marginTop: 8 }}>
-          <Text style={{ ...styles.text, fontFamily: "Helvetica-Bold" }}>{MAKLER_KONTAKT.unternehmen}</Text>
-          <Text style={styles.small}>{MAKLER_KONTAKT.strasse}</Text>
-          <Text style={styles.small}>{MAKLER_KONTAKT.plzOrt}</Text>
-          <Text style={{ ...styles.small, marginTop: 4 }}>Vertreten durch: Daniel Parma &amp; Robin Kolbe</Text>
-          <Text style={styles.small}>Telefon: {MAKLER_KONTAKT.telefon}</Text>
-          <Text style={styles.small}>E-Mail: info@parmaimmobilien.de</Text>
-          <Text style={styles.small}>Website: https://www.parmaimmobilien.de/</Text>
-        </View>
-
-        {DATENSCHUTZ_SEKTIONEN.map((sektion) => (
-          <View key={sektion.nummer} style={{ marginTop: 8 }} wrap={false}>
-            <AbschnittsTitel kicker={`§ ${sektion.nummer}`} titel={sektion.titel} />
-            <RechtsBloecke sektion={sektion} />
-          </View>
-        ))}
-        <Fusszeile titel="Datenschutzerklärung" />
       </Page>
     </Document>
   );

@@ -120,3 +120,30 @@ export function waehleVorauswahl(
 
   return [...pool].sort((a, b) => naeheScore(a, subjekt) - naeheScore(b, subjekt)).slice(0, anzahl);
 }
+
+/**
+ * Mittelwerte (Kaufpreis, Wohnfläche, Preis/m²) über eine Liste ausgewählter Vergleichsobjekte —
+ * genutzt sowohl von Vergleichswert.tsx (Anzeige im Reiter) als auch von
+ * GesamtpraesentationDokument.tsx (PDF-Export). Bewusst hier statt in Vergleichswert.tsx: Diese
+ * Datei trägt kein "use client" — Vergleichswert.tsx dagegen schon, wodurch ein Export von dort
+ * beim serverseitigen PDF-Rendern (react-pdf läuft in einer Node-API-Route, kein Client-
+ * Rendering) als "Client-Function kann nicht vom Server aufgerufen werden" fehlschlägt (live
+ * beobachtet, September 2026).
+ */
+export function berechneMittelwerte(objekte: Immobilie[]) {
+  const kaufpreise = objekte.map((o) => o.kaufpreis).filter((p) => p > 0);
+  const kaufpreis = kaufpreise.length ? kaufpreise.reduce((a, b) => a + b, 0) / kaufpreise.length : undefined;
+
+  const flaechen = objekte.map((o) => o.wohnflaeche).filter((f): f is number => !!f);
+  const wohnflaeche = flaechen.length ? flaechen.reduce((a, b) => a + b, 0) / flaechen.length : undefined;
+
+  // Preis/m² je Objekt einzeln berechnen und davon den Mittelwert bilden (statt Summe der
+  // Preise durch Summe der Flächen) — sonst würde ein einzelnes großes Objekt den Wert
+  // überproportional dominieren.
+  const preiseProM2 = objekte
+    .filter((o) => o.kaufpreis > 0 && o.wohnflaeche)
+    .map((o) => o.kaufpreis / o.wohnflaeche!);
+  const preisProM2 = preiseProM2.length ? preiseProM2.reduce((a, b) => a + b, 0) / preiseProM2.length : undefined;
+
+  return { kaufpreis, wohnflaeche, preisProM2 };
+}

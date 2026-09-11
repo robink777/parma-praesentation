@@ -24,6 +24,8 @@ export async function POST(request: NextRequest) {
     referenzobjektIds: body.referenzobjektIds,
     navZustand: body.navZustand,
     gewaehltesPaket: typeof body.gewaehltesPaket === "string" ? body.gewaehltesPaket : undefined,
+    maklervertragDaten:
+      body.maklervertragDaten && typeof body.maklervertragDaten === "object" ? body.maklervertragDaten : undefined,
   };
 
   const url = await erstelleShareLink(new URL(request.url).origin, config);

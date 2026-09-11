@@ -1,6 +1,6 @@
 // Wörtliche Inhalte der Datenschutzerklärung, vom Nutzer als Referenz-PDF bereitgestellt
 // (Downloads/Datenschutzerklaerung.pdf, Stand siehe § 14). Abschnitt 1 (Verantwortlicher) wird
-// im MandatDokument als eigene Kontaktkarte gerendert (Wiederverwendung des Karten-Stils aus dem
+// in DatenschutzDokument.tsx als eigene Kontaktkarte gerendert (Wiederverwendung des Karten-Stils aus dem
 // Maklervertrag) und ist daher hier bewusst nicht enthalten — diese Liste beginnt bei § 2.
 export type RechtsBlock =
   | { art: "text"; text: string }

@@ -1,6 +1,6 @@
 import { erzeugeShareSignatur, shareSignaturIstGueltig } from "./auth";
 import { NavZustandEintrag } from "@/components/layout/nav";
-import { LeistungspaketId } from "@/types";
+import { LeistungspaketId, MaklervertragDaten } from "@/types";
 
 // Konfiguration, die eine geteilte Präsentation festhält (Chat-Vorgabe September 2026: "Die
 // geteilte Präsentation müsste unveränderbar sein") — genau die Auswahl, die der Berater/die
@@ -14,6 +14,11 @@ export interface PraesentationConfig {
   referenzobjektIds: string[];
   navZustand: NavZustandEintrag[];
   gewaehltesPaket?: LeistungspaketId;
+  // Die im Maklervertrag-Formular erfassten/bearbeiteten Vertragsdaten (siehe Maklervertrag.tsx,
+  // PraesentationApp.tsx) — ohne dieses Feld würde der geteilte Link beim Laden erneut die
+  // automatischen Standardwerte erzeugen (baueInitialdaten) und dabei jede manuelle Anpassung
+  // aus dem Beratungstermin verlieren (z.B. eingetragene Mängel, individuelle Vereinbarungen).
+  maklervertragDaten?: MaklervertragDaten;
 }
 
 function istPraesentationConfig(wert: unknown): wert is PraesentationConfig {
@@ -30,7 +35,12 @@ function istPraesentationConfig(wert: unknown): wert is PraesentationConfig {
         typeof e === "object" &&
         typeof (e as NavZustandEintrag).id === "string" &&
         typeof (e as NavZustandEintrag).sichtbar === "boolean"
-    )
+    ) &&
+    // maklervertragDaten nur grob (Objekt oder fehlend) geprüft, nicht feldweise — die Signatur
+    // (siehe pruefeShareParameter) stellt bereits sicher, dass die Konfiguration unverändert von
+    // /api/share stammt, eine erfundene/manipulierte Payload würde die Signaturprüfung davor
+    // schon verwerfen.
+    (config.maklervertragDaten === undefined || typeof config.maklervertragDaten === "object")
   );
 }
 
