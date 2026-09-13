@@ -236,12 +236,17 @@ export function PraesentationApp({
         {activeId === "preis-des-wartens" && <PreisDesWartens immobilie={daten.immobilie} />}
         {activeId === "dokumente" && <Dokumente dokumente={daten.dokumente} />}
         {activeId === "vergleich" && (
+          // readOnly hier bewusst fest statt aus der readOnly-Prop von PraesentationApp: Die
+          // Auswahl der Vergleichsobjekte findet ausschließlich im Vorbereitungsmodus statt (siehe
+          // Vorbereitungsmodus.tsx, dieselbe Komponente dort ohne readOnly) — im eigentlichen
+          // Präsentations-Reiter (egal ob live vor dem Kunden oder über den geteilten Link)
+          // sollen weder leere Suchkacheln noch das Entfernen-Icon erscheinen.
           <Vergleichswert
             immobilie={daten.immobilie}
             referenzobjekte={referenzobjekte}
             onReferenzobjektAendern={referenzobjektAendern}
             vorauswahlLaedt={vorauswahlLaedt}
-            readOnly={readOnly}
+            readOnly
           />
         )}
         {activeId === "leistungsversprechen" && (
@@ -261,13 +266,10 @@ export function PraesentationApp({
         {activeId === "verabschiedung" && (
           <Verabschiedung
             kunde={daten.kunde}
-            weitereEigentuemer={daten.weitereEigentuemer}
             immobilie={daten.immobilie}
             bewertung={daten.bewertung}
-            betreuer={daten.betreuer}
             daten={maklervertragDaten}
             gewaehltesPaket={gewaehltesPaket}
-            referenzobjekte={referenzobjekte.filter((o): o is Immobilie => o !== null)}
             shareParams={shareParams}
           />
         )}

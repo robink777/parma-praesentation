@@ -4,7 +4,7 @@ import { useState } from "react";
 import Script from "next/script";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
-import { Betreuer, Bewertung, Immobilie, Kunde, LeistungspaketId, MaklervertragDaten } from "@/types";
+import { Bewertung, Immobilie, Kunde, LeistungspaketId, MaklervertragDaten } from "@/types";
 
 // bottimmo-Widget-Script — "afterInteractive", da das Widget der eigentliche Inhalt dieser Folie
 // ist und beim Aufrufen zeitnah laden soll (nicht erst, wenn der Browser irgendwann Leerlaufzeit
@@ -14,9 +14,9 @@ const BOTTIMMO_SCRIPT_SRC =
   "https://components.bottimmo.com/components/6752d9b04a83ff4efdcf4c50/btm-widget/de-DE";
 
 // Löst einen Datei-Download über einen POST-Aufruf aus (Blob → Object-URL → Klick auf ein
-// unsichtbares <a> → Aufräumen) — für die beiden PDFs, deren Inhalt zu umfangreich für eine
-// GET-Query ist (Maklervertrag, Gesamtpräsentation). Wirft bei Fehlschlag, der Aufrufer zeigt
-// die Meldung an (siehe herunterladen() unten).
+// unsichtbares <a> → Aufräumen) — für den Maklervertrag, dessen Inhalt zu umfangreich für eine
+// GET-Query ist. Wirft bei Fehlschlag, der Aufrufer zeigt die Meldung an (siehe herunterladen()
+// unten).
 async function postUndHerunterladen(url: string, body: unknown, dateiname: string) {
   const res = await fetch(url, {
     method: "POST",
@@ -101,25 +101,23 @@ function DownloadZeile({
 // PDF-Routen (/api/pdf/*) akzeptieren dafür wahlweise die normale Session ODER das d/sig-Paar
 // aus der URL des geteilten Links (siehe middleware.ts) — Letzteres wird hier über
 // useSearchParams ausgelesen und an jeden Download angehängt, live sind d/sig einfach leer.
+//
+// Die Gesamtpräsentation als eigenes PDF wurde wieder entfernt (Chat-Vorgabe September 2026:
+// "Kann gelöscht werden. Soll nicht zum Download angeboten werden!") — die vier verbliebenen
+// Dokumente decken den Bedarf ab.
 export function Verabschiedung({
   kunde,
-  weitereEigentuemer,
   immobilie,
   bewertung,
-  betreuer,
   daten,
   gewaehltesPaket,
-  referenzobjekte,
   shareParams,
 }: {
   kunde: Kunde;
-  weitereEigentuemer: Kunde[];
   immobilie: Immobilie;
   bewertung: Bewertung;
-  betreuer: Betreuer;
   daten: MaklervertragDaten;
   gewaehltesPaket?: LeistungspaketId;
-  referenzobjekte: Immobilie[];
   // Nur im geteilten Kunden-Link gesetzt (siehe app/geteilt/page.tsx → PraesentationApp.tsx) —
   // als Props statt über useSearchParams() gelesen, damit diese Komponente nicht in einen
   // <Suspense>-Rand gewrappt werden muss (Next.js verlangt das für useSearchParams()) und live
@@ -192,21 +190,6 @@ export function Verabschiedung({
             href={bewertung.pdfUrl}
           />
         )}
-        <DownloadZeile
-          icon="document"
-          titel="Gesamtpräsentation"
-          beschreibung="Alle wesentlichen Inhalte dieser Präsentation als ein Dokument"
-          laedt={ladendeDatei === "gesamt"}
-          onClick={() =>
-            herunterladen("gesamt", () =>
-              postUndHerunterladen(
-                mitQuery("/api/pdf/gesamt"),
-                { kunde, weitereEigentuemer, immobilie, bewertung, betreuer, daten, gewaehltesPaket, referenzobjekte },
-                `Gesamtpraesentation_${nachname}.pdf`
-              )
-            )
-          }
-        />
       </div>
       {fehler && <p className="mb-lg text-small text-anthrazit/80">Fehler: {fehler}</p>}
 

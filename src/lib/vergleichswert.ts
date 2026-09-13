@@ -123,12 +123,7 @@ export function waehleVorauswahl(
 
 /**
  * Mittelwerte (Kaufpreis, Wohnfläche, Preis/m²) über eine Liste ausgewählter Vergleichsobjekte —
- * genutzt sowohl von Vergleichswert.tsx (Anzeige im Reiter) als auch von
- * GesamtpraesentationDokument.tsx (PDF-Export). Bewusst hier statt in Vergleichswert.tsx: Diese
- * Datei trägt kein "use client" — Vergleichswert.tsx dagegen schon, wodurch ein Export von dort
- * beim serverseitigen PDF-Rendern (react-pdf läuft in einer Node-API-Route, kein Client-
- * Rendering) als "Client-Function kann nicht vom Server aufgerufen werden" fehlschlägt (live
- * beobachtet, September 2026).
+ * genutzt von Vergleichswert.tsx (Anzeige im Reiter).
  */
 export function berechneMittelwerte(objekte: Immobilie[]) {
   const kaufpreise = objekte.map((o) => o.kaufpreis).filter((p) => p > 0);

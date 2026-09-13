@@ -9,8 +9,8 @@ import { RechtsSektion } from "@/data/rechtstexte";
 // MandatDokument.tsx, das auf Chat-Vorgabe September 2026 ("Maklervertrag + Widerruf,
 // Leistungsversprechen, Datenschutz — also 3 Dokumente") in eigenständige Dokumente aufgeteilt
 // wurde (siehe MaklervertragWiderrufDokument.tsx, LeistungsversprechenDokument.tsx,
-// DatenschutzDokument.tsx, GesamtpraesentationDokument.tsx). Hier zentral, statt in jedem
-// Dokument dupliziert, damit alle Exporte optisch identisch bleiben.
+// DatenschutzDokument.tsx). Hier zentral, statt in jedem Dokument dupliziert, damit alle Exporte
+// optisch identisch bleiben.
 
 // Farbwerte 1:1 aus der Parma-CI-Referenz (Abschnitt 3 · Farbsystem) — siehe parma-design-Skill.
 // Walnuss ausschließlich für Text/Linien, Messing sparsam als Einzelakzent pro Seite,

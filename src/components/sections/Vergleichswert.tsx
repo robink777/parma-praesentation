@@ -251,10 +251,12 @@ export function Vergleichswert({
   // kompakte Größe) statt der leeren Suchmasken gezeigt — vorher gab es hier gar keine visuelle
   // Rückmeldung, dass im Hintergrund noch etwas lädt.
   vorauswahlLaedt: boolean;
-  // Geteilter, unveränderbarer Kunden-Link (siehe PraesentationApp.tsx, lib/share.ts) — leere
-  // Slots (Suchmaske) entfallen komplett, gefüllte Karten verlieren ihr "Entfernen"-Icon (siehe
-  // ReferenzobjektSlot). Diese Sektion wird nicht nur im Vergleichswert-Reiter, sondern auch
-  // unverändert im Vorbereitungsmodus eingebettet (dort nie readOnly).
+  // true im laufenden Präsentations-Reiter (live wie über den geteilten Kunden-Link, siehe
+  // PraesentationApp.tsx — dort fest gesetzt, die Auswahl ist dort abgeschlossen) und false im
+  // Vorbereitungsmodus (siehe Vorbereitungsmodus.tsx, dieselbe Sektion dort eingebettet, aber
+  // bearbeitbar). Blendet leere Slots (Suchmaske) komplett aus statt sie als offene Kachel zu
+  // zeigen (Chat-Vorgabe September 2026: "keine freien Plätze in der Präsentation zu sehen") und
+  // entfernt bei gefüllten Karten das "Entfernen"-Icon (siehe ReferenzobjektSlot).
   readOnly?: boolean;
 }) {
   const ausgewaehlt = referenzobjekte.filter((o): o is Immobilie => o !== null);
