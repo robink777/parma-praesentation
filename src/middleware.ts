@@ -90,12 +90,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Statische Assets (_next, Logos, Standort-Fotos, Demo-Dokumente, favicon) sowie /login und
-  // /api/login selbst laufen bewusst NICHT durch die Middleware — Logos/Dokumente werden auch
-  // auf der Login-Seite gebraucht, bevor überhaupt ein Session-Cookie existiert. "standorte"
-  // (Fotos der Büro-Standorte, siehe data/unternehmen.ts) muss ebenfalls ausgenommen werden:
-  // sonst leitet die Middleware next/image's internen Abruf der Bilddatei auf /login um, und
-  // der Bildoptimierer bekommt HTML statt Bilddaten geliefert ("requested resource isn't a
-  // valid image", live beobachtet Juli 2026).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|logos|standorte|dokumente|login|api/login).*)"],
+  // Statische Assets (_next, Logos, Standort-Fotos, Team-Fotos, Demo-Dokumente, favicon) sowie
+  // /login und /api/login selbst laufen bewusst NICHT durch die Middleware — Logos/Dokumente
+  // werden auch auf der Login-Seite gebraucht, bevor überhaupt ein Session-Cookie existiert.
+  // "standorte"/"team" (Fotos, siehe data/unternehmen.ts bzw. Begruessung.tsx) müssen ebenfalls
+  // ausgenommen werden: sonst leitet die Middleware next/image's internen Abruf der Bilddatei auf
+  // /login um, und der Bildoptimierer bekommt HTML statt Bilddaten geliefert ("requested resource
+  // isn't a valid image", live beobachtet Juli 2026 bei "standorte", September 2026 identisch bei
+  // "team" reproduziert).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logos|standorte|team|dokumente|login|api/login).*)"],
 };

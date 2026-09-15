@@ -5,8 +5,10 @@ import Image from "next/image";
 // Bewusst kein Objektfoto: Der Empfang soll ein ruhiges, einladendes "Eintreten in den
 // Raum" vermitteln, nicht schon auf die Immobilie des Kunden verweisen — das folgt erst
 // in den späteren Sektionen (Objektdaten, Bewertung etc.).
-const WILLKOMMENSBILD =
-  "https://www.parmaimmobilien.de/wp-content/uploads/2025/09/fotokleer_207-KOpie-scaled.jpg";
+// Neues Teamfoto (September 2026, vom Nutzer bereitgestellt, foto-kleer.de) — ersetzt das
+// vorherige externe WordPress-Bild, lokal unter public/team/ abgelegt statt extern verlinkt
+// (analog zu den Standort-Fotos in public/standorte/, siehe data/unternehmen.ts).
+const WILLKOMMENSBILD = "/team/team-1.jpg";
 
 // Kurzform pro Person (z.B. "Herr Mustermann") — bewusst ohne Vorname: Bei mehreren
 // Eigentümern/innen (Miteigentum, Erbengemeinschaft) stehen die Namen untereinander (siehe
