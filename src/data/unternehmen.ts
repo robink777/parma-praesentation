@@ -34,12 +34,12 @@ export const GOOGLE_BEWERTUNG = { sterne: 5.0, anzahlRezensionen: 241 };
 
 // "Portalanfragen Gesamt" aus dem OnOffice-Statistikreiter — anders als "Verkaufte Objekte" und
 // "Kunden" NICHT live aus der API abrufbar: resourcetype "statistic" liefert für diesen Account
-// durchgehend den Fehler "missing configuration for resourceType" (live geprüft, Juli 2026,
-// mehrere Actionid-/Parameter-Varianten durchprobiert) — das Statistik-Modul ist dort nicht per
-// API freigeschaltet, nur im OnOffice-Backend selbst einsehbar. Wert daher manuell gepflegt, bei
-// Bedarf im OnOffice-Backend unter dem Statistikreiter nachschlagen und hier aktualisieren.
-// Stand laut Nutzerangabe: Juli 2026.
-export const PORTALANFRAGEN_JAHR = 16004;
+// durchgehend den Fehler "missing configuration for resourceType" (zuletzt live geprüft September
+// 2026, auch nach Freigabe zusätzlicher API-Rechte durch den Nutzer weiterhin derselbe Fehler) —
+// das Statistik-Modul ist dort nicht per API freigeschaltet, nur im OnOffice-Backend selbst
+// einsehbar. Wert daher manuell gepflegt, bei Bedarf im OnOffice-Backend unter dem
+// Statistikreiter nachschlagen und hier aktualisieren. Stand laut Nutzerangabe: September 2026.
+export const PORTALANFRAGEN_JAHR = 23952;
 
 // Team-Roster, Stand Juli 2026: Live gegen den OnOffice-Account abgeglichen (resourcetype
 // "user"). Celin Borgwaldt wurde dabei zum 30.06.2026 als deaktiviert festgestellt (Benutzerkonto
