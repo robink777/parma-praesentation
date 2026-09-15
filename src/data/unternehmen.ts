@@ -20,10 +20,14 @@ export const STANDORTE: Standort[] = [
   { name: "Jülich", adresse: "Gereonstraße 1, 52428 Jülich", bilder: ["/standorte/dueren-3.jpg"] },
 ];
 
+// "Team" bewusst NICHT hier als eigene feste Zahl (siehe Unternehmen.tsx, wo sie stattdessen aus
+// TEAM.length abgeleitet wird) — genau ein solcher separat gepflegter Zähler war es, der zuletzt
+// veraltete (Chat-Vorgabe September 2026: "Schau dir bitte nochmal die Benutzer in OnOffice an.
+// Auch diese werden nicht mehr aktualisiert"), weil beim Ergänzen neuer Team-Mitglieder leicht
+// vergessen wird, ihn manuell mit hochzuzählen.
 export const KENNZAHLEN: Kennzahl[] = [
   { label: "Jahre Erfahrung", wert: "6" },
   { label: "Standorte", wert: "3" },
-  { label: "Team", wert: "11" },
 ];
 
 // Google-Bewertung: bewusst NICHT Teil der KENNZAHLEN-Karten-Grid, sondern eigener Abschnitt mit
@@ -41,26 +45,36 @@ export const GOOGLE_BEWERTUNG = { sterne: 5.0, anzahlRezensionen: 241 };
 // Statistikreiter nachschlagen und hier aktualisieren. Stand laut Nutzerangabe: September 2026.
 export const PORTALANFRAGEN_JAHR = 23952;
 
-// Team-Roster, Stand Juli 2026: Live gegen den OnOffice-Account abgeglichen (resourcetype
-// "user"). Celin Borgwaldt wurde dabei zum 30.06.2026 als deaktiviert festgestellt (Benutzerkonto
-// nicht mehr aktiv) und auf Nutzerwunsch aus der Liste entfernt. Dawid Parma wurde ergänzt: aktiver
-// Benutzer in OnOffice (da.parma@parmaimmobilien.com, Adress-ID 44851), der zuvor nicht in dieser
-// Liste stand. Für ihn ist wie für alle anderen kein "jobPosition"-Feld in OnOffice gepflegt
-// (das Feld ist dort für jeden bisher geprüften Mitarbeiter leer) — Rolle daher auf Nutzerangabe
-// "Immobilienmakler" gesetzt, kein Profilfoto in OnOffice hinterlegt (erscheint vorerst mit
-// Initialen-Avatar, siehe Unternehmen.tsx).
+// Team-Roster, Stand September 2026: erneut live gegen den OnOffice-Account abgeglichen
+// (resourcetype "user", alle ~30 Benutzer-Datensätze durchsucht). Christian Rother (Nr. 77,
+// aktiv seit 29.05.2026) und Leon Otten (Nr. 95, aktiv seit 29.07.2026) waren dabei aktive
+// Benutzer, die noch nicht in dieser Liste standen — auf Nutzerangabe ergänzt (Christian Rother:
+// Kaufmännischer Leiter, Leon Otten: Immobilienmakler). Santino Giese (private E-Mail-Domain,
+// kein @parmaimmobilien.com) und Stefanie Scalone (@parmafinanz.de, andere Marke) bewusst NICHT
+// aufgenommen. Tabea Erz/Nilgün Akbay/Celin Borgwaldt bleiben draußen (in OnOffice deaktiviert).
+//
+// Frühere Historie: Celin Borgwaldt wurde zum 30.06.2026 als deaktiviert festgestellt und auf
+// Nutzerwunsch entfernt. Dawid Parma wurde ergänzt: aktiver Benutzer in OnOffice
+// (da.parma@parmaimmobilien.com, Adress-ID 44851), der zuvor nicht in dieser Liste stand. Für ihn
+// ist wie für alle anderen kein "jobPosition"-Feld in OnOffice gepflegt (das Feld ist dort für
+// jeden bisher geprüften Mitarbeiter leer) — Rolle daher auf Nutzerangabe "Immobilienmakler"
+// gesetzt, kein Profilfoto in OnOffice hinterlegt (erscheint vorerst mit Initialen-Avatar, siehe
+// Unternehmen.tsx).
 //
 // adressId/nutzerNr/benutzername (Juli 2026 hierher konsolidiert, siehe TeamMitglied in
 // types/index.ts für die Herleitung/den Grund): drei unterschiedliche OnOffice-ID-Räume für
 // dieselbe Person — adressId fürs address-Modul (Kontaktdaten), nutzerNr fürs user-Modul
 // (Objekt-Betreuer-Zuordnung, Statistik), benutzername der dort zusätzlich verwendete
 // Kurz-Login-Name. Celin Borgwaldt/Christian Rother/Tabea Erz/Nilgün Akbay/Santino Giese haben
-// bewusst KEINEN Eintrag (siehe Datenschutz-/Status-Hinweis, der früher bei
+// bewusst KEINEN adressId-Eintrag (siehe Datenschutz-/Status-Hinweis, der früher bei
 // MITARBEITER_LIVE_ADRESS_IDS in onoffice/estate.ts stand): mehrere Personen haben in OnOffice
 // zusätzlich einen privaten Adressdatensatz (Wohnanschrift/private Kontaktdaten) — hier ist
 // ausschließlich die geschäftliche Adress-ID hinterlegt, damit niemals private Daten auf der
-// öffentlichen Präsentationsseite erscheinen. Tim Hartwich/Dawid Parma haben kein Profilfoto in
-// OnOffice hinterlegt (erscheinen mit Initialen-Avatar).
+// öffentlichen Präsentationsseite erscheinen. Für Christian Rother (September 2026 live geprüft)
+// ist unter seiner geschäftlichen E-Mail nur ein privater Adressdatensatz (Wohnanschrift in
+// Vettweiß/Kelz) hinterlegt — er bekommt daher bewusst nutzerNr/benutzername (für
+// Betreuer-/Statistik-Zuordnung, unkritisch), aber KEINE adressId. Tim Hartwich/Dawid Parma haben
+// kein Profilfoto in OnOffice hinterlegt (erscheinen mit Initialen-Avatar).
 export const TEAM: TeamMitglied[] = [
   {
     name: "Daniel Parma",
@@ -138,6 +152,19 @@ export const TEAM: TeamMitglied[] = [
     adressId: "44851",
     nutzerNr: "79",
     benutzername: "Dawid",
+  },
+  {
+    name: "Christian Rother",
+    rolle: "Kaufmännischer Leiter",
+    nutzerNr: "77",
+    benutzername: "Christian",
+  },
+  {
+    name: "Leon Otten",
+    rolle: "Immobilienmakler",
+    adressId: "46243",
+    nutzerNr: "95",
+    benutzername: "Leon",
   },
 ];
 

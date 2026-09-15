@@ -79,7 +79,14 @@ export function Unternehmen({
   kennzahlen: { verkaufteObjekte: number | null; kundenNummer: number | null } | null;
 }) {
   const fotos = fotoLookup(alleMitarbeiter);
-  const alleKennzahlen = [...KENNZAHLEN, ...liveKennzahlen(kennzahlen)];
+  // "Team" aus TEAM.length abgeleitet statt als eigene Zahl in data/unternehmen.ts gepflegt (siehe
+  // Kommentar bei KENNZAHLEN) — kann dadurch nicht mehr unabhängig von der tatsächlichen
+  // Team-Liste veralten.
+  const alleKennzahlen = [
+    ...KENNZAHLEN,
+    { label: "Team", wert: String(TEAM.length) },
+    ...liveKennzahlen(kennzahlen),
+  ];
 
   return (
     <SectionShell label="Über uns" title="Parma Immobilien">
@@ -87,7 +94,7 @@ export function Unternehmen({
         2020 gegründet, um dem Maklerberuf wieder ein seriöses Bild zu geben: Der
         Dienstleistungsgedanke steht bei uns über allem — wir suchen nicht den schnellen
         Abschluss, sondern das beste Ergebnis für alle Beteiligten. Heute sind wir mit einem
-        elfköpfigen Team an drei Standorten in der Region Düren für Sie da.
+        dreizehnköpfigen Team an drei Standorten in der Region Düren für Sie da.
       </p>
 
       <div className="mb-lg grid grid-cols-2 gap-sm md:grid-cols-3">
