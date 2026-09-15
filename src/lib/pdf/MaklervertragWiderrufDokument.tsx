@@ -11,7 +11,6 @@ import {
   Zeile,
   Formularzeile,
   formatiereBetragPdf,
-  heute,
 } from "./bausteine";
 
 // Eigenständiges Dokument "Maklervertrag + Widerruf" (Chat-Vorgabe September 2026: "Maklervertrag
@@ -20,10 +19,6 @@ import {
 // sind jetzt eigenständige Dokumente (siehe LeistungsversprechenDokument.tsx,
 // DatenschutzDokument.tsx), bleiben inhaltlich im Vertragstext (§ 10) aber weiterhin als "Anlage
 // 1"/"Anlage 2" referenziert, da sie dem Kunden gemeinsam mit diesem Dokument übergeben werden.
-const DOKUMENTTEILE = [
-  { titel: "Maklervertrag", anlage: undefined },
-  { titel: "Widerrufsbelehrung", anlage: "Anlage 2" },
-];
 
 export interface MaklervertragWiderrufDokumentProps {
   kunde: Kunde;
@@ -42,12 +37,6 @@ export function MaklervertragWiderrufDokument({
 }: MaklervertragWiderrufDokumentProps) {
   const logo = ladeLogo();
   const kundeName = [kunde.anrede, kunde.vorname, kunde.nachname].filter(Boolean).join(" ");
-  const kundeAdresse = [kunde.strasse, [kunde.plz, kunde.ort].filter(Boolean).join(" ")]
-    .filter(Boolean)
-    .join(", ");
-  const objektAdresse = [immobilie.strasse, [immobilie.plz, immobilie.ort].filter(Boolean).join(", ")]
-    .filter(Boolean)
-    .join(", ");
   const gewaehltesPaketDaten = LEISTUNGSPAKETE.find((p) => p.id === gewaehltesPaket);
 
   // Eine eigene Unterschriftszeile pro erfasster Vertragspartei (auftraggeber1 + weitere
@@ -62,107 +51,15 @@ export function MaklervertragWiderrufDokument({
     <Document title={`Maklervertrag ${kundeName || "Parma Immobilien"}`.trim()}>
       {/* ── Teil 1: Maklervertrag ───────────────────────────────────────────────── */}
 
-      {/* Deckblatt */}
+      {/* § 1–3 — bewusst OHNE separates Deckblatt und OHNE eigene Stammdaten-Seite davor (Chat-
+          Vorgabe September 2026: "Die ersten beiden Seiten sind völlig nutzlos"). Beide vorher
+          hier vorangestellten Seiten bestanden fast ausschließlich aus Daten, die dem
+          Kunden/der Kundin bereits bekannt sind (eigener Name, eigenes Objekt) und ließen dabei
+          jeweils über die Hälfte der Seite leer — der Vertrag beginnt jetzt direkt mit den
+          rechtlich relevanten Vertragsparteien (Karten unten) und § 1. Logo wandert hierher,
+          damit das Dokument weiterhin ab der ersten Seite als Parma-Dokument erkennbar ist. */}
       <Page size="A4" style={styles.page}>
         {logo && <Image src={logo} style={styles.logo} />}
-        <Text style={styles.label}>Mandat &amp; Leistungsversprechen</Text>
-        <Text style={styles.h1}>Maklervertrag</Text>
-        <View style={{ flexDirection: "row", marginBottom: 8 }}>
-          <View style={{ ...styles.card, flex: 1, marginRight: 6 }}>
-            <Text style={{ ...styles.small, fontFamily: "Courier", marginBottom: 4 }}>
-              VERKÄUFER/IN · AUFTRAGGEBER/IN
-            </Text>
-            <Text style={{ ...styles.text, fontFamily: "Helvetica-Bold" }}>{kundeName || "—"}</Text>
-            {kundeAdresse && <Text style={styles.text}>{kundeAdresse}</Text>}
-          </View>
-          <View style={{ ...styles.card, flex: 1 }}>
-            <Text style={{ ...styles.small, fontFamily: "Courier", marginBottom: 4 }}>OBJEKT</Text>
-            <Text style={{ ...styles.text, fontFamily: "Helvetica-Bold" }}>
-              {immobilie.bezeichnung || objektAdresse || "—"}
-            </Text>
-            {objektAdresse && <Text style={styles.text}>{objektAdresse}</Text>}
-            {immobilie.kaufpreis ? (
-              <Text style={styles.text}>Kaufpreis: {formatiereBetragPdf(immobilie.kaufpreis)}</Text>
-            ) : null}
-          </View>
-        </View>
-        {gewaehltesPaketDaten && (
-          <View style={{ marginTop: 4, marginBottom: 24 }}>
-            <Text style={styles.badge}>Gewähltes Paket</Text>
-            <Text style={{ ...styles.h2, marginTop: 0, borderBottom: "none", paddingBottom: 0 }}>
-              {gewaehltesPaketDaten.name} · {gewaehltesPaketDaten.provisionProzent.toLocaleString("de-DE")} %
-            </Text>
-          </View>
-        )}
-
-        <View style={{ marginTop: "auto", paddingTop: 24, borderTop: `0.5pt solid ${FARBE.sand}` }}>
-          <Text style={styles.label}>Inhalt dieses Dokuments</Text>
-          {DOKUMENTTEILE.map((teil, i) => (
-            <View
-              key={teil.titel}
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                paddingVertical: 4,
-                borderBottom: i < DOKUMENTTEILE.length - 1 ? `0.5pt solid ${FARBE.sand}` : undefined,
-              }}
-            >
-              <Text style={styles.text}>
-                {i + 1}. {teil.titel}
-              </Text>
-              {teil.anlage && <Text style={{ ...styles.small, opacity: 0.65 }}>{teil.anlage}</Text>}
-            </View>
-          ))}
-          <Text style={{ ...styles.small, marginTop: 12 }}>Erstellt am {heute()}</Text>
-        </View>
-        <Fusszeile titel="Deckblatt" />
-      </Page>
-
-      {/* Kunden- und Objektdaten */}
-      <Page size="A4" style={styles.page}>
-        <Text style={styles.label}>Stammdaten</Text>
-        <Text style={styles.h2}>Kundendaten</Text>
-        <Zeile label="Anrede" wert={kunde.anrede} />
-        <Zeile label="Name" wert={[kunde.vorname, kunde.nachname].filter(Boolean).join(" ")} />
-        <Zeile label="Straße" wert={kunde.strasse} />
-        <Zeile label="PLZ / Ort" wert={[kunde.plz, kunde.ort].filter(Boolean).join(" ")} />
-        <Zeile label="Telefon" wert={kunde.telefon} />
-        <Zeile label="E-Mail" wert={kunde.email} />
-
-        <Text style={styles.h2}>Objektdaten</Text>
-        <Zeile label="Bezeichnung" wert={immobilie.bezeichnung} />
-        <Zeile label="ImmoNr." wert={immobilie.immoNr} />
-        <Zeile label="Objektart" wert={immobilie.objektart} />
-        <Zeile label="Adresse" wert={objektAdresse} />
-        <Zeile label="Kaufpreis" wert={formatiereBetragPdf(immobilie.kaufpreis)} />
-        <Zeile label="Wohnfläche" wert={immobilie.wohnflaeche ? `${immobilie.wohnflaeche} m²` : undefined} />
-        <Zeile
-          label="Grundstücksfläche"
-          wert={immobilie.grundstuecksflaeche ? `${immobilie.grundstuecksflaeche} m²` : undefined}
-        />
-        <Zeile label="Zimmer" wert={immobilie.anzahlZimmer} />
-        <Zeile label="Baujahr" wert={immobilie.baujahr} />
-        <Zeile label="Zustand" wert={immobilie.zustand} />
-        <Zeile label="Energieklasse" wert={immobilie.energieklasse} />
-        <Zeile label="Modernisierungen" wert={immobilie.modernisierungen?.join(", ")} />
-        {immobilie.objektbeschreibung && (
-          <>
-            <Text style={styles.h3}>Objektbeschreibung</Text>
-            <Text style={styles.text}>{immobilie.objektbeschreibung}</Text>
-          </>
-        )}
-
-        <Text style={styles.h2}>Bewertung</Text>
-        <Zeile label="Sachwert" wert={formatiereBetragPdf(bewertung.sachwert)} />
-        <Zeile label="Ertragswert" wert={formatiereBetragPdf(bewertung.ertragswert)} />
-        <Zeile label="Vergleichswert" wert={formatiereBetragPdf(bewertung.vergleichswert)} />
-        <Zeile label="Empfohlener Angebotspreis" wert={formatiereBetragPdf(bewertung.empfohlenerAngebotspreis)} />
-        <Zeile label="Stand der Wertermittlung" wert={bewertung.stand} />
-        <Fusszeile titel="Maklervertrag" />
-      </Page>
-
-      {/* § 1–3 */}
-      <Page size="A4" style={styles.page}>
         <Text style={styles.label}>Vertrag</Text>
         <Text style={styles.h1}>Maklervertrag</Text>
 
