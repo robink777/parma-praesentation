@@ -9,15 +9,14 @@ import { Immobilie } from "@/types";
 import { formatiereBetrag } from "@/lib/berechnung";
 import { berechneMittelwerte } from "@/lib/vergleichswert";
 
-// Kleine Trefferliste beim Fokussieren des leeren Suchfelds — analog zu ObjektAuswahl.tsx,
-// dort aber "zuletzt angelegt", hier (vergleichspool=1) "zuletzt erstellt" aus dem Pool
-// verkaufter und aktiv vermarkteter Objekte.
+// Kleine Trefferliste beim Fokussieren des leeren Suchfelds — analog zu ObjektAuswahl.tsx
+// ("zuletzt angelegt"), hier "zuletzt erstellt".
 const NEUESTE_LIMIT = 10;
-// Hohes Limit für die eigentliche Freitextsuche, siehe Begründung in /api/onoffice/route.ts —
-// mit nur 261 Objekten insgesamt im Vergleichspool (verkauft + aktiv vermarktet, Live-Account,
-// September 2026) genügt hier deutlich weniger als das dortige RAW_LISTLIMIT für den vollen
-// "kauf"-Bestand.
-const LISTLIMIT = 250;
+// Wie ObjektAuswahl.tsx: Die Referenzobjekt-Suche greift seit Chat-Vorgabe September 2026
+// ("grundsätzlich ... auf alle Immobilien in onOffice zugreifen können") ohne Status-Filter auf
+// den kompletten Kauf-Bestand zu (kein "vergleichspool"-Parameter mehr an /api/onoffice, siehe
+// dort) — Limit daher identisch zu ObjektAuswahl.tsx gewählt.
+const LISTLIMIT = 200;
 
 function ReferenzobjektSlot({
   objekt,
@@ -69,13 +68,13 @@ function ReferenzobjektSlot({
     setLaden(true);
     setFehler(null);
     try {
-      // vergleichspool=1: Serverseitig auf status2 in [verkauft, aktive_vermarktung] gefiltert
-      // (siehe /api/onoffice/route.ts) — die Suchmaske soll sowohl bereits verkaufte als auch
-      // aktuell aktiv vermarktete Referenzobjekte anbieten (Chat-Vorgabe September 2026: "auch
-      // die Immobilien ... die wir aktuell in der Vermarktung haben, nicht nur die Verkauften").
+      // Kein "vergleichspool"-Parameter (mehr): Die Suchmaske soll auf den kompletten
+      // Kauf-Bestand zugreifen können, unabhängig vom Verkaufs-/Vermarktungsstatus (Chat-Vorgabe
+      // September 2026, siehe /api/onoffice/route.ts) — fällt damit serverseitig automatisch auf
+      // denselben ungefilterten Bestand wie die normale Objektauswahl-Suche zurück.
       const params = query
-        ? new URLSearchParams({ limit: String(LISTLIMIT), suche: query, vergleichspool: "1" })
-        : new URLSearchParams({ limit: String(NEUESTE_LIMIT), neueste: "1", vergleichspool: "1" });
+        ? new URLSearchParams({ limit: String(LISTLIMIT), suche: query })
+        : new URLSearchParams({ limit: String(NEUESTE_LIMIT), neueste: "1" });
 
       const res = await fetch(`/api/onoffice?${params}`);
       const data = await res.json();
@@ -216,23 +215,23 @@ function ReferenzobjektSlot({
 }
 
 // Referenzobjekt-Auswahl: Der Berater/die Beraterin wählt bis zu sechs Vergleichsobjekte aus dem
-// echten OnOffice-Bestand aus (Suchmaske gefiltert auf status2 in [verkauft, aktive_vermarktung],
-// siehe /api/onoffice/route.ts) — bewusst nicht mehr nur tatsächlich verkaufte Objekte (Chat-
-// Vorgabe September 2026: "auch die Immobilien ... die wir aktuell in der Vermarktung haben,
-// nicht nur die Verkauften"), da bei manchen Objekttypen/Lagen zu wenige abgeschlossene Verkäufe
-// vorliegen, um allein daraus einen belastbaren Vergleich zu bilden. Eine frühere automatische
-// Ähnlichkeits-Bewertung gegen einen festen Demo-Objektpool lieferte keine zum jeweiligen
-// Kundenobjekt passenden Treffer und wurde deshalb komplett ersetzt (Juli 2026) — die Auswahl war
-// seitdem rein manuell.
+// echten OnOffice-Bestand aus. Die manuelle Suche greift dabei auf den kompletten Kauf-Bestand zu,
+// unabhängig vom Verkaufs-/Vermarktungsstatus (Chat-Vorgabe September 2026: "grundsätzlich ... auf
+// alle Immobilien in onOffice zugreifen können", siehe /api/onoffice/route.ts) — da bei manchen
+// Objekttypen/Lagen zu wenige abgeschlossene Verkäufe vorliegen, um allein daraus einen
+// belastbaren Vergleich zu bilden. Eine frühere automatische Ähnlichkeits-Bewertung gegen einen
+// festen Demo-Objektpool lieferte keine zum jeweiligen Kundenobjekt passenden Treffer und wurde
+// deshalb komplett ersetzt (Juli 2026) — die Auswahl war seitdem rein manuell.
 // Seit Juli 2026 gibt es zusätzlich wieder eine automatische VORAUSWAHL (siehe
 // lib/vergleichswert.ts, waehleVorauswahl, aufgerufen aus PraesentationApp.tsx): Sie arbeitet
-// gegen denselben echten Vergleichspool statt eines Demo-Pools und nutzt eine explizit
-// vorgegebene, kaskadierende Filterlogik (PLZ exakt → Wohnfläche/Baujahr/Kaufpreis mit Toleranz)
-// statt eines pauschalen Ähnlichkeits-Scores. Sie befüllt nur den leeren Ausgangszustand — die
-// hier implementierte manuelle Suche bleibt unverändert vollständig erhalten, jede Auswahl (ob
-// automatisch vorbefüllt oder manuell gewählt) ist jederzeit anpassbar und austauschbar. Die
-// Auswahl liegt (wie gewaehltesPaket) in PraesentationApp.tsx, damit sie beim Wechsel zwischen
-// Reitern erhalten bleibt.
+// bewusst gegen einen ENGEREN Pool als die manuelle Suche — nur tatsächlich verkaufte Objekte
+// (status2=verkauft, siehe /api/onoffice/route.ts, Parameter "vorauswahl") — und nutzt eine
+// explizit vorgegebene, kaskadierende Filterlogik (PLZ exakt → Wohnfläche/Baujahr/Kaufpreis mit
+// Toleranz) statt eines pauschalen Ähnlichkeits-Scores. Sie befüllt nur den leeren
+// Ausgangszustand — die hier implementierte manuelle Suche bleibt unverändert vollständig
+// erhalten, jede Auswahl (ob automatisch vorbefüllt oder manuell gewählt) ist jederzeit anpassbar
+// und austauschbar. Die Auswahl liegt (wie gewaehltesPaket) in PraesentationApp.tsx, damit sie
+// beim Wechsel zwischen Reitern erhalten bleibt.
 export function Vergleichswert({
   immobilie,
   referenzobjekte,

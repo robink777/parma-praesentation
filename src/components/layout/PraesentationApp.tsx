@@ -113,10 +113,12 @@ export function PraesentationApp({
   // waehleVorauswahl): läuft beim Laden der Präsentation — bewusst hier in PraesentationApp statt
   // in Vergleichswert.tsx, da der Vergleichswert-Reiter beim Wechsel zwischen Reitern
   // unmountet/wieder gemountet wird und der Effekt sonst bei jedem erneuten Öffnen des Reiters
-  // erneut liefe. Holt den Vergleichspool (verkaufte UND aktuell aktiv vermarktete Objekte)
-  // über denselben Endpunkt wie die manuelle Suche (siehe /api/onoffice/route.ts,
-  // vergleichspool=1) und wendet die vom Nutzer vorgegebene, kaskadierende Filterlogik
-  // (PLZ → Wohnfläche → Baujahr → Kaufpreis) an.
+  // erneut liefe. Holt AUSSCHLIESSLICH tatsächlich verkaufte Objekte (siehe
+  // /api/onoffice/route.ts, Parameter "vorauswahl") — bewusst enger als die manuelle Suche im
+  // Vergleichswert-Reiter, die seit Chat-Vorgabe September 2026 den kompletten Kauf-Bestand
+  // durchsucht ("Die erste Vorauswahl sollte aber bitte so bleiben wie gehabt und sich erstmal
+  // nur auf tatsächlich verkaufte Objekte beziehen") — und wendet die vom Nutzer vorgegebene,
+  // kaskadierende Filterlogik (PLZ → Wohnfläche → Baujahr → Kaufpreis) an.
   // Überschreibt NUR den Ausgangszustand (alle Slots noch leer, siehe setReferenzobjekte
   // unten) — jede spätere manuelle Auswahl/Entfernung bleibt danach unangetastet, die Vorauswahl
   // ist also lediglich ein komfortabler Startwert, kein sich aufdrängendes Automatik-Feature.
@@ -148,7 +150,7 @@ export function PraesentationApp({
 
     async function ladeVorauswahl() {
       try {
-        const res = await fetch("/api/onoffice?limit=250&vergleichspool=1");
+        const res = await fetch("/api/onoffice?limit=250&vorauswahl=1");
         if (!res.ok) return;
         const kandidaten = await res.json();
         if (abgebrochen || !Array.isArray(kandidaten)) return;
