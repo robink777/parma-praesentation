@@ -13,7 +13,9 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "unternehmen", label: "Über uns", icon: "building" },
   { id: "objekt", label: "Objektdaten", icon: "house" },
   { id: "dokumente", label: "Bewertungsunterlagen", icon: "document" },
-  { id: "deepimmo", label: "DeepImmo", icon: "externalLink" },
+  // Label "Käuferperspektive" (Chat-Vorgabe September 2026) — die id bleibt "deepimmo", damit
+  // gespeicherte Navigations-Konfigurationen (siehe useAutoSpeichern.ts) gültig bleiben.
+  { id: "deepimmo", label: "Käuferperspektive", icon: "externalLink" },
   // Eigenständige Punkte, bewusst NICHT als Unterpunkte von DeepImmo eingerückt (Chat-Vorgabe
   // Juli 2026: "Bitte die beiden neuen Punkte nicht als Unterpunkte von DeepImmo sondern als
   // eigenständige Punkte ausgeben" — Korrektur einer vorherigen Einrückungs-Vorgabe).

@@ -38,7 +38,7 @@ export function DeepImmo({ immobilie }: { immobilie: Immobilie }) {
   const link = immobilie.deepImmoLink || DEEPIMMO_DEFAULT_LINK;
 
   return (
-    <SectionShell label="DeepImmo" title="DeepImmo-Verknüpfung">
+    <SectionShell label="DeepImmo" title="Käuferperspektive">
       <a href={link} target="_blank" rel="noopener noreferrer" className="group block max-w-[480px]">
         {/* Eigener Card-Aufbau statt der gemeinsamen <Card>-Komponente: die dort fest
             vorgegebene Innen-Polsterung (p-md/md:p-lg) lässt sich per zusätzlicher Klasse nicht
