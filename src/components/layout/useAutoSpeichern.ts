@@ -36,7 +36,7 @@ async function sendeKonfiguration(config: PraesentationConfig, keepalive = false
 // jedes bloße Öffnen einer Präsentation eine Datei anlegen und dabei z.B. die aktuellen
 // Kundendaten aus onOffice einfrieren. Änderungen, die schon während des (bei onOffice teils
 // >10 Sekunden dauernden) Ladens passieren, werden so ebenfalls erfasst.
-export function useAutoSpeichern(config: PraesentationConfig, aktiv: boolean) {
+export function useAutoSpeichern(config: PraesentationConfig, aktiv: boolean, sofortAusloeser?: string) {
   const [status, setStatus] = useState<SpeicherStatus>({ art: "leer" });
   const letzterStand = useRef<string | null>(null);
   const ausstehend = useRef<{ config: PraesentationConfig; json: string } | null>(null);
@@ -46,6 +46,26 @@ export function useAutoSpeichern(config: PraesentationConfig, aktiv: boolean) {
 
   const json = JSON.stringify(config);
 
+  // Sendet den noch ausstehenden Stand (falls vorhanden) sofort, ohne die Wartezeit abzuwarten.
+  function sendeAusstehendes() {
+    const zuSpeichern = ausstehend.current;
+    if (!zuSpeichern) return;
+    ausstehend.current = null;
+    setStatus({ art: "speichert" });
+    kette.current = kette.current.then(async () => {
+      try {
+        await sendeKonfiguration(zuSpeichern.config);
+        letzterStand.current = zuSpeichern.json;
+        setStatus({ art: "gespeichert", zeit: new Date() });
+      } catch (error) {
+        setStatus({
+          art: "fehler",
+          meldung: error instanceof Error ? error.message : "Speichern in onOffice fehlgeschlagen",
+        });
+      }
+    });
+  }
+
   useEffect(() => {
     if (!aktiv) return;
     if (json === letzterStand.current) {
@@ -54,28 +74,21 @@ export function useAutoSpeichern(config: PraesentationConfig, aktiv: boolean) {
     }
 
     ausstehend.current = { config, json };
-    const timer = setTimeout(() => {
-      const zuSpeichern = ausstehend.current;
-      if (!zuSpeichern) return;
-      ausstehend.current = null;
-      setStatus({ art: "speichert" });
-      kette.current = kette.current.then(async () => {
-        try {
-          await sendeKonfiguration(zuSpeichern.config);
-          letzterStand.current = zuSpeichern.json;
-          setStatus({ art: "gespeichert", zeit: new Date() });
-        } catch (error) {
-          setStatus({
-            art: "fehler",
-            meldung: error instanceof Error ? error.message : "Speichern in onOffice fehlgeschlagen",
-          });
-        }
-      });
-    }, SPEICHER_VERZOEGERUNG_MS);
+    const timer = setTimeout(sendeAusstehendes, SPEICHER_VERZOEGERUNG_MS);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [json, aktiv]);
+
+  // Wechselt der Ausloeser (Präsentation gestartet, Navigationspunkt gewechselt — siehe
+  // PraesentationApp.tsx), wird ein noch offener Stand sofort gesichert, statt die Wartezeit
+  // abzuwarten. Bewusst NACH dem Effekt oben deklariert: Bei einer gleichzeitigen Änderung
+  // (Klick auf "Präsentation starten" setzt auch das Änderungs-Flag) hat der Effekt oben den Stand
+  // dann bereits als ausstehend vorgemerkt.
+  useEffect(() => {
+    sendeAusstehendes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sofortAusloeser]);
 
   // Seite wird während der Wartezeit neu geladen/geschlossen (genau der Fall, der das Speichern
   // überhaupt nötig macht): die noch nicht gesendete letzte Änderung mit keepalive absetzen,

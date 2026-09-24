@@ -104,7 +104,7 @@ export function PraesentationApp({
   // ist (siehe Effekt unten) — ab dann speichert useAutoSpeichern jede Änderung zurück nach
   // onOffice. Bleibt false im geteilten Kunden-Link (unveränderbar) und im Demo-Modus (kein
   // onOffice-Objekt, an das eine Datei gehängt werden könnte).
-  const [speichernAktiv, setSpeichernAktiv] = useState(false);
+  const [speichernVerfuegbar, setSpeichernVerfuegbar] = useState(false);
   // Wird true, sobald der Nutzer selbst etwas ändert (Vergleichsobjekt, Navigation, Paket,
   // Vertragsdaten) — erst dann wird in onOffice gespeichert, siehe useAutoSpeichern.ts.
   const [veraendert, setVeraendert] = useState(false);
@@ -129,7 +129,8 @@ export function PraesentationApp({
       gewaehltesPaket,
       maklervertragDaten,
     },
-    speichernAktiv && veraendert
+    speichernVerfuegbar && veraendert,
+    `${praesentationGestartet}|${activeId}`
   );
 
   function referenzobjektAendern(index: number, objekt: Immobilie | null) {
@@ -200,9 +201,8 @@ export function PraesentationApp({
 
     let abgebrochen = false;
 
-    // Liefert den Vorschlag statt ihn selbst anzuwenden — alle State-Änderungen samt
-    // speichernAktiv/vorauswahlLaedt müssen unten in EINEM Schritt passieren, damit der Stand, ab
-    // dem useAutoSpeichern Änderungen erkennt, schon die angewendete Auswahl enthält.
+    // Liefert den Vorschlag statt ihn selbst anzuwenden — der Aufrufer wendet ihn zusammen mit
+    // dem Beenden des Ladezustands (vorauswahlLaedt) in einem Schritt an.
     async function ladeVorauswahl(): Promise<Immobilie[]> {
       try {
         const res = await fetch("/api/onoffice?limit=250&vorauswahl=1");
@@ -258,6 +258,10 @@ export function PraesentationApp({
       const { verfuegbar, config } = await ladeGespeichert();
       if (abgebrochen) return;
 
+      // Ob gespeichert werden kann, steht jetzt fest — bewusst VOR der (bei onOffice teils
+      // >10 Sekunden dauernden) Vorauswahl: Wer "Präsentation starten" klickt oder die Seite
+      // verlässt, bevor sie fertig ist, soll trotzdem sofort eine Datei in onOffice bekommen.
+      setSpeichernVerfuegbar(verfuegbar);
       if (!config) setKonfigGeprueft(true);
 
       if (config) {
@@ -270,14 +274,32 @@ export function PraesentationApp({
         setGewaehltesPaket(config.gewaehltesPaket);
         if (config.maklervertragDaten) setMaklervertragDaten(config.maklervertragDaten);
         setSpeicherStatus({ art: "geladen" });
-        setSpeichernAktiv(true);
-        setVorauswahlLaedt(false);
+        setSpeichernVerfuegbar(true);
+        // Wurde der Stand gespeichert, bevor die (langsame) Vorauswahl fertig war, enthält die
+        // Datei noch keine Vergleichsobjekte — dann wird die Vorauswahl jetzt nachgeholt (siehe
+        // unten), statt dauerhaft mit leeren Slots zu starten.
+        const ohneVergleichsobjekte = geladeneObjekte.every((o) => o === null);
+        setVorauswahlLaedt(ohneVergleichsobjekte);
         // Bereits konfiguriertes Objekt: direkt in die Präsentation (Chat-Vorgabe September 2026:
         // "nach der ersten Voreinstellung nicht mehr auf die Vorbereitungsseite zurückgeführt ...
         // standardmäßig in der Präsentation landen") — zurück zur Vorbereitung geht über die
         // Sidebar (onZurVorbereitung).
         setPraesentationGestartet(true);
         setKonfigGeprueft(true);
+
+        if (ohneVergleichsobjekte) {
+          const nachgeholt = await ladeVorauswahl();
+          if (abgebrochen) return;
+          if (nachgeholt.length > 0) {
+            setReferenzobjekte((prev) =>
+              prev.every((o) => o === null)
+                ? Array.from({ length: ANZAHL_REFERENZOBJEKTE }, (_, i) => nachgeholt[i] ?? null)
+                : prev
+            );
+            setVeraendert(true);
+          }
+          setVorauswahlLaedt(false);
+        }
         return;
       }
 
@@ -294,7 +316,6 @@ export function PraesentationApp({
       // (React Strict Mode Doppel-Mount, siehe Kommentar oben) würde der abgebrochene
       // Probe-Durchlauf sonst den Ladezustand bereits beenden, während der echte Abruf noch
       // läuft (kurzes, nur lokal auf localhost sichtbares Flackern).
-      setSpeichernAktiv(verfuegbar);
       setVorauswahlLaedt(false);
     }
 
