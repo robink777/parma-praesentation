@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { NAV_ITEMS, NavZustandEintrag, erstelleStandardNavZustand, useNavZustand } from "./nav";
 import { useAutoSpeichern } from "./useAutoSpeichern";
+import { ParmaLoader } from "@/components/ParmaLoader";
 import { SpeicherHinweis } from "./SpeicherHinweis";
 import { Vorbereitungsmodus } from "./Vorbereitungsmodus";
 import { Immobilie, LeistungspaketId, Praesentation } from "@/types";
@@ -65,6 +66,10 @@ export function PraesentationApp({
   // URL) aufgerufen wurde. Im readOnly-Modus (geteilter Kunden-Link) entfällt dieser Schritt
   // komplett, da die Konfiguration dort bereits feststeht.
   const [praesentationGestartet, setPraesentationGestartet] = useState(readOnly);
+  // Ob schon geprüft wurde, ob in onOffice ein gespeicherter Stand existiert (siehe Effekt unten)
+  // — bis dahin weder Vorbereitungsmodus noch Präsentation zeigen (sonst blitzt bei bereits
+  // konfigurierten Objekten kurz die Vorbereitungsseite auf), sondern einen Ladezustand.
+  const [konfigGeprueft, setKonfigGeprueft] = useState(readOnly);
   const { navZustand, setNavZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(NAV_ITEMS, initialerNavZustand);
   const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>(initialesPaket);
   // Maklervertrag-Formulardaten liegen seit "Präsentation teilen" (siehe Maklervertrag.tsx)
@@ -253,6 +258,8 @@ export function PraesentationApp({
       const { verfuegbar, config } = await ladeGespeichert();
       if (abgebrochen) return;
 
+      if (!config) setKonfigGeprueft(true);
+
       if (config) {
         const geladeneObjekte = await ladeReferenzobjekte(config.referenzobjektIds);
         if (abgebrochen) return;
@@ -265,6 +272,12 @@ export function PraesentationApp({
         setSpeicherStatus({ art: "geladen" });
         setSpeichernAktiv(true);
         setVorauswahlLaedt(false);
+        // Bereits konfiguriertes Objekt: direkt in die Präsentation (Chat-Vorgabe September 2026:
+        // "nach der ersten Voreinstellung nicht mehr auf die Vorbereitungsseite zurückgeführt ...
+        // standardmäßig in der Präsentation landen") — zurück zur Vorbereitung geht über die
+        // Sidebar (onZurVorbereitung).
+        setPraesentationGestartet(true);
+        setKonfigGeprueft(true);
         return;
       }
 
@@ -292,6 +305,14 @@ export function PraesentationApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (!konfigGeprueft) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-reinweiss">
+        <ParmaLoader label="Präsentation wird geladen" size={120} />
+      </div>
+    );
+  }
+
   if (!praesentationGestartet) {
     return (
       <Vorbereitungsmodus
@@ -307,7 +328,12 @@ export function PraesentationApp({
         onUmschalten={navUmschalten}
         onZuruecksetzen={navZuruecksetzen}
         speicherStatus={speicherStatus}
-        onStart={() => setPraesentationGestartet(true)}
+        onStart={() => {
+          // Der Start gilt als abgeschlossene Voreinstellung: auch ohne weitere Änderung wird der
+          // Stand gespeichert, damit ein Neuladen direkt in der Präsentation landet.
+          setVeraendert(true);
+          setPraesentationGestartet(true);
+        }}
       />
     );
   }
@@ -324,6 +350,7 @@ export function PraesentationApp({
         onUmschalten={navUmschalten}
         onZuruecksetzen={navZuruecksetzen}
         bearbeitungErlaubt={!readOnly}
+        onZurVorbereitung={readOnly ? undefined : () => setPraesentationGestartet(false)}
       />
       <main className="flex-1 overflow-hidden bg-reinweiss">
         {activeId === "begruessung" && (

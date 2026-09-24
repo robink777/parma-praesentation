@@ -36,6 +36,7 @@ export function Sidebar({
   // vom Berater/von der Beraterin im Vorbereitungsmodus getroffene Auswahl nicht mehr ändern
   // können.
   bearbeitungErlaubt = true,
+  onZurVorbereitung,
 }: {
   navItems: NavItem[];
   activeId: string;
@@ -57,6 +58,10 @@ export function Sidebar({
   onUmschalten: (id: string) => void;
   onZuruecksetzen: () => void;
   bearbeitungErlaubt?: boolean;
+  // Führt zurück in den Vorbereitungsmodus (Vergleichsobjekte, Navigation, ...) — die
+  // Präsentation startet bei bereits gespeichertem Stand direkt, ohne Umweg über die Vorbereitung
+  // (siehe PraesentationApp.tsx). Nicht übergeben im geteilten Kunden-Link/Admin-Bereich.
+  onZurVorbereitung?: () => void;
 }) {
   const router = useRouter();
   // Eingeklappter Zustand ist bewusst lokaler Component-State (statt in PraesentationApp
@@ -209,6 +214,17 @@ export function Sidebar({
           >
             <Icon name={eingeklappt ? "chevronRight" : "chevronLeft"} size={18} />
           </button>
+          {onZurVorbereitung && (
+            <button
+              type="button"
+              onClick={onZurVorbereitung}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-walnuss/60 transition-colors hover:bg-reinweiss/60 hover:text-walnuss"
+              title="Zurück zur Vorbereitung"
+              aria-label="Zurück zur Vorbereitung"
+            >
+              <Icon name="sliders" size={18} />
+            </button>
+          )}
           {bearbeitungErlaubt && (
             <button
               type="button"
