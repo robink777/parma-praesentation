@@ -6,6 +6,8 @@ import { Vergleichswert } from "@/components/sections/Vergleichswert";
 import { Immobilie } from "@/types";
 import { NavItem, NavZustandEintrag } from "./nav";
 import { NavZustandBearbeiten } from "./NavZustandBearbeiten";
+import { SpeicherHinweis } from "./SpeicherHinweis";
+import type { SpeicherStatus } from "./useAutoSpeichern";
 
 // Der eigentlichen Präsentation vorgeschalteter Vorbereitungsschritt (Chat-Vorgabe September
 // 2026: "eine Art Bearbeitungsmodus vorgeschaltet ... hier kann man dann die Vergleichsobjekte
@@ -31,6 +33,7 @@ export function Vorbereitungsmodus({
   onVerschieben,
   onUmschalten,
   onZuruecksetzen,
+  speicherStatus,
   onStart,
 }: {
   titel: string;
@@ -44,6 +47,7 @@ export function Vorbereitungsmodus({
   onVerschieben: (index: number, richtung: -1 | 1) => void;
   onUmschalten: (id: string) => void;
   onZuruecksetzen: () => void;
+  speicherStatus: SpeicherStatus;
   onStart: () => void;
 }) {
   return (
@@ -101,11 +105,12 @@ export function Vorbereitungsmodus({
         </Card>
       </div>
 
-      <footer className="sticky bottom-0 flex justify-end border-t border-sand bg-reinweiss px-xl py-md">
+      <footer className="sticky bottom-0 flex items-center justify-between gap-md border-t border-sand bg-reinweiss px-xl py-md">
+        <SpeicherHinweis status={speicherStatus} />
         <button
           type="button"
           onClick={onStart}
-          className="rounded-md bg-messing px-lg py-sm font-medium text-reinweiss transition-colors hover:bg-messing/90"
+          className="ml-auto rounded-md bg-messing px-lg py-sm font-medium text-reinweiss transition-colors hover:bg-messing/90"
         >
           Präsentation starten
         </button>

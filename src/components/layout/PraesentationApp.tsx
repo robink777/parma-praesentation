@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "./Sidebar";
-import { NAV_ITEMS, NavZustandEintrag, useNavZustand } from "./nav";
+import { NAV_ITEMS, NavZustandEintrag, erstelleStandardNavZustand, useNavZustand } from "./nav";
+import { useAutoSpeichern } from "./useAutoSpeichern";
+import { SpeicherHinweis } from "./SpeicherHinweis";
 import { Vorbereitungsmodus } from "./Vorbereitungsmodus";
 import { Immobilie, LeistungspaketId, Praesentation } from "@/types";
 import { Begruessung } from "@/components/sections/Begruessung";
@@ -19,6 +21,7 @@ import { Maklervertrag, baueInitialdaten } from "@/components/sections/Maklerver
 import { Verabschiedung } from "@/components/sections/Verabschiedung";
 import { waehleVorauswahl } from "@/lib/vergleichswert";
 import { MaklervertragDaten } from "@/types";
+import type { PraesentationConfig } from "@/lib/share";
 
 // Anzahl der Vergleichsobjekt-Slots im Vergleichswert-Reiter (Juli 2026 Chat-Vorgabe: "Mache aus
 // den 3 Vergleichsobjekten bitte 6") — eine einzige Stelle statt eines an mehreren Stellen
@@ -62,7 +65,7 @@ export function PraesentationApp({
   // URL) aufgerufen wurde. Im readOnly-Modus (geteilter Kunden-Link) entfällt dieser Schritt
   // komplett, da die Konfiguration dort bereits feststeht.
   const [praesentationGestartet, setPraesentationGestartet] = useState(readOnly);
-  const { navZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(NAV_ITEMS, initialerNavZustand);
+  const { navZustand, setNavZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(NAV_ITEMS, initialerNavZustand);
   const [gewaehltesPaket, setGewaehltesPaket] = useState<LeistungspaketId | undefined>(initialesPaket);
   // Maklervertrag-Formulardaten liegen seit "Präsentation teilen" (siehe Maklervertrag.tsx)
   // hier statt lokal im Reiter selbst — damit sowohl der Share-Link (praesentationTeilen) als
@@ -92,6 +95,14 @@ export function PraesentationApp({
   // Vergleichswert.tsx (zeigtLadeplatzhalter). Start-Wert true, da der Abruf sofort beim Mounten
   // dieser Komponente losläuft (useEffect unten).
   const [vorauswahlLaedt, setVorauswahlLaedt] = useState(true);
+  // Erst true, wenn der aus onOffice geladene Stand bzw. die automatische Vorauswahl angewendet
+  // ist (siehe Effekt unten) — ab dann speichert useAutoSpeichern jede Änderung zurück nach
+  // onOffice. Bleibt false im geteilten Kunden-Link (unveränderbar) und im Demo-Modus (kein
+  // onOffice-Objekt, an das eine Datei gehängt werden könnte).
+  const [speichernAktiv, setSpeichernAktiv] = useState(false);
+  // Wird true, sobald der Nutzer selbst etwas ändert (Vergleichsobjekt, Navigation, Paket,
+  // Vertragsdaten) — erst dann wird in onOffice gespeichert, siehe useAutoSpeichern.ts.
+  const [veraendert, setVeraendert] = useState(false);
   // Sidebar zeigt bei mehreren Eigentümern (Miteigentum/Erbengemeinschaft) jede Person auf einer
   // eigenen Zeile inkl. E-Mail/Telefon (siehe Sidebar.tsx, Chat-Vorgabe: "blende die Mailadresse
   // und Telefonnummer der Kunden in der dauerhaften Navi links ein") — Name bewusst nur Anrede +
@@ -105,9 +116,42 @@ export function PraesentationApp({
     }))
     .filter((k) => k.name);
 
+  const { status: speicherStatus, setStatus: setSpeicherStatus } = useAutoSpeichern(
+    {
+      estateId: daten.immobilie.id,
+      referenzobjektIds: referenzobjekte.filter((o): o is Immobilie => o !== null).map((o) => o.id),
+      navZustand,
+      gewaehltesPaket,
+      maklervertragDaten,
+    },
+    speichernAktiv && veraendert
+  );
+
   function referenzobjektAendern(index: number, objekt: Immobilie | null) {
+    setVeraendert(true);
     setReferenzobjekte((prev) => prev.map((o, i) => (i === index ? objekt : o)));
   }
+
+  const navVerschieben: typeof verschieben = (...args) => {
+    setVeraendert(true);
+    verschieben(...args);
+  };
+  const navUmschalten: typeof umschalten = (...args) => {
+    setVeraendert(true);
+    umschalten(...args);
+  };
+  const navZuruecksetzen = () => {
+    setVeraendert(true);
+    zuruecksetzen();
+  };
+  const paketWaehlen: typeof setGewaehltesPaket = (wert) => {
+    setVeraendert(true);
+    setGewaehltesPaket(wert);
+  };
+  const vertragsdatenAendern: typeof setMaklervertragDaten = (wert) => {
+    setVeraendert(true);
+    setMaklervertragDaten(wert);
+  };
 
   // Automatische Vorauswahl der Vergleichsobjekte (siehe lib/vergleichswert.ts,
   // waehleVorauswahl): läuft beim Laden der Präsentation — bewusst hier in PraesentationApp statt
@@ -119,6 +163,9 @@ export function PraesentationApp({
   // durchsucht ("Die erste Vorauswahl sollte aber bitte so bleiben wie gehabt und sich erstmal
   // nur auf tatsächlich verkaufte Objekte beziehen") — und wendet die vom Nutzer vorgegebene,
   // kaskadierende Filterlogik (PLZ → Wohnfläche → Baujahr → Kaufpreis) an.
+  // Ist für dieses Objekt bereits ein Stand in onOffice gespeichert (siehe useAutoSpeichern.ts,
+  // /api/praesentation-konfig), wird dieser stattdessen geladen und die Vorauswahl übersprungen —
+  // die Vorauswahl liefert nur den Startwert für eine noch nie bearbeitete Präsentation.
   // Überschreibt NUR den Ausgangszustand (alle Slots noch leer, siehe setReferenzobjekte
   // unten) — jede spätere manuelle Auswahl/Entfernung bleibt danach unangetastet, die Vorauswahl
   // ist also lediglich ein komfortabler Startwert, kein sich aufdrängendes Automatik-Feature.
@@ -148,34 +195,97 @@ export function PraesentationApp({
 
     let abgebrochen = false;
 
-    async function ladeVorauswahl() {
+    // Liefert den Vorschlag statt ihn selbst anzuwenden — alle State-Änderungen samt
+    // speichernAktiv/vorauswahlLaedt müssen unten in EINEM Schritt passieren, damit der Stand, ab
+    // dem useAutoSpeichern Änderungen erkennt, schon die angewendete Auswahl enthält.
+    async function ladeVorauswahl(): Promise<Immobilie[]> {
       try {
         const res = await fetch("/api/onoffice?limit=250&vorauswahl=1");
-        if (!res.ok) return;
+        if (!res.ok) return [];
         const kandidaten = await res.json();
-        if (abgebrochen || !Array.isArray(kandidaten)) return;
+        if (!Array.isArray(kandidaten)) return [];
+        return waehleVorauswahl(daten.immobilie, kandidaten, ANZAHL_REFERENZOBJEKTE);
+      } catch {
+        // Stiller Fehlschlag: Die Vorauswahl ist ein Komfort-Feature — schlägt der Abruf fehl,
+        // bleibt die manuelle Suche im Vergleichswert-Reiter unverändert vollständig nutzbar.
+        return [];
+      }
+    }
 
-        const vorschlag = waehleVorauswahl(daten.immobilie, kandidaten, ANZAHL_REFERENZOBJEKTE);
-        if (vorschlag.length === 0) return;
+    // Gespeicherter Stand aus onOffice (siehe /api/praesentation-konfig): null = nichts
+    // gespeichert, Abruf nicht möglich (Demo-Modus) oder fehlgeschlagen — dann läuft wie bisher
+    // die automatische Vorauswahl.
+    async function ladeGespeichert(): Promise<{ verfuegbar: boolean; config: PraesentationConfig | null }> {
+      try {
+        const res = await fetch(`/api/praesentation-konfig?estateId=${encodeURIComponent(daten.immobilie.id)}`);
+        if (!res.ok) return { verfuegbar: false, config: null };
+        const antwort = await res.json();
+        return { verfuegbar: antwort.verfuegbar === true, config: antwort.config ?? null };
+      } catch {
+        return { verfuegbar: false, config: null };
+      }
+    }
 
+    async function ladeReferenzobjekte(ids: string[]): Promise<(Immobilie | null)[]> {
+      return Promise.all(
+        ids.map(async (id) => {
+          try {
+            const res = await fetch(`/api/onoffice?id=${encodeURIComponent(id)}`);
+            return res.ok ? ((await res.json()) as Immobilie) : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+    }
+
+    // Gespeicherte Navigation an die aktuellen NAV_ITEMS angleichen: entfernte Punkte fallen
+    // weg, seit dem Speichern neu hinzugekommene erscheinen mit ihrem Standardzustand.
+    function gleicheNavAb(gespeichert: NavZustandEintrag[]): NavZustandEintrag[] {
+      const standard = erstelleStandardNavZustand(NAV_ITEMS);
+      const bekannt = new Set(standard.map((e) => e.id));
+      const behalten = gespeichert.filter((e) => bekannt.has(e.id));
+      const fehlend = standard.filter((e) => !behalten.some((b) => b.id === e.id));
+      return [...behalten, ...fehlend];
+    }
+
+    async function starten() {
+      const { verfuegbar, config } = await ladeGespeichert();
+      if (abgebrochen) return;
+
+      if (config) {
+        const geladeneObjekte = await ladeReferenzobjekte(config.referenzobjektIds);
+        if (abgebrochen) return;
+        setReferenzobjekte(
+          [...geladeneObjekte, ...Array(ANZAHL_REFERENZOBJEKTE).fill(null)].slice(0, ANZAHL_REFERENZOBJEKTE)
+        );
+        setNavZustand(gleicheNavAb(config.navZustand));
+        setGewaehltesPaket(config.gewaehltesPaket);
+        if (config.maklervertragDaten) setMaklervertragDaten(config.maklervertragDaten);
+        setSpeicherStatus({ art: "geladen" });
+        setSpeichernAktiv(true);
+        setVorauswahlLaedt(false);
+        return;
+      }
+
+      const vorschlag = await ladeVorauswahl();
+      if (abgebrochen) return;
+      if (vorschlag.length > 0) {
         setReferenzobjekte((prev) =>
           prev.every((o) => o === null)
             ? Array.from({ length: ANZAHL_REFERENZOBJEKTE }, (_, i) => vorschlag[i] ?? null)
             : prev
         );
-      } catch {
-        // Stiller Fehlschlag: Die Vorauswahl ist ein Komfort-Feature — schlägt der Abruf fehl,
-        // bleibt die manuelle Suche im Vergleichswert-Reiter unverändert vollständig nutzbar.
-      } finally {
-        // Nur den NICHT abgebrochenen Durchlauf den Ladezustand beenden lassen — im Dev-Modus
-        // (React Strict Mode Doppel-Mount, siehe Kommentar oben) würde der abgebrochene
-        // Probe-Durchlauf sonst den Ladezustand bereits beenden, während der echte Abruf noch
-        // läuft (kurzes, nur lokal auf localhost sichtbares Flackern).
-        if (!abgebrochen) setVorauswahlLaedt(false);
       }
+      // Nur den NICHT abgebrochenen Durchlauf den Ladezustand beenden lassen — im Dev-Modus
+      // (React Strict Mode Doppel-Mount, siehe Kommentar oben) würde der abgebrochene
+      // Probe-Durchlauf sonst den Ladezustand bereits beenden, während der echte Abruf noch
+      // läuft (kurzes, nur lokal auf localhost sichtbares Flackern).
+      setSpeichernAktiv(verfuegbar);
+      setVorauswahlLaedt(false);
     }
 
-    ladeVorauswahl();
+    starten();
     return () => {
       abgebrochen = true;
     };
@@ -193,9 +303,10 @@ export function PraesentationApp({
         vorauswahlLaedt={vorauswahlLaedt}
         navItems={NAV_ITEMS}
         navZustand={navZustand}
-        onVerschieben={verschieben}
-        onUmschalten={umschalten}
-        onZuruecksetzen={zuruecksetzen}
+        onVerschieben={navVerschieben}
+        onUmschalten={navUmschalten}
+        onZuruecksetzen={navZuruecksetzen}
+        speicherStatus={speicherStatus}
         onStart={() => setPraesentationGestartet(true)}
       />
     );
@@ -209,9 +320,9 @@ export function PraesentationApp({
         onSelect={setActiveId}
         kundenKontakte={kundenKontakte}
         navZustand={navZustand}
-        onVerschieben={verschieben}
-        onUmschalten={umschalten}
-        onZuruecksetzen={zuruecksetzen}
+        onVerschieben={navVerschieben}
+        onUmschalten={navUmschalten}
+        onZuruecksetzen={navZuruecksetzen}
         bearbeitungErlaubt={!readOnly}
       />
       <main className="flex-1 overflow-hidden bg-reinweiss">
@@ -252,7 +363,7 @@ export function PraesentationApp({
           />
         )}
         {activeId === "leistungsversprechen" && (
-          <Leistungsversprechen gewaehltesPaket={gewaehltesPaket} onWaehlePaket={setGewaehltesPaket} />
+          <Leistungsversprechen gewaehltesPaket={gewaehltesPaket} onWaehlePaket={paketWaehlen} />
         )}
         {activeId === "maklervertrag" && (
           <Maklervertrag
@@ -261,7 +372,7 @@ export function PraesentationApp({
             referenzobjekte={referenzobjekte}
             navZustand={navZustand}
             daten={maklervertragDaten}
-            onDatenChange={setMaklervertragDaten}
+            onDatenChange={vertragsdatenAendern}
             readOnly={readOnly}
           />
         )}
@@ -276,6 +387,12 @@ export function PraesentationApp({
           />
         )}
       </main>
+      {!readOnly && (
+        <SpeicherHinweis
+          status={speicherStatus}
+          className="pointer-events-none fixed bottom-sm right-md rounded-sm bg-reinweiss/90 px-sm py-xs"
+        />
+      )}
     </div>
   );
 }

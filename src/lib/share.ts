@@ -21,7 +21,7 @@ export interface PraesentationConfig {
   maklervertragDaten?: MaklervertragDaten;
 }
 
-function istPraesentationConfig(wert: unknown): wert is PraesentationConfig {
+export function istPraesentationConfig(wert: unknown): wert is PraesentationConfig {
   if (!wert || typeof wert !== "object") return false;
   const config = wert as Record<string, unknown>;
   return (

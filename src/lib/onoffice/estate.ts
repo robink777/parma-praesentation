@@ -11,6 +11,7 @@ import {
 import { TEAM } from "@/data/unternehmen";
 import { distanzZwischenPlzKm } from "@/lib/geo";
 import { callOnOfficeApi } from "./client";
+import { PRAESENTATIONSDATEI_NAME } from "./praesentationsdatei";
 import {
   ADDRESS_FIELDS,
   BETREUER_FIELDS,
@@ -190,6 +191,9 @@ export async function ladeObjektDokumente(estateId: string): Promise<ObjektDokum
       parameters: {
         estateid: estateId,
         includeImageUrl: "original",
+        // Ohne listlimit liefert onOffice nur 20 Dateien pro Abruf (live geprüft September 2026:
+        // Testobjekt 955 hat 32) — weitere Dokumente würden im Reiter stillschweigend fehlen.
+        listlimit: 500,
       },
     },
   ]);
@@ -197,6 +201,9 @@ export async function ladeObjektDokumente(estateId: string): Promise<ObjektDokum
   const records = result?.response?.results?.[0]?.data?.records || [];
   return records
     .filter((r) => !DOKUMENTE_AUSGESCHLOSSENE_TYPEN.includes(r.elements?.type || ""))
+    // Die interne Präsentations-Konfiguration (siehe praesentationsdatei.ts) ist technisch ein
+    // normales Objektdokument, gehört aber nicht in den "Dokumente"-Reiter für Kunden.
+    .filter((r) => r.elements?.originalname !== PRAESENTATIONSDATEI_NAME)
     .map((r) => mapFileRecord(r, estateId));
 }
 
