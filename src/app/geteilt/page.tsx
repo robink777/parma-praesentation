@@ -1,4 +1,5 @@
 import { PraesentationApp } from "@/components/layout/PraesentationApp";
+import { LadeFehler } from "@/components/layout/LadeFehler";
 import { ladePraesentationsDaten } from "@/lib/praesentation";
 import { ladeImmobilieById } from "@/lib/onoffice/estate";
 import { ONOFFICE_MODE } from "@/lib/onoffice/config";
@@ -55,10 +56,16 @@ export default async function GeteiltPage({
     );
   }
 
-  const [daten, referenzobjekte] = await Promise.all([
-    ladePraesentationsDaten({ estateId: config.estateId, addressId: config.addressId }),
-    ladeReferenzobjekte(config.referenzobjektIds),
-  ]);
+  let daten;
+  let referenzobjekte;
+  try {
+    [daten, referenzobjekte] = await Promise.all([
+      ladePraesentationsDaten({ estateId: config.estateId, addressId: config.addressId }),
+      ladeReferenzobjekte(config.referenzobjektIds),
+    ]);
+  } catch {
+    return <LadeFehler kundenansicht />;
+  }
 
   return (
     <PraesentationApp

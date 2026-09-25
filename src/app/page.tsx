@@ -1,5 +1,6 @@
 import { PraesentationApp } from "@/components/layout/PraesentationApp";
 import { ObjektAuswahl } from "@/components/layout/ObjektAuswahl";
+import { LadeFehler } from "@/components/layout/LadeFehler";
 import { ladePraesentationsDaten } from "@/lib/praesentation";
 
 // Erzwingt dynamisches Rendering bei jedem Aufruf (kein statisches Caching der Seite durch
@@ -34,7 +35,12 @@ export default async function Home({
     return <ObjektAuswahl />;
   }
 
-  const daten = await ladePraesentationsDaten(params);
+  let daten;
+  try {
+    daten = await ladePraesentationsDaten(params);
+  } catch {
+    return <LadeFehler referenz={params.estateId} />;
+  }
 
   return <PraesentationApp daten={daten} />;
 }

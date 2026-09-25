@@ -35,7 +35,9 @@ export interface PraesentationsParams {
 /**
  * Lädt die Daten für eine Präsentation, ausgelöst über den Link aus OnOffice
  * (Query-Parameter estateId / addressId). Solange ONOFFICE_MODE=mock (Default, siehe
- * onoffice/config.ts) oder der Live-Abruf fehlschlägt, werden Demo-Daten verwendet.
+ * onoffice/config.ts), werden Demo-Daten verwendet. Im Live-Betrieb wirft die Funktion dagegen bei
+ * einem nicht ladbaren Objekt einen Fehler (die Seiten zeigen dann LadeFehler.tsx) — früher
+ * erschien hier still eine Demo-Präsentation mit erfundenem Eigentümer.
  * Die übrige Bewertung (Sach-/Ertrags-/Vergleichswert) liegt aktuell als PDF vor und wird nicht
  * automatisch aus OnOffice berechnet — das folgt, sobald die nötigen Felder dort gepflegt sind.
  * Ausnahmen: Die drei PriceHubble-Marktwertfelder sowie das Bewertungsdatum (alle über
@@ -178,8 +180,11 @@ export async function ladePraesentationsDaten(
         };
       }
     } catch (error) {
-      console.error("Live-Abruf aus OnOffice fehlgeschlagen, verwende Demo-Daten:", error);
+      console.error("Live-Abruf aus OnOffice fehlgeschlagen:", error);
+      throw error;
     }
+    // Objekt existiert (noch) nicht in onOffice — bewusst KEIN Rückfall auf Demo-Daten.
+    throw new Error(`Objekt "${params.estateId}" nicht gefunden`);
   }
 
   return {
