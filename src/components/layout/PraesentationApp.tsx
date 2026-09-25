@@ -23,6 +23,7 @@ import { Verabschiedung } from "@/components/sections/Verabschiedung";
 import { waehleVorauswahl } from "@/lib/vergleichswert";
 import { MaklervertragDaten } from "@/types";
 import type { PraesentationConfig } from "@/lib/share";
+import { gleicheVertragsdatenAb } from "@/lib/maklervertragAbgleich";
 
 // Anzahl der Vergleichsobjekt-Slots im Vergleichswert-Reiter (Juli 2026 Chat-Vorgabe: "Mache aus
 // den 3 Vergleichsobjekten bitte 6") — eine einzige Stelle statt eines an mehreren Stellen
@@ -79,10 +80,14 @@ export function PraesentationApp({
   // Standardwerte (baueInitialdaten). Im geteilten Link kommt initialesMaklervertragDaten aus
   // der Konfiguration (siehe app/geteilt/page.tsx); live wird es wie zuvor aus den Objekt-/
   // Kundendaten vorausgefüllt.
+  // Der aus den AKTUELLEN onOffice-Daten vorgeschlagene Ausgangsstand — wird beim Speichern als
+  // "Basis" mitgeschrieben und beim Laden mit dem gespeicherten Stand abgeglichen, damit nur echte
+  // Nutzeränderungen erhalten bleiben (siehe lib/maklervertragAbgleich.ts).
+  const [vertragsBasis] = useState<MaklervertragDaten>(() =>
+    baueInitialdaten(daten.kunde, daten.weitereEigentuemer, daten.immobilie, daten.bewertung)
+  );
   const [maklervertragDaten, setMaklervertragDaten] = useState<MaklervertragDaten>(
-    () =>
-      initialesMaklervertragDaten ??
-      baueInitialdaten(daten.kunde, daten.weitereEigentuemer, daten.immobilie, daten.bewertung)
+    () => initialesMaklervertragDaten ?? vertragsBasis
   );
   // Referenzobjekte im Vergleichswert-Reiter (siehe Vergleichswert.tsx) — hier (statt lokal im
   // Reiter selbst) gehalten, damit die Auswahl beim Wechsel zwischen Reitern erhalten bleibt,
@@ -128,6 +133,7 @@ export function PraesentationApp({
       navZustand,
       gewaehltesPaket,
       maklervertragDaten,
+      maklervertragBasis: vertragsBasis,
     },
     speichernVerfuegbar && veraendert,
     `${praesentationGestartet}|${activeId}`
@@ -272,7 +278,13 @@ export function PraesentationApp({
         );
         setNavZustand(gleicheNavAb(config.navZustand));
         setGewaehltesPaket(config.gewaehltesPaket);
-        if (config.maklervertragDaten) setMaklervertragDaten(config.maklervertragDaten);
+        if (config.maklervertragDaten) {
+          // Aus onOffice abgeleitete Felder (Eigentümer, Anschrift, Objekt, Kaufpreis, Auftragsdauer)
+          // kommen aktuell, nur vom Nutzer geänderte bleiben — siehe lib/maklervertragAbgleich.ts.
+          setMaklervertragDaten(
+            gleicheVertragsdatenAb(config.maklervertragDaten, config.maklervertragBasis, vertragsBasis)
+          );
+        }
         setSpeicherStatus({ art: "geladen" });
         setSpeichernVerfuegbar(true);
         // Wurde der Stand gespeichert, bevor die (langsame) Vorauswahl fertig war, enthält die

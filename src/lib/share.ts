@@ -19,6 +19,11 @@ export interface PraesentationConfig {
   // automatischen Standardwerte erzeugen (baueInitialdaten) und dabei jede manuelle Anpassung
   // aus dem Beratungstermin verlieren (z.B. eingetragene Mängel, individuelle Vereinbarungen).
   maklervertragDaten?: MaklervertragDaten;
+  // Nur für die in onOffice gespeicherte Konfiguration (siehe lib/onoffice/praesentationsdatei.ts,
+  // lib/maklervertragAbgleich.ts): der beim Speichern automatisch vorgeschlagene Ausgangsstand der
+  // Vertragsdaten — daran erkennt der Abgleich beim Laden, welche Felder der Nutzer wirklich
+  // geändert hat und welche nur eingefrorene Vorschlagswerte aus onOffice sind.
+  maklervertragBasis?: MaklervertragDaten;
 }
 
 export function istPraesentationConfig(wert: unknown): wert is PraesentationConfig {
