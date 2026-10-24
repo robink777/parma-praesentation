@@ -6,10 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "node scripts/copy-maplibre-worker.cjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
+    "maplibre-gl": "^6.15.0",
     "next": "^15.5.20",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

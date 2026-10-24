@@ -7,6 +7,7 @@ import { useNavZustand } from "@/components/layout/nav";
 import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { Kontrolle } from "./Kontrolle";
 import { Leadquellen } from "./Leadquellen";
+import { Objektkarte } from "./Objektkarte";
 import { AKQUISE_NAMEN, SETTING_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unternehmen";
 import { Icon } from "@/components/icons/Icon";
 import { formatiereBetrag } from "@/lib/berechnung";
@@ -16,6 +17,7 @@ import {
   MitarbeiterKennzahlen,
   MitarbeiterObjekt,
   ObjektGesamtKennzahlen,
+  ObjektkarteDaten,
   TeamMitglied,
 } from "@/types";
 
@@ -780,11 +782,13 @@ export function Mitarbeiterstatistik({
   gesamtKennzahlen,
   kontrollObjekte,
   leadquellenKennzahlen,
+  objektkarteDaten,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
   kontrollObjekte?: KontrollObjekt[];
   leadquellenKennzahlen?: LeadquellenKennzahlen;
+  objektkarteDaten?: ObjektkarteDaten;
 }) {
   const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
   const [abschnitt, setAbschnitt] = useState("uebersicht");
@@ -872,6 +876,15 @@ export function Mitarbeiterstatistik({
         {abschnitt === "kontrolle" && (
           <SectionShell label="Admin-Bereich" title="Kontrolle">
             <Kontrolle objekte={kontrollObjekte} />
+          </SectionShell>
+        )}
+        {abschnitt === "karte" && (
+          <SectionShell label="Admin-Bereich" title="Objektkarte">
+            <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
+              Objekte im Landkreis Düren nach PLZ, aufgeteilt nach Akquise, aktivem Verkauf und
+              bereits verkauften Objekten.
+            </p>
+            <Objektkarte daten={objektkarteDaten} />
           </SectionShell>
         )}
       </main>

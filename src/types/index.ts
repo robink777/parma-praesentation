@@ -410,6 +410,25 @@ export interface KontrollObjekt {
   probleme: string[];
 }
 
+// Objektzahlen je PLZ für die Objektkarte im Admin-Bereich (siehe onoffice/estate.ts,
+// ladeObjektkarteDaten, components/admin/Objektkarte.tsx) — Chat-Vorgabe Oktober 2026: "wo die
+// Objekte sind die wir a) akquirieren b) verkaufen und c) verkauft haben". Die drei Kategorien
+// bilden den onOffice-Status2 gebündelt ab (siehe Kommentar bei ladeObjektkarteDaten für die
+// genaue Zuordnung) — vermietungsart=kauf, wie überall sonst in der App.
+export interface ObjektkartePlzEintrag {
+  plz: string;
+  akquise: number;
+  verkaufen: number;
+  verkauft: number;
+}
+
+export interface ObjektkarteDaten {
+  jePlz: ObjektkartePlzEintrag[];
+  // Objekte ohne (auswertbare) PLZ — fließen nicht in die Karte ein, werden aber separat
+  // ausgewiesen, damit sie nicht kommentarlos verschwinden.
+  ohnePlz: number;
+}
+
 // Unternehmensweite Lead-Herkunft-Übersicht für die "Leadquellen"-Seite im Admin-Bereich (siehe
 // ladeLeadquellenKennzahlen in onoffice/estate.ts, Chat-Vorgabe August 2026: "wo kommen die
 // Leads" / "Mach zwischen Mitarbeiter und Kontrolle bitte noch eine Kachel mit Leadquellen").

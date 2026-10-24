@@ -1,5 +1,8 @@
 # dependencies
 /node_modules
+# von scripts/copy-maplibre-worker.cjs (postinstall) generiert, siehe components/admin/
+# Objektkarte.tsx — kein Quelltext, wird bei jedem "npm install" frisch aus node_modules kopiert.
+/public/vendor
 /.pnp
 .pnp.js
 .yarn/install-state.gz

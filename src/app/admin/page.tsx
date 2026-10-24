@@ -4,12 +4,13 @@ import {
   ladeMitarbeiterKennzahlen,
   ladeObjektGesamtKennzahlen,
 } from "@/lib/onoffice/mitarbeiterstatistik";
-import { ladeKontrollObjekte, ladeLeadquellenKennzahlen } from "@/lib/onoffice/estate";
+import { ladeKontrollObjekte, ladeLeadquellenKennzahlen, ladeObjektkarteDaten } from "@/lib/onoffice/estate";
 import {
   KontrollObjekt,
   LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
   ObjektGesamtKennzahlen,
+  ObjektkarteDaten,
 } from "@/types";
 
 // Admin-Bereich, zusätzlich zur App-weiten Anmeldung durch ein zweites, separates Passwort
@@ -31,42 +32,50 @@ export default async function AdminPage() {
   let gesamtKennzahlen: ObjektGesamtKennzahlen | undefined;
   let kontrollObjekte: KontrollObjekt[] | undefined;
   let leadquellenKennzahlen: LeadquellenKennzahlen | undefined;
+  let objektkarteDaten: ObjektkarteDaten | undefined;
 
   if (ONOFFICE_MODE === "live") {
-    // Alle vier Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
+    // Alle fünf Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
     // voneinander, ein sequenzielles await würde die Ladezeit der Seite unnötig verlängern.
     // Trotzdem einzeln abgesichert (separate try/catch statt einem gemeinsamen um das
     // Promise.all) — schlägt einer der Abrufe fehl, sollen die übrigen trotzdem angezeigt werden
     // (analog zum bestehenden Muster der einzelnen .catch(() => null) in ladeMitarbeiterKennzahlen).
-    const [kennzahlenErgebnis, gesamtKennzahlenErgebnis, kontrollErgebnis, leadquellenErgebnis] =
-      await Promise.all([
-        ladeMitarbeiterKennzahlen().catch((error) => {
-          console.error(
-            "Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:",
-            error
-          );
-          return undefined;
-        }),
-        ladeObjektGesamtKennzahlen().catch((error) => {
-          console.error(
-            "Live-Abruf der unternehmensweiten Objekt-Gesamtkennzahlen aus OnOffice fehlgeschlagen:",
-            error
-          );
-          return undefined;
-        }),
-        ladeKontrollObjekte().catch((error) => {
-          console.error("Live-Abruf der Kontrollobjekte aus OnOffice fehlgeschlagen:", error);
-          return undefined;
-        }),
-        ladeLeadquellenKennzahlen().catch((error) => {
-          console.error("Live-Abruf der Leadquellen aus OnOffice fehlgeschlagen:", error);
-          return undefined;
-        }),
-      ]);
+    const [
+      kennzahlenErgebnis,
+      gesamtKennzahlenErgebnis,
+      kontrollErgebnis,
+      leadquellenErgebnis,
+      objektkarteErgebnis,
+    ] = await Promise.all([
+      ladeMitarbeiterKennzahlen().catch((error) => {
+        console.error("Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+      ladeObjektGesamtKennzahlen().catch((error) => {
+        console.error(
+          "Live-Abruf der unternehmensweiten Objekt-Gesamtkennzahlen aus OnOffice fehlgeschlagen:",
+          error
+        );
+        return undefined;
+      }),
+      ladeKontrollObjekte().catch((error) => {
+        console.error("Live-Abruf der Kontrollobjekte aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+      ladeLeadquellenKennzahlen().catch((error) => {
+        console.error("Live-Abruf der Leadquellen aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+      ladeObjektkarteDaten().catch((error) => {
+        console.error("Live-Abruf der Objektkarte aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+    ]);
     kennzahlen = kennzahlenErgebnis;
     gesamtKennzahlen = gesamtKennzahlenErgebnis;
     kontrollObjekte = kontrollErgebnis;
     leadquellenKennzahlen = leadquellenErgebnis;
+    objektkarteDaten = objektkarteErgebnis;
   }
 
   // Kein SectionShell-Wrapper mehr — Mitarbeiterstatistik baut seit August 2026 ihr eigenes
@@ -78,6 +87,7 @@ export default async function AdminPage() {
       gesamtKennzahlen={gesamtKennzahlen}
       kontrollObjekte={kontrollObjekte}
       leadquellenKennzahlen={leadquellenKennzahlen}
+      objektkarteDaten={objektkarteDaten}
     />
   );
 }

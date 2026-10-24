@@ -13,4 +13,8 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "mitarbeiter", label: "Mitarbeiter", icon: "team" },
   { id: "leadquellen", label: "Leadquellen", icon: "location" },
   { id: "kontrolle", label: "Kontrolle", icon: "warning" },
+  // Objektkarte (siehe components/admin/Objektkarte.tsx), Chat-Vorgabe Oktober 2026: "über
+  // OpenStreetMap gehostete Karte ... zeigt wo die Objekte sind, die wir akquirieren/verkaufen/
+  // verkauft haben". Eigenes Icon "globe" statt "location" (das trägt bereits Leadquellen).
+  { id: "karte", label: "Objektkarte", icon: "globe" },
 ];

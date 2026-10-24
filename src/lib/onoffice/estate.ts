@@ -7,6 +7,8 @@ import {
   LeadquellenKennzahlen,
   MitarbeiterObjekt,
   ObjektDokument,
+  ObjektkarteDaten,
+  ObjektkartePlzEintrag,
 } from "@/types";
 import { TEAM } from "@/data/unternehmen";
 import { distanzZwischenPlzKm } from "@/lib/geo";
@@ -1794,6 +1796,88 @@ export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
   }
 
   return ergebnis;
+}
+
+interface RawObjektkarteRecord {
+  id: string;
+  elements: { plz?: string; status2?: string };
+}
+
+const OBJEKTKARTE_FIELDS = ["Id", "plz", "status2"];
+
+async function ladeObjektkarteRecordsSeite(offset: number): Promise<RawObjektkarteRecord[]> {
+  const result = await callOnOfficeApi<RawObjektkarteRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: OBJEKTKARTE_FIELDS,
+        // vermarktungsart=kauf wie überall sonst in der App (siehe z.B. api/onoffice/route.ts) —
+        // Vermietungsobjekte gehören nicht in die Akquise-/Verkaufsübersicht.
+        filter: { vermarktungsart: [{ op: "=", val: "kauf" }] },
+        listlimit: GESAMT_OBJEKT_LISTLIMIT,
+        listoffset: offset,
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.records || [];
+}
+
+// Objektzahlen je PLZ für die Objektkarte im Admin-Bereich (siehe components/admin/
+// Objektkarte.tsx, Chat-Vorgabe Oktober 2026: "zeigt wo die Objekte sind die wir a) akquirieren
+// b) verkaufen und c) verkauft haben"). onOffice kennt dafür fünf status2-Werte (siehe
+// permitted_values, Live-Feldkatalog geprüft September 2026) — auf die drei vom Nutzer genannten
+// Kategorien gebündelt, statt Objekte in weiteren, nicht genannten Stufen (vorbereitung,
+// reserviert) kommentarlos von der Karte verschwinden zu lassen:
+//   - akquirieren: in_akquise (Erstansprache/Bewertung) UND vorbereitung (bereits beauftragt,
+//     Vermarktung aber noch nicht gestartet — gehört inhaltlich noch zur Akquise-Pipeline)
+//   - verkaufen: aktive_vermarktung UND reserviert (ein reserviertes Objekt wird noch aktiv
+//     verkauft, der Notarvertrag steht nur noch aus)
+//   - verkauft: verkauft
+// Paginiert wie ladeKontrollObjekte oben (GESAMT_OBJEKT_LISTLIMIT-Schritte).
+export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
+  const alle: RawObjektkarteRecord[] = [];
+  let offset = 0;
+  for (;;) {
+    const seite = await ladeObjektkarteRecordsSeite(offset);
+    alle.push(...seite);
+    if (seite.length < GESAMT_OBJEKT_LISTLIMIT) break;
+    offset += GESAMT_OBJEKT_LISTLIMIT;
+  }
+
+  const AKQUISE_STATUS = new Set(["in_akquise", "vorbereitung"]);
+  const VERKAUFEN_STATUS = new Set(["aktive_vermarktung", "reserviert"]);
+
+  const zaehlerJePlz = new Map<string, ObjektkartePlzEintrag>();
+  let ohnePlz = 0;
+
+  for (const record of alle) {
+    const plz = record.elements.plz?.trim();
+    const status2 = record.elements.status2;
+    if (!plz) {
+      ohnePlz++;
+      continue;
+    }
+
+    let eintrag = zaehlerJePlz.get(plz);
+    if (!eintrag) {
+      eintrag = { plz, akquise: 0, verkaufen: 0, verkauft: 0 };
+      zaehlerJePlz.set(plz, eintrag);
+    }
+
+    if (status2 === "verkauft") eintrag.verkauft++;
+    else if (status2 && VERKAUFEN_STATUS.has(status2)) eintrag.verkaufen++;
+    else if (status2 && AKQUISE_STATUS.has(status2)) eintrag.akquise++;
+    // Andere/leere status2-Werte (z.B. ganz neue, noch unkategorisierte Objekte) zählen bewusst
+    // in keine der drei vom Nutzer genannten Kategorien — der PLZ-Eintrag selbst wird trotzdem
+    // angelegt, damit ein Objekt mit gültiger PLZ aber unbekanntem Status nicht fälschlich unter
+    // "ohnePlz" auftaucht.
+  }
+
+  return { jePlz: [...zaehlerJePlz.values()], ohnePlz };
 }
 
 function chunkArray<T>(werte: T[], groesse: number): T[][] {
