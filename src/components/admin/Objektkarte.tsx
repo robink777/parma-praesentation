@@ -79,10 +79,10 @@ const KLICK_ZOOM = 10.6;
 // Deckkraft der PLZ-Flächenfüllung (Messing) im Ruhezustand — "gering", wie gefordert, aber
 // noch sichtbar genug, dass die Akzentfarbe über die gesamte Kreisfläche hinweg erkennbar bleibt.
 const PLZ_FUELLUNG_RUHE = 0.12;
-// Bei Hover bewusst nicht 100 %, sondern 80 % — darunter sollen Straßen/Orte der Kartenbasis
+// Bei Hover bewusst nicht 100 %, sondern 60 % — darunter sollen Straßen/Orte der Kartenbasis
 // weiterhin durchscheinen (Chat-Vorgabe Oktober 2026: "100% Füllung ist zu viel ... man soll die
-// Straßen usw. noch sehen").
-const PLZ_FUELLUNG_HOVER = 0.8;
+// Straßen usw. noch sehen", nach 80% noch "immernoch recht viel").
+const PLZ_FUELLUNG_HOVER = 0.6;
 
 const KARTENSTIL: StyleSpecification = {
   version: 8,
