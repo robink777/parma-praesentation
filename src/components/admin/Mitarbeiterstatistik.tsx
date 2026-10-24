@@ -878,15 +878,10 @@ export function Mitarbeiterstatistik({
             <Kontrolle objekte={kontrollObjekte} />
           </SectionShell>
         )}
-        {abschnitt === "karte" && (
-          <SectionShell label="Admin-Bereich" title="Objektkarte">
-            <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
-              Objekte im Landkreis Düren nach PLZ, aufgeteilt nach Akquise, aktivem Verkauf und
-              bereits verkauften Objekten.
-            </p>
-            <Objektkarte daten={objektkarteDaten} />
-          </SectionShell>
-        )}
+        {/* Kein SectionShell hier (anders als die übrigen Reiter) — Objektkarte.tsx baut ihr
+            eigenes Vollbild-Layout mit Stein- statt Reinweiß-Hintergrund auf, Chat-Vorgabe
+            Oktober 2026: "optische Abgrenzung zu den anderen Bereichen". */}
+        {abschnitt === "karte" && <Objektkarte daten={objektkarteDaten} />}
       </main>
     </div>
   );
