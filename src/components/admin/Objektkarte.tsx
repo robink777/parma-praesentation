@@ -79,6 +79,10 @@ const KLICK_ZOOM = 10.6;
 // Deckkraft der PLZ-Flächenfüllung (Messing) im Ruhezustand — "gering", wie gefordert, aber
 // noch sichtbar genug, dass die Akzentfarbe über die gesamte Kreisfläche hinweg erkennbar bleibt.
 const PLZ_FUELLUNG_RUHE = 0.12;
+// Bei Hover bewusst nicht 100 %, sondern 80 % — darunter sollen Straßen/Orte der Kartenbasis
+// weiterhin durchscheinen (Chat-Vorgabe Oktober 2026: "100% Füllung ist zu viel ... man soll die
+// Straßen usw. noch sehen").
+const PLZ_FUELLUNG_HOVER = 0.8;
 
 const KARTENSTIL: StyleSpecification = {
   version: 8,
@@ -248,7 +252,7 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
           // Deckkraft. Wenn man drüber geht mit der Maus, soll der Bereich volle Deckkraft
           // haben." — über Feature-State je PLZ-Fläche gesteuert (siehe mousemove/mouseleave
           // unten), nicht global, damit nur die gerade überfahrene Fläche hervortritt.
-          "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, PLZ_FUELLUNG_RUHE],
+          "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], PLZ_FUELLUNG_HOVER, PLZ_FUELLUNG_RUHE],
           "fill-opacity-transition": { duration: 150 },
         },
       });
