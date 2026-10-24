@@ -20,13 +20,13 @@ import kreisUmrissGeoJson from "@/data/geo/landkreis-dueren-umriss.json";
 // sofort lädt). Kartenkacheln kommen live von OpenFreeMap (siehe KARTENSTIL unten) — ein
 // OSM-basierter, kostenloser Kachel-Dienst ohne API-Key, bereits im Vorprojekt erprobt.
 //
-// Bewusst zentrumsbasierte Marker statt einer Flächen-Einfärbung nach Objektzahl: Eine
-// durchgehende Farbverlaufs-Füllung über alle 18 Gebiete würde der CI-Regel "Messing max. einmal
-// pro Sichtbereich" widersprechen (viele unterschiedlich intensive Messing-Töne gleichzeitig).
-// Stattdessen bleiben die Flächen neutral (Stein-Füllung, Walnuss-Umriss), die drei Kategorien
-// erscheinen nur als kompakte, weiße Stat-Karten an den PLZ-Mittelpunkten — "Verkaufen" ist dabei
-// bewusst der einzige Messing-Akzent der Karte (aktiver Vermarktungsstatus), Akquise und Verkauft
-// nutzen gedeckte Walnuss-/Asche-Töne.
+// Zentrumsbasierte Marker statt einer Flächen-Einfärbung nach Objektzahl: Die drei Kategorien
+// erscheinen als kompakte, weiße Stat-Karten an den PLZ-Mittelpunkten, nicht als unterschiedlich
+// intensive Flächenfarben (das würde die Objektzahlen vortäuschen, als wäre die Karte selbst eine
+// Heatmap). Die Flächenfüllung (plz-fill) trägt stattdessen einheitlich die Akzentfarbe Messing
+// bei geringer Deckkraft — Chat-Vorgabe Oktober 2026: "der Kreis komplett in der Akzentfarbe ...
+// mit geringer Deckkraft, beim Hover volle Deckkraft" — über Feature-State je PLZ-Fläche
+// einzeln gesteuert (siehe PLZ_HOVER_STATE_* unten).
 interface PlzFeatureProps {
   plz: string;
   st: string;
@@ -75,6 +75,10 @@ const KREIS_BOUNDS: [[number, number], [number, number]] = [
 // dragPan (siehe MaplibreMap-Konstruktion) ein stärker hineingezoomter Ausschnitt nicht mehr
 // verschoben werden könnte.
 const KLICK_ZOOM = 10.6;
+
+// Deckkraft der PLZ-Flächenfüllung (Messing) im Ruhezustand — "gering", wie gefordert, aber
+// noch sichtbar genug, dass die Akzentfarbe über die gesamte Kreisfläche hinweg erkennbar bleibt.
+const PLZ_FUELLUNG_RUHE = 0.12;
 
 const KARTENSTIL: StyleSpecification = {
   version: 8,
@@ -226,15 +230,34 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
     karte.addControl(new NavigationControl({ showCompass: false, showZoom: true }), "top-right");
     karte.on("load", () => {
       if (verworfen) return;
-      karte.addSource("plz", { type: "geojson", data: plzGeoJson as GeoJSON.FeatureCollection });
-      karte.addLayer({ id: "plz-fill", type: "fill", source: "plz", paint: { "fill-color": "#F2F1ED", "fill-opacity": 0.6 } });
+      // generateId: true — die GeoJSON-Features selbst tragen keine numerische "id" (nur
+      // properties.plz als fachlicher Schlüssel), Feature-State (für den Hover-Effekt unten)
+      // braucht aber eine id pro Feature; MapLibre vergibt sie damit automatisch.
+      karte.addSource("plz", {
+        type: "geojson",
+        data: plzGeoJson as GeoJSON.FeatureCollection,
+        generateId: true,
+      });
+      karte.addLayer({
+        id: "plz-fill",
+        type: "fill",
+        source: "plz",
+        paint: {
+          "fill-color": "#CB8E49",
+          // Chat-Vorgabe Oktober 2026: "der Kreis komplett in der Akzentfarbe ... mit geringer
+          // Deckkraft. Wenn man drüber geht mit der Maus, soll der Bereich volle Deckkraft
+          // haben." — über Feature-State je PLZ-Fläche gesteuert (siehe mousemove/mouseleave
+          // unten), nicht global, damit nur die gerade überfahrene Fläche hervortritt.
+          "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, PLZ_FUELLUNG_RUHE],
+          "fill-opacity-transition": { duration: 150 },
+        },
+      });
       karte.addLayer({ id: "plz-outline", type: "line", source: "plz", paint: { "line-color": "#503F3D", "line-width": 1.5, "line-opacity": 0.75 } });
 
       // Äußere Kreisgrenze (ein einzelnes Polygon aus der OSM-Verwaltungsgrenze des Landkreises,
-      // siehe src/data/geo/landkreis-dueren-umriss.json) in Messing statt Walnuss — Chat-Vorgabe
-      // Oktober 2026: "Der Landkreis soll sich noch ein bisschen mehr abheben. Nutz dafür die
-      // Akzentfarbe." Einzige Messing-Verwendung der Karte (CI-Regel "max. 1× pro Sichtbereich"),
-      // "Verkaufen" in der Legende nutzt bewusst einen anderen Ton (siehe FARBE unten).
+      // siehe src/data/geo/landkreis-dueren-umriss.json) zusätzlich als eigene Linie in Messing —
+      // Chat-Vorgabe Oktober 2026: "Der Landkreis soll sich noch ein bisschen mehr abheben. Nutz
+      // dafür die Akzentfarbe."
       karte.addSource("kreis-umriss", { type: "geojson", data: kreisUmrissGeoJson as GeoJSON.FeatureCollection });
       karte.addLayer({
         id: "kreis-umriss",
@@ -245,12 +268,28 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
 
       // Chat-Vorgabe Oktober 2026: "die einzelnen PLZ Gebiete sollen anklickbar sein ... beim
       // Klicken ... soll die Karte ein bisschen reinzoomen" — Klick auf eine PLZ-Fläche zoomt auf
-      // einen festen, maßvollen Ziel-Zoom (KLICK_ZOOM) um die Klickposition herum.
-      karte.on("mouseenter", "plz-fill", () => {
+      // einen festen, maßvollen Ziel-Zoom (KLICK_ZOOM) um die Klickposition herum. mousemove statt
+      // mouseenter für den Hover-Zustand, damit beim Wechsel von einer Fläche direkt in die
+      // nächste (ohne dazwischen die Karte zu verlassen) die vorherige zuverlässig zurückgesetzt
+      // wird — mouseenter/mouseleave feuern pro Layer nur einmal beim Betreten/Verlassen der
+      // gesamten Ebene, nicht pro einzelnem Feature.
+      let gehoverteFlaecheId: number | string | undefined;
+      karte.on("mousemove", "plz-fill", (e) => {
         karte.getCanvas().style.cursor = "pointer";
+        const id = e.features?.[0]?.id;
+        if (id === undefined || id === gehoverteFlaecheId) return;
+        if (gehoverteFlaecheId !== undefined) {
+          karte.setFeatureState({ source: "plz", id: gehoverteFlaecheId }, { hover: false });
+        }
+        gehoverteFlaecheId = id;
+        karte.setFeatureState({ source: "plz", id }, { hover: true });
       });
       karte.on("mouseleave", "plz-fill", () => {
         karte.getCanvas().style.cursor = "";
+        if (gehoverteFlaecheId !== undefined) {
+          karte.setFeatureState({ source: "plz", id: gehoverteFlaecheId }, { hover: false });
+        }
+        gehoverteFlaecheId = undefined;
       });
       karte.on("click", "plz-fill", (e) => {
         karte.easeTo({ center: e.lngLat, zoom: KLICK_ZOOM, duration: 500 });
