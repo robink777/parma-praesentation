@@ -9,6 +9,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { ObjektkarteDaten } from "@/types";
 import plzGeoJson from "@/data/geo/landkreis-dueren-plz.json";
 import plzOrte from "@/data/geo/landkreis-dueren-plz-orte.json";
+import kreisUmrissGeoJson from "@/data/geo/landkreis-dueren-umriss.json";
 
 // Objektkarte: zeigt, wo im Landkreis Düren Objekte in Akquise, aktivem Verkauf und bereits
 // verkauft sind (Chat-Vorgabe Oktober 2026) — Zahlen aus onOffice (siehe onoffice/estate.ts,
@@ -66,6 +67,14 @@ const KREIS_BOUNDS: [[number, number], [number, number]] = [
   [5.95, 50.42],
   [6.96, 51.22],
 ];
+
+// Chat-Vorgabe Oktober 2026: "beim Klicken auf die PLZ Bereich soll die Karte ein bisschen
+// reinzoomen" — fester Ziel-Zoom statt relativer Schritte, damit mehrfaches Klicken (auch auf
+// dasselbe oder verschiedene Gebiete) immer zum gleichen, maßvollen Ausschnitt führt statt sich
+// bei jedem Klick weiter aufzuaddieren. maxZoom auf der Karte selbst knapp darüber, da ohne
+// dragPan (siehe MaplibreMap-Konstruktion) ein stärker hineingezoomter Ausschnitt nicht mehr
+// verschoben werden könnte.
+const KLICK_ZOOM = 10.6;
 
 const KARTENSTIL: StyleSpecification = {
   version: 8,
@@ -196,6 +205,7 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
       center: KARTENMITTE,
       zoom: 9.3,
       minZoom: 8.6,
+      maxZoom: 11.4,
       maxBounds: KREIS_BOUNDS,
       attributionControl: { compact: true },
       // Chat-Vorgabe Oktober 2026: "die Karte fix sein und nur bis zu einem gewissen Punkt
@@ -219,6 +229,33 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
       karte.addSource("plz", { type: "geojson", data: plzGeoJson as GeoJSON.FeatureCollection });
       karte.addLayer({ id: "plz-fill", type: "fill", source: "plz", paint: { "fill-color": "#F2F1ED", "fill-opacity": 0.6 } });
       karte.addLayer({ id: "plz-outline", type: "line", source: "plz", paint: { "line-color": "#503F3D", "line-width": 1.5, "line-opacity": 0.75 } });
+
+      // Äußere Kreisgrenze (ein einzelnes Polygon aus der OSM-Verwaltungsgrenze des Landkreises,
+      // siehe src/data/geo/landkreis-dueren-umriss.json) in Messing statt Walnuss — Chat-Vorgabe
+      // Oktober 2026: "Der Landkreis soll sich noch ein bisschen mehr abheben. Nutz dafür die
+      // Akzentfarbe." Einzige Messing-Verwendung der Karte (CI-Regel "max. 1× pro Sichtbereich"),
+      // "Verkaufen" in der Legende nutzt bewusst einen anderen Ton (siehe FARBE unten).
+      karte.addSource("kreis-umriss", { type: "geojson", data: kreisUmrissGeoJson as GeoJSON.FeatureCollection });
+      karte.addLayer({
+        id: "kreis-umriss",
+        type: "line",
+        source: "kreis-umriss",
+        paint: { "line-color": "#CB8E49", "line-width": 2.5, "line-opacity": 0.9 },
+      });
+
+      // Chat-Vorgabe Oktober 2026: "die einzelnen PLZ Gebiete sollen anklickbar sein ... beim
+      // Klicken ... soll die Karte ein bisschen reinzoomen" — Klick auf eine PLZ-Fläche zoomt auf
+      // einen festen, maßvollen Ziel-Zoom (KLICK_ZOOM) um die Klickposition herum.
+      karte.on("mouseenter", "plz-fill", () => {
+        karte.getCanvas().style.cursor = "pointer";
+      });
+      karte.on("mouseleave", "plz-fill", () => {
+        karte.getCanvas().style.cursor = "";
+      });
+      karte.on("click", "plz-fill", (e) => {
+        karte.easeTo({ center: e.lngLat, zoom: KLICK_ZOOM, duration: 500 });
+      });
+
       setBereit(true);
     });
     kartenRef.current = karte;
