@@ -334,66 +334,53 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
     };
   }, [bereit, orte]);
 
-  // Eigenes Vollbild-Layout statt des gemeinsamen SectionShell/Card-Aufbaus der übrigen
-  // Admin-Reiter (Chat-Vorgabe Oktober 2026: "optische Abgrenzung zu den anderen Bereichen") —
-  // dieser Reiter füllt den gesamten <main>-Bereich mit Stein statt Reinweiß, damit der Wechsel
-  // auf "Objektkarte" sofort als eigener, klar abgegrenzter Bereich erkennbar ist, nicht nur als
-  // eine weitere Karte auf der üblichen Seite.
+  // Kompakter Header-Streifen statt der früheren eigenen Vollbild-Seite (Chat-Vorgabe Oktober
+  // 2026: "ich hätte gerne die Karte als fixen Header-Bereich ... der Header soll immer da
+  // sein") — Objektkarte sitzt jetzt oberhalb der Admin-Navigation und ist über alle Reiter
+  // hinweg sichtbar, statt selbst ein eigener Reiter zu sein (siehe Mitarbeiterstatistik.tsx:
+  // "karte" wurde entsprechend aus ADMIN_NAV_ITEMS entfernt). Die frühere große H1 + der
+  // Einleitungstext passen nicht mehr zu einem immer sichtbaren Header und entfallen deshalb,
+  // Stein-Hintergrund bleibt als optische Abgrenzung gegenüber dem darunterliegenden Reinweiß-
+  // Inhalt erhalten.
   return (
-    <div className="h-full overflow-y-auto bg-stein">
-      <div className="mx-auto max-w-content px-xl pt-xl">
-        <p className="label mb-xs">Admin-Bereich</p>
-        <h1 className="mb-sm [hyphens:auto] break-words text-[40px] leading-[1.2] md:text-[56px]">
-          Objektkarte
-        </h1>
-        <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
-          Objekte im Landkreis Düren nach PLZ, aufgeteilt nach Akquise, aktivem Verkauf und
-          bereits verkauften Objekten.
-        </p>
-      </div>
-
-      <div className="mx-auto max-w-content px-xl pb-xl">
-        <div className="mb-md flex flex-wrap items-end justify-between gap-sm">
-          <p className="label text-anthrazit/50">Landkreis Düren</p>
-          {daten !== undefined && (
-            <p className="text-small text-anthrazit/60">
-              {gesamtSumme} Objekt{gesamtSumme === 1 ? "" : "e"} zugeordnet
-              {daten.ohnePlz > 0 && ` · ${daten.ohnePlz} ohne PLZ`}
-            </p>
-          )}
-        </div>
-
-        {daten === undefined && (
-          <p className="mb-sm text-small text-anthrazit/50">
-            Objektzahlen konnten nicht aus onOffice geladen werden — die Karte zeigt nur die
-            Gebietsgrenzen.
+    <div className="border-b border-walnuss/10 bg-stein px-lg pt-sm md:px-xl">
+      <div className="mb-xs flex flex-wrap items-end justify-between gap-sm">
+        <p className="label text-anthrazit/50">Landkreis Düren · Objektkarte</p>
+        {daten !== undefined ? (
+          <p className="text-small text-anthrazit/60">
+            {gesamtSumme} Objekt{gesamtSumme === 1 ? "" : "e"} zugeordnet
+            {daten.ohnePlz > 0 && ` · ${daten.ohnePlz} ohne PLZ`}
+          </p>
+        ) : (
+          <p className="text-small text-anthrazit/50">
+            Objektzahlen nicht geladen — nur Gebietsgrenzen
           </p>
         )}
+      </div>
 
-        <div
-          ref={containerRef}
-          className="h-[560px] w-full overflow-hidden rounded-sm border border-walnuss/20 shadow-[0_2px_16px_rgba(80,63,61,0.14)]"
-        />
+      <div
+        ref={containerRef}
+        className="h-[280px] w-full overflow-hidden rounded-sm border border-walnuss/20 shadow-[0_2px_16px_rgba(80,63,61,0.14)]"
+      />
 
-        {/* Quellenangabe für die Kartenkacheln/Geodaten steckt bereits im eingeblendeten
-            MapLibre-Attribution-Control oben rechts in der Karte ("OpenFreeMap © OpenMapTiles ·
-            Data from OpenStreetMap") — hier keine zweite, redundante Angabe. */}
-        <div className="mt-md flex flex-wrap items-center gap-lg border-t border-walnuss/15 pt-sm">
-          {KATEGORIEN.map((kat) => (
-            <div key={kat.key} className="flex items-center gap-xs">
-              <span
-                className="inline-block h-[10px] w-[10px] rounded-full"
-                style={{ background: FARBE[kat.key] }}
-              />
-              <span className="text-small text-anthrazit/80">
-                {kat.label}
-                {daten !== undefined && (
-                  <span className="ml-xs font-medium text-anthrazit">{summe[kat.key]}</span>
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
+      {/* Quellenangabe für die Kartenkacheln/Geodaten steckt bereits im eingeblendeten
+          MapLibre-Attribution-Control oben rechts in der Karte ("OpenFreeMap © OpenMapTiles ·
+          Data from OpenStreetMap") — hier keine zweite, redundante Angabe. */}
+      <div className="flex flex-wrap items-center gap-lg py-xs">
+        {KATEGORIEN.map((kat) => (
+          <div key={kat.key} className="flex items-center gap-xs">
+            <span
+              className="inline-block h-[10px] w-[10px] rounded-full"
+              style={{ background: FARBE[kat.key] }}
+            />
+            <span className="text-small text-anthrazit/80">
+              {kat.label}
+              {daten !== undefined && (
+                <span className="ml-xs font-medium text-anthrazit">{summe[kat.key]}</span>
+              )}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

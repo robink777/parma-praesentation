@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { useNavZustand } from "@/components/layout/nav";
+import { AdminNav } from "./AdminNavigation";
 import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { Kontrolle } from "./Kontrolle";
 import { Leadquellen } from "./Leadquellen";
@@ -794,28 +793,23 @@ export function Mitarbeiterstatistik({
   const [abschnitt, setAbschnitt] = useState("uebersicht");
   const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>("vertrieb");
   const [zeitraum, setZeitraum] = useState<Zeitraum>("Jahr");
-  // navZustand liegt seit der Extraktion des Vorbereitungsmodus (Kundenpräsentation, siehe
-  // PraesentationApp.tsx) als geteilter Hook statt als Sidebar-internem State vor (nav.ts,
-  // useNavZustand) — hier unverändert nur lokal für den Admin-Bereich genutzt.
-  const { navZustand, verschieben, umschalten, zuruecksetzen } = useNavZustand(ADMIN_NAV_ITEMS);
 
   return (
-    <div className="flex h-screen w-screen">
-      {/* logoHref bewusst NICHT gesetzt (Default "/") — der Logo-Klick führt wie in der
-          Präsentation zurück zur Startseite und verlässt damit zugleich den Admin-Bereich
-          (siehe app/admin/layout.tsx, AdminSessionWaechter: meldet die Admin-Session beim
-          Verlassen des Layouts automatisch ab). Ersetzt den früheren separaten
-          "Zurück zur Startseite"-Link in app/admin/page.tsx. */}
-      <Sidebar
-        navItems={ADMIN_NAV_ITEMS}
-        activeId={abschnitt}
-        onSelect={setAbschnitt}
-        navZustand={navZustand}
-        onVerschieben={verschieben}
-        onUmschalten={umschalten}
-        onZuruecksetzen={zuruecksetzen}
-      />
-      <main className="flex-1 overflow-hidden bg-reinweiss">
+    <div className="flex h-screen w-screen flex-col overflow-hidden">
+      {/* Objektkarte als fester Header über dem gesamten Admin-Bereich, unabhängig vom
+          gewählten Reiter darunter — Chat-Vorgabe Oktober 2026: "ich hätte gerne die Karte als
+          fixen Header-Bereich ... der Header soll immer da sein". shrink-0, damit "main" unten
+          den verbleibenden Platz bekommt und selbst scrollt (siehe dort). */}
+      <header className="shrink-0">
+        <Objektkarte daten={objektkarteDaten} />
+      </header>
+      {/* Horizontale Admin-Navigation statt der Sidebar aus der Kundenpräsentation — Chat-Vorgabe:
+          "Die Navi drunter aber breit nicht hoch" (siehe AdminNavigation.tsx für die Begründung, warum
+          das eine eigene Komponente ist). Logo-Klick dort führt wie zuvor zurück zur Startseite
+          und verlässt damit den Admin-Bereich (siehe app/admin/layout.tsx,
+          AdminSessionWaechter: meldet die Admin-Session beim Verlassen automatisch ab). */}
+      <AdminNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
+      <main className="flex-1 overflow-y-auto bg-reinweiss">
         {abschnitt === "uebersicht" && (
           <SectionShell label="Admin-Bereich" title="Auf einen Blick">
             <Infoboxen gesamt={gesamtKennzahlen} />
@@ -878,10 +872,6 @@ export function Mitarbeiterstatistik({
             <Kontrolle objekte={kontrollObjekte} />
           </SectionShell>
         )}
-        {/* Kein SectionShell hier (anders als die übrigen Reiter) — Objektkarte.tsx baut ihr
-            eigenes Vollbild-Layout mit Stein- statt Reinweiß-Hintergrund auf, Chat-Vorgabe
-            Oktober 2026: "optische Abgrenzung zu den anderen Bereichen". */}
-        {abschnitt === "karte" && <Objektkarte daten={objektkarteDaten} />}
       </main>
     </div>
   );
