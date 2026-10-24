@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/Icon";
 import { NavItem } from "@/components/layout/nav";
 
@@ -14,6 +12,10 @@ import { NavItem } from "@/components/layout/nav";
 // die die Sidebar für die Kundenpräsentation anbietet, entfällt hier bewusst (admin-interne
 // Navigation, keine für Kunden vorbereitete Auswahl) — ADMIN_NAV_ITEMS wird unverändert in
 // fester Reihenfolge angezeigt.
+//
+// Kein Logo mehr hier (Chat-Vorgabe Oktober 2026: "Das Logo muss auch umplatziert werden") — es
+// sitzt jetzt im Karten-Header (Objektkarte.tsx), der seitdem der prominenteste Bereich der
+// Seite ist; diese Leiste bleibt dadurch reine Navigation.
 export function AdminNav({
   navItems,
   activeId,
@@ -23,19 +25,8 @@ export function AdminNav({
   activeId: string;
   onSelect: (id: string) => void;
 }) {
-  const router = useRouter();
-
   return (
     <nav className="flex h-14 shrink-0 items-center gap-sm overflow-x-auto border-b border-walnuss/10 bg-stein px-lg md:px-xl">
-      <button
-        type="button"
-        onClick={() => router.push("/")}
-        className="shrink-0 transition-opacity hover:opacity-70"
-        title="Zurück zur Startseite"
-      >
-        <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={120} height={30} priority />
-      </button>
-      <div className="h-6 w-px shrink-0 bg-walnuss/15" />
       {navItems.map((item) => {
         const aktiv = item.id === activeId;
         return (
