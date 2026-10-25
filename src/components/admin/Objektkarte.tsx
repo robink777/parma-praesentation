@@ -82,10 +82,13 @@ const KREIS_BOUNDS: [[number, number], [number, number]] = [
 // Chat-Vorgabe Oktober 2026: "beim Klicken auf die PLZ Bereich soll die Karte ein bisschen
 // reinzoomen" — fester Ziel-Zoom statt relativer Schritte, damit mehrfaches Klicken (auch auf
 // dasselbe oder verschiedene Gebiete) immer zum gleichen, maßvollen Ausschnitt führt statt sich
-// bei jedem Klick weiter aufzuaddieren. maxZoom auf der Karte selbst knapp darüber, da ohne
-// dragPan (siehe MaplibreMap-Konstruktion) ein stärker hineingezoomter Ausschnitt nicht mehr
-// verschoben werden könnte.
+// bei jedem Klick weiter aufzuaddieren.
 const KLICK_ZOOM = 10.6;
+
+// Rand um KREIS_BBOX_EXAKT beim Einpassen (fitBounds) — großzügiger als eine reine
+// Kanten-an-Kante-Passung, damit die Karte im Ruhezustand spürbar weiter herausgezoomt wirkt
+// (Chat-Vorgabe Oktober 2026: "die Karte müsste noch etwas mehr rausgezoomt sein").
+const KARTE_FIT_PADDING = 56;
 
 // Deckkraft der PLZ-Flächenfüllung (Messing) im Ruhezustand — "gering", wie gefordert, aber
 // noch sichtbar genug, dass die Akzentfarbe über die gesamte Kreisfläche hinweg erkennbar bleibt.
@@ -225,35 +228,35 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
       // tatsächliche Größe des Headers an, statt einen festen Ausschnitt anzunehmen (siehe
       // KREIS_BBOX_EXAKT oben).
       bounds: KREIS_BBOX_EXAKT,
-      fitBoundsOptions: { padding: 16 },
-      minZoom: 8.6,
+      fitBoundsOptions: { padding: KARTE_FIT_PADDING },
+      minZoom: 7.8,
       maxZoom: 11.4,
       maxBounds: KREIS_BOUNDS,
       attributionControl: { compact: true },
-      // Chat-Vorgabe Oktober 2026: "die Karte fix sein und nur bis zu einem gewissen Punkt
-      // rauszoombar" — die Karte dient hier als feste Übersicht, nicht als frei erkundbare
-      // Navigationskarte. Verschieben/Drehen/Kippen daher komplett deaktiviert, Zoomen bleibt
-      // erlaubt (begrenzt durch minZoom oben), aber immer um die Kartenmitte statt um den
-      // Mauszeiger/Pinch-Punkt (sonst würde die Kartenmitte beim Zoomen trotzdem "wandern").
-      dragPan: false,
+      // dragPan wieder aktiv — Chat-Vorgabe Oktober 2026: "ich kann mit der Maus nicht in der
+      // Karte navigieren!" (die ursprüngliche "fixe Karte" aus einer früheren Chat-Vorgabe passte
+      // zur damaligen kleinen Kopfzeile, nicht mehr zur jetzigen 2/3-Spalte, siehe
+      // Mitarbeiterstatistik.tsx). Drehen/Kippen bleiben deaktiviert (für eine 2D-Übersichtskarte
+      // nicht sinnvoll), minZoom/maxBounds bleiben als sanfte Leitplanken bestehen, damit man sich
+      // nicht komplett aus dem Landkreis heraus verschieben/zoomen kann.
+      dragPan: true,
       dragRotate: false,
       touchPitch: false,
       boxZoom: false,
-      keyboard: false,
-      doubleClickZoom: false,
-      scrollZoom: { around: "center" },
-      touchZoomRotate: { around: "center" },
+      keyboard: true,
+      doubleClickZoom: true,
     });
+    // Pinch-Rotation auf Touch-Geräten bleibt deaktiviert (für eine 2D-Übersichtskarte nicht
+    // sinnvoll), Pinch-Zoom bleibt erlaubt — dragRotate oben deckt nur die Maus-Variante ab.
     karte.touchZoomRotate.disableRotation();
     karte.addControl(new NavigationControl({ showCompass: false, showZoom: true }), "top-right");
-    // Chat-Vorgabe Oktober 2026: "der Header Bereich ... muss jederzeit so groß sein dass man
-    // die ganze Karte sieht" — "resize" feuert MapLibre-intern, sobald sich die tatsächliche
-    // Größe des Containers ändert (z.B. Fenster verkleinert/vergrößert, Orientierungswechsel auf
-    // Mobilgeräten), nicht bei normaler Interaktion (Klick-Zoom, Scroll-Zoom). Ein erneutes
-    // fitBounds stellt dann wieder sicher, dass der gesamte Landkreis sichtbar bleibt, auch wenn
-    // das zuvor gewählte Zoomlevel dafür nicht mehr passen würde.
+    // "resize" feuert MapLibre-intern, sobald sich die tatsächliche Größe des Containers ändert
+    // (z.B. Fenster verkleinert/vergrößert, Orientierungswechsel auf Mobilgeräten), nicht bei
+    // normaler Interaktion (Klick-Zoom, Scroll-Zoom, Verschieben) — ein erneutes fitBounds stellt
+    // dann wieder sicher, dass der gesamte Landkreis sichtbar bleibt, auch wenn das zuvor gewählte
+    // Zoomlevel dafür nicht mehr passen würde.
     karte.on("resize", () => {
-      karte.fitBounds(KREIS_BBOX_EXAKT, { padding: 16, duration: 0 });
+      karte.fitBounds(KREIS_BBOX_EXAKT, { padding: KARTE_FIT_PADDING, duration: 0 });
     });
     karte.on("load", () => {
       if (verworfen) return;
