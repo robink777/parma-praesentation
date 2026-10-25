@@ -3,30 +3,30 @@
 import { Icon } from "@/components/icons/Icon";
 import { NavItem } from "@/components/layout/nav";
 
-// Eigene, horizontale Admin-Navigation statt der wiederverwendeten Sidebar (components/layout/
-// Sidebar.tsx) — Chat-Vorgabe Oktober 2026: "Die Navi drunter aber breit nicht hoch". Die
-// Sidebar-Komponente ist bewusst NICHT dafür umgebaut worden, da sie zugleich die
-// Kundenpräsentation trägt (PraesentationApp.tsx) und dort vertikal/einklappbar bleiben muss —
-// ein eigenes, schlankes Bauteil nur für den Admin-Bereich vermeidet, dass eine Admin-Anforderung
-// das Layout der Kundenpräsentation mit beeinflusst. Die Reihenfolge/Sichtbarkeits-Bearbeitung,
-// die die Sidebar für die Kundenpräsentation anbietet, entfällt hier bewusst (admin-interne
-// Navigation, keine für Kunden vorbereitete Auswahl) — ADMIN_NAV_ITEMS wird unverändert in
-// fester Reihenfolge angezeigt.
+// Minimal-Navigation, schwebend über der Karte, statt einer vollbreiten Leiste — Chat-Vorgabe
+// Oktober 2026, zuletzt: "Die Navigation soll so klein wie möglich zu sehen sein" (davor schon
+// "Die Navi drunter aber breit nicht hoch"). Die Karte ist seitdem der alleinige Seiteninhalt
+// (siehe Objektkarte.tsx, Mitarbeiterstatistik.tsx) — diese Leiste ist nur noch ein kompaktes,
+// icon-only Dock zum Öffnen/Schließen der übrigen Bereiche als Vollbild-Overlay darüber, kein
+// eigener Layout-Bereich mehr. Nicht die wiederverwendete Sidebar (components/layout/
+// Sidebar.tsx): die trägt zugleich die Kundenpräsentation und muss dort vertikal/einklappbar
+// bleiben, eine Admin-spezifische Anforderung soll deren Layout nicht mit beeinflussen.
 //
-// Kein Logo mehr hier (Chat-Vorgabe Oktober 2026: "Das Logo muss auch umplatziert werden") — es
-// sitzt jetzt im Karten-Header (Objektkarte.tsx), der seitdem der prominenteste Bereich der
-// Seite ist; diese Leiste bleibt dadurch reine Navigation.
+// activeId ist hier bewusst "string | null" statt "string" — null bedeutet "kein Overlay offen,
+// nur die Karte sichtbar" (der von der Chat-Vorgabe gewünschte Grundzustand). Ein Klick auf den
+// bereits aktiven Punkt schließt das Overlay wieder (siehe onSelect-Logik in
+// Mitarbeiterstatistik.tsx), statt dass ein separater Schließen-Mechanismus hier nötig wäre.
 export function AdminNav({
   navItems,
   activeId,
   onSelect,
 }: {
   navItems: NavItem[];
-  activeId: string;
+  activeId: string | null;
   onSelect: (id: string) => void;
 }) {
   return (
-    <nav className="flex h-14 shrink-0 items-center gap-sm overflow-x-auto border-b border-walnuss/10 bg-stein px-lg md:px-xl">
+    <nav className="absolute bottom-md left-1/2 z-40 flex -translate-x-1/2 items-center gap-xs rounded-full bg-stein/95 p-xs shadow-[0_2px_12px_rgba(80,63,61,0.18)]">
       {navItems.map((item) => {
         const aktiv = item.id === activeId;
         return (
@@ -34,14 +34,16 @@ export function AdminNav({
             key={item.id}
             type="button"
             onClick={() => onSelect(item.id)}
-            className={`flex shrink-0 items-center gap-xs rounded-sm px-sm py-xs text-[15px] transition-colors ${
+            title={item.label}
+            aria-label={item.label}
+            aria-pressed={aktiv}
+            className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
               aktiv
-                ? "bg-reinweiss font-medium text-walnuss"
-                : "text-walnuss/70 hover:bg-reinweiss/60 hover:text-walnuss"
+                ? "bg-reinweiss text-walnuss"
+                : "text-walnuss/60 hover:bg-reinweiss/60 hover:text-walnuss"
             }`}
           >
             <Icon name={item.icon} size={18} />
-            <span>{item.label}</span>
           </button>
         );
       })}

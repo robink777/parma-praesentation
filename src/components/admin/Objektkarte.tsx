@@ -62,10 +62,10 @@ setWorkerUrl("/vendor/maplibre-gl-worker.js");
 
 // Exakte Bounding Box der Kreisgeometrie (Nominatim-Verwaltungsgrenze, siehe
 // src/data/geo/landkreis-dueren-umriss.json) — Grundlage für fitBounds: Chat-Vorgabe Oktober
-// 2026: "der Header Bereich ... muss jederzeit so groß sein dass man die ganze Karte sieht".
-// Die Karte wird deshalb nicht mehr mit fixem center/zoom erzeugt, sondern passt sich beim
-// Laden UND bei jeder späteren Größenänderung des Headers (siehe "resize"-Handler unten) auf
-// genau diese Fläche an — unabhängig davon, wie hoch/breit der Header gerade tatsächlich ist.
+// 2026: "die Karte muss auf der ganzen Seite zu sehen sein". Die Karte wird deshalb nicht mit
+// festem center/zoom erzeugt, sondern passt sich beim Laden UND bei jeder späteren
+// Fenstergrößenänderung (siehe "resize"-Handler unten) auf genau diese Fläche an — unabhängig
+// davon, wie groß der verfügbare Platz gerade tatsächlich ist.
 const KREIS_BBOX_EXAKT: [[number, number], [number, number]] = [
   [6.1935622, 50.5973696],
   [6.7183571, 51.0456677],
@@ -357,61 +357,59 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
     };
   }, [bereit, orte]);
 
-  // Kompakter, aber dominanter Header-Streifen statt der früheren eigenen Vollbild-Seite
-  // (Chat-Vorgabe Oktober 2026: "ich hätte gerne die Karte als fixen Header-Bereich ... der
-  // Header soll immer da sein", später präzisiert: "der Header Bereich ist das Wichtigste. Er
-  // muss jederzeit so groß sein dass man die ganze Karte sieht") — Objektkarte sitzt oberhalb
-  // der Admin-Navigation und ist über alle Reiter hinweg sichtbar, statt selbst ein eigener
-  // Reiter zu sein (siehe Mitarbeiterstatistik.tsx: "karte" wurde entsprechend aus
-  // ADMIN_NAV_ITEMS entfernt). Die frühere große H1 + der Einleitungstext passen nicht mehr zu
-  // einem immer sichtbaren Header und entfallen deshalb, Stein-Hintergrund bleibt als optische
-  // Abgrenzung gegenüber dem darunterliegenden Reinweiß-Inhalt erhalten.
+  // Die Karte ist jetzt der alleinige Seiteninhalt des Admin-Bereichs, nicht mehr ein Header
+  // oder ein eigener Reiter (Chat-Vorgabe Oktober 2026, in drei Schritten: erst "Karte als fixen
+  // Header-Bereich", dann "der Header Bereich ist das Wichtigste ... muss jederzeit so groß sein
+  // dass man die ganze Karte sieht", zuletzt "die Karte muss auf der ganzen Seite zu sehen sein.
+  // Vielleicht nicht als Header sondern als einziger Inhalt der Seite"). Objektkarte füllt daher
+  // per absolute inset-0 den gesamten Admin-Bereich (siehe Mitarbeiterstatistik.tsx: der
+  // umgebende Container ist "relative h-screen w-screen"); Label, Objektzahlen und Legende
+  // liegen als schwebende, halbtransparente Chips über der Karte statt sie durch ein
+  // gestapeltes Layout zu verkleinern. Mitarbeiter/Leadquellen/Kontrolle erscheinen seitdem als
+  // Vollbild-Overlay über der Karte (siehe dort) — "erstmal als Overlay, langfristig eigene
+  // Seiten" laut Chat-Vorgabe.
   //
-  // Logo hierher verschoben, nicht mehr in die Admin-Nav (AdminNavigation.tsx) — Chat-Vorgabe:
-  // "Das Logo muss auch umplatziert werden". Der Header ist jetzt der prominenteste Bereich der
-  // Seite, die Navi-Leiste darunter bleibt dadurch reine Navigation ohne Branding-Element.
+  // Logo sitzt im linken Chip statt in der Admin-Nav (AdminNavigation.tsx) — Chat-Vorgabe:
+  // "Das Logo muss auch umplatziert werden".
   const router = useRouter();
 
   return (
-    <div className="border-b border-walnuss/10 bg-stein px-lg pt-sm md:px-xl">
-      <div className="mb-xs flex flex-wrap items-end justify-between gap-sm">
-        <div className="flex items-center gap-sm">
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className="shrink-0 transition-opacity hover:opacity-70"
-            title="Zurück zur Startseite"
-          >
-            <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={120} height={30} priority />
-          </button>
-          <div className="h-5 w-px shrink-0 bg-walnuss/15" />
+    <div className="absolute inset-0">
+      {/* h-full/w-full statt "absolute inset-0": MapLibre setzt auf seinem Container selbst
+          position:relative per Inline-Style (live beobachtet Oktober 2026 — der Container blieb
+          dadurch 0px hoch, "inset-0" wirkt nur bei position:absolute/fixed). h-full/w-full
+          braucht dafür nur ein Elternelement mit definierter Höhe, unabhängig vom eigenen
+          position-Wert — das übernimmt der äußere "absolute inset-0"-Wrapper oben. */}
+      <div ref={containerRef} className="h-full w-full" />
+
+      {/* Logo + Label + Objektzahlen, oben links schwebend über der Karte. */}
+      <div className="absolute left-md top-md z-10 flex items-center gap-sm rounded-md bg-stein/95 px-sm py-xs shadow-[0_2px_12px_rgba(80,63,61,0.18)]">
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="shrink-0 transition-opacity hover:opacity-70"
+          title="Zurück zur Startseite"
+        >
+          <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={104} height={26} priority />
+        </button>
+        <div className="h-5 w-px shrink-0 bg-walnuss/15" />
+        <div>
           <p className="label text-anthrazit/50">Landkreis Düren · Objektkarte</p>
+          {daten !== undefined ? (
+            <p className="text-small text-anthrazit/60">
+              {gesamtSumme} Objekt{gesamtSumme === 1 ? "" : "e"} zugeordnet
+              {daten.ohnePlz > 0 && ` · ${daten.ohnePlz} ohne PLZ`}
+            </p>
+          ) : (
+            <p className="text-small text-anthrazit/50">Objektzahlen nicht geladen</p>
+          )}
         </div>
-        {daten !== undefined ? (
-          <p className="text-small text-anthrazit/60">
-            {gesamtSumme} Objekt{gesamtSumme === 1 ? "" : "e"} zugeordnet
-            {daten.ohnePlz > 0 && ` · ${daten.ohnePlz} ohne PLZ`}
-          </p>
-        ) : (
-          <p className="text-small text-anthrazit/50">
-            Objektzahlen nicht geladen — nur Gebietsgrenzen
-          </p>
-        )}
       </div>
 
-      {/* vh-basierte Höhe statt eines festen Pixelwerts, damit der Header auf jeder
-          Fensterhöhe groß genug bleibt (siehe fitBounds/KREIS_BBOX_EXAKT oben, die dafür sorgen,
-          dass bei jeder resultierenden Größe der ganze Landkreis sichtbar ist, nicht nur ein
-          Ausschnitt). */}
-      <div
-        ref={containerRef}
-        className="h-[46vh] min-h-[340px] max-h-[560px] w-full overflow-hidden rounded-sm border border-walnuss/20 shadow-[0_2px_16px_rgba(80,63,61,0.14)]"
-      />
-
-      {/* Quellenangabe für die Kartenkacheln/Geodaten steckt bereits im eingeblendeten
-          MapLibre-Attribution-Control oben rechts in der Karte ("OpenFreeMap © OpenMapTiles ·
-          Data from OpenStreetMap") — hier keine zweite, redundante Angabe. */}
-      <div className="flex flex-wrap items-center gap-lg py-xs">
+      {/* Legende, unten links schwebend — Quellenangabe für die Kartenkacheln/Geodaten steckt
+          bereits im MapLibre-Attribution-Control ("i"-Symbol unten rechts), hier keine zweite,
+          redundante Angabe. */}
+      <div className="absolute bottom-md left-md z-10 flex flex-wrap items-center gap-md rounded-md bg-stein/95 px-sm py-xs shadow-[0_2px_12px_rgba(80,63,61,0.18)]">
         {KATEGORIEN.map((kat) => (
           <div key={kat.key} className="flex items-center gap-xs">
             <span

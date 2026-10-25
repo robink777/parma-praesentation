@@ -790,89 +790,111 @@ export function Mitarbeiterstatistik({
   objektkarteDaten?: ObjektkarteDaten;
 }) {
   const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
-  const [abschnitt, setAbschnitt] = useState("uebersicht");
+  // null = kein Overlay offen, nur die Karte sichtbar — der von der Chat-Vorgabe gewünschte
+  // Grundzustand ("die Karte muss auf der ganzen Seite zu sehen sein ... als einziger Inhalt der
+  // Seite"), siehe AdminNavigation.tsx. Ein Klick auf den bereits offenen Punkt schließt ihn
+  // wieder (Toggle), siehe waehleAbschnitt unten.
+  const [abschnitt, setAbschnitt] = useState<string | null>(null);
   const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>("vertrieb");
   const [zeitraum, setZeitraum] = useState<Zeitraum>("Jahr");
 
+  const waehleAbschnitt = (id: string) => {
+    setAbschnitt((aktuell) => (aktuell === id ? null : id));
+  };
+
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden">
-      {/* Objektkarte als fester Header über dem gesamten Admin-Bereich, unabhängig vom
-          gewählten Reiter darunter — Chat-Vorgabe Oktober 2026: "ich hätte gerne die Karte als
-          fixen Header-Bereich ... der Header soll immer da sein". shrink-0, damit "main" unten
-          den verbleibenden Platz bekommt und selbst scrollt (siehe dort). */}
-      <header className="shrink-0">
-        <Objektkarte daten={objektkarteDaten} />
-      </header>
-      {/* Horizontale Admin-Navigation statt der Sidebar aus der Kundenpräsentation — Chat-Vorgabe:
-          "Die Navi drunter aber breit nicht hoch" (siehe AdminNavigation.tsx für die Begründung, warum
-          das eine eigene Komponente ist). Logo-Klick dort führt wie zuvor zurück zur Startseite
-          und verlässt damit den Admin-Bereich (siehe app/admin/layout.tsx,
-          AdminSessionWaechter: meldet die Admin-Session beim Verlassen automatisch ab). */}
-      <AdminNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
-      <main className="flex-1 overflow-y-auto bg-reinweiss">
-        {abschnitt === "uebersicht" && (
-          <SectionShell label="Admin-Bereich" title="Auf einen Blick">
-            <Infoboxen gesamt={gesamtKennzahlen} />
-          </SectionShell>
-        )}
-        {abschnitt === "mitarbeiter" && (
-          <SectionShell label="Admin-Bereich" title="Mitarbeiter">
-            <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
-              Auslastung des Teams als Entscheidungsgrundlage dafür, wer ein Objekt nach der
-              Akquise übernimmt.
-            </p>
-            <MitarbeiterReiterleiste aktiv={mitarbeiterReiter} onSelect={setMitarbeiterReiter} />
-            {/* Zeitraum-Umschalter nur für Vertrieb/Akquise/Setting (Chat-Vorgabe nennt explizit
-                nur diese drei) — "Weitere Mitarbeiter" bleibt unverändert bei beiden Spalten
-                nebeneinander. */}
-            {mitarbeiterReiter !== "weitere" && (
-              <ZeitraumSchalter aktiv={zeitraum} onSelect={setZeitraum} />
-            )}
-            {mitarbeiterReiter === "vertrieb" && (
-              <MitarbeiterTabelle
-                titel="Vertrieb"
-                mitglieder={vertrieb}
-                kennzahlen={kennzahlen}
-                zeitraum={zeitraum}
-              />
-            )}
-            {mitarbeiterReiter === "akquise" && (
-              <MitarbeiterTabelle
-                titel="Akquise"
-                mitglieder={akquise}
-                kennzahlen={kennzahlen}
-                modus="akquise"
-                zeitraum={zeitraum}
-              />
-            )}
-            {mitarbeiterReiter === "setting" && (
-              <MitarbeiterTabelle
-                titel="Setting"
-                mitglieder={setting}
-                kennzahlen={kennzahlen}
-                zeitraum={zeitraum}
-              />
-            )}
-            {mitarbeiterReiter === "weitere" && (
-              <MitarbeiterTabelle
-                titel="Weitere Mitarbeiter"
-                mitglieder={weitere}
-                kennzahlen={kennzahlen}
-              />
-            )}
-          </SectionShell>
-        )}
-        {abschnitt === "leadquellen" && (
-          <SectionShell label="Admin-Bereich" title="Leadquellen">
-            <Leadquellen kennzahlen={leadquellenKennzahlen} />
-          </SectionShell>
-        )}
-        {abschnitt === "kontrolle" && (
-          <SectionShell label="Admin-Bereich" title="Kontrolle">
-            <Kontrolle objekte={kontrollObjekte} />
-          </SectionShell>
-        )}
-      </main>
+    // relative + h-screen w-screen: die Karte (Objektkarte.tsx, "absolute inset-0") und das
+    // Overlay-Panel unten füllen diesen Container komplett, statt in einem Flex-Layout
+    // nebeneinander/untereinander zu stehen — Chat-Vorgabe Oktober 2026: "die Karte muss auf der
+    // ganzen Seite zu sehen sein. Vielleicht nicht als Header sondern als einziger Inhalt der
+    // Seite".
+    <div className="relative h-screen w-screen overflow-hidden">
+      <Objektkarte daten={objektkarteDaten} />
+
+      {/* Minimal-Navigation, schwebend über der Karte — Chat-Vorgabe: "Die Navigation soll so
+          klein wie möglich zu sehen sein" (siehe AdminNavigation.tsx für die Begründung). */}
+      <AdminNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={waehleAbschnitt} />
+
+      {/* Vollbild-Overlay für Mitarbeiter/Leadquellen/Kontrolle/Übersicht — Chat-Vorgabe:
+          "erstmal als Overlay. Ich will aber dass die Karte langfristig das Zentrum der Daten
+          bildet. Für Mitarbeiter und alle anderen Daten will ich langfristig eine eigene Seite"
+          (dieser Overlay-Zustand ist also bewusst ein Zwischenschritt, keine Endlösung). Die
+          Karte bleibt im Hintergrund bestehen, das Overlay deckt sie nur ab. */}
+      {abschnitt !== null && (
+        <div className="absolute inset-0 z-30 overflow-y-auto bg-reinweiss">
+          <button
+            type="button"
+            onClick={() => setAbschnitt(null)}
+            className="fixed right-lg top-lg z-10 flex h-10 w-10 items-center justify-center rounded-full bg-stein text-walnuss shadow-md transition-colors hover:bg-sand"
+            title="Schließen"
+            aria-label="Schließen"
+          >
+            <Icon name="close" size={18} />
+          </button>
+          {abschnitt === "uebersicht" && (
+            <SectionShell label="Admin-Bereich" title="Auf einen Blick">
+              <Infoboxen gesamt={gesamtKennzahlen} />
+            </SectionShell>
+          )}
+          {abschnitt === "mitarbeiter" && (
+            <SectionShell label="Admin-Bereich" title="Mitarbeiter">
+              <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
+                Auslastung des Teams als Entscheidungsgrundlage dafür, wer ein Objekt nach der
+                Akquise übernimmt.
+              </p>
+              <MitarbeiterReiterleiste aktiv={mitarbeiterReiter} onSelect={setMitarbeiterReiter} />
+              {/* Zeitraum-Umschalter nur für Vertrieb/Akquise/Setting (Chat-Vorgabe nennt
+                  explizit nur diese drei) — "Weitere Mitarbeiter" bleibt unverändert bei beiden
+                  Spalten nebeneinander. */}
+              {mitarbeiterReiter !== "weitere" && (
+                <ZeitraumSchalter aktiv={zeitraum} onSelect={setZeitraum} />
+              )}
+              {mitarbeiterReiter === "vertrieb" && (
+                <MitarbeiterTabelle
+                  titel="Vertrieb"
+                  mitglieder={vertrieb}
+                  kennzahlen={kennzahlen}
+                  zeitraum={zeitraum}
+                />
+              )}
+              {mitarbeiterReiter === "akquise" && (
+                <MitarbeiterTabelle
+                  titel="Akquise"
+                  mitglieder={akquise}
+                  kennzahlen={kennzahlen}
+                  modus="akquise"
+                  zeitraum={zeitraum}
+                />
+              )}
+              {mitarbeiterReiter === "setting" && (
+                <MitarbeiterTabelle
+                  titel="Setting"
+                  mitglieder={setting}
+                  kennzahlen={kennzahlen}
+                  zeitraum={zeitraum}
+                />
+              )}
+              {mitarbeiterReiter === "weitere" && (
+                <MitarbeiterTabelle
+                  titel="Weitere Mitarbeiter"
+                  mitglieder={weitere}
+                  kennzahlen={kennzahlen}
+                />
+              )}
+            </SectionShell>
+          )}
+          {abschnitt === "leadquellen" && (
+            <SectionShell label="Admin-Bereich" title="Leadquellen">
+              <Leadquellen kennzahlen={leadquellenKennzahlen} />
+            </SectionShell>
+          )}
+          {abschnitt === "kontrolle" && (
+            <SectionShell label="Admin-Bereich" title="Kontrolle">
+              <Kontrolle objekte={kontrollObjekte} />
+            </SectionShell>
+          )}
+        </div>
+      )}
     </div>
   );
 }
