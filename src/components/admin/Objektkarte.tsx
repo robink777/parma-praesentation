@@ -357,20 +357,19 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
     };
   }, [bereit, orte]);
 
-  // Die Karte ist jetzt der alleinige Seiteninhalt des Admin-Bereichs, nicht mehr ein Header
-  // oder ein eigener Reiter (Chat-Vorgabe Oktober 2026, in drei Schritten: erst "Karte als fixen
-  // Header-Bereich", dann "der Header Bereich ist das Wichtigste ... muss jederzeit so groß sein
-  // dass man die ganze Karte sieht", zuletzt "die Karte muss auf der ganzen Seite zu sehen sein.
-  // Vielleicht nicht als Header sondern als einziger Inhalt der Seite"). Objektkarte füllt daher
-  // per absolute inset-0 den gesamten Admin-Bereich (siehe Mitarbeiterstatistik.tsx: der
-  // umgebende Container ist "relative h-screen w-screen"); Label, Objektzahlen und Legende
-  // liegen als schwebende, halbtransparente Chips über der Karte statt sie durch ein
-  // gestapeltes Layout zu verkleinern. Mitarbeiter/Leadquellen/Kontrolle erscheinen seitdem als
-  // Vollbild-Overlay über der Karte (siehe dort) — "erstmal als Overlay, langfristig eigene
-  // Seiten" laut Chat-Vorgabe.
+  // Die Karte nimmt die linken zwei Drittel des Admin-Bereichs ein, nicht mehr nur einen Header
+  // oder einen eigenen Reiter (Chat-Vorgabe Oktober 2026, in mehreren Schritten verfeinert, zuletzt:
+  // "die Karte soll in 2/3 der Ansicht auftauchen und dann ein Overlay auf dem 1/3 auf der
+  // rechten Seite. Im Overlay kann die Navi rein" — siehe Mitarbeiterstatistik.tsx für die
+  // Zwei-Spalten-Aufteilung). Objektkarte füllt dabei per absolute inset-0 ihre eigene Spalte
+  // komplett; Label, Objektzahlen und Legende liegen als schwebende, halbtransparente Chips über
+  // der Karte statt sie durch ein gestapeltes Layout zu verkleinern. Navigation und die übrigen
+  // Bereiche (Mitarbeiter/Leadquellen/Kontrolle/Übersicht) leben im rechten Drittel-Panel
+  // (AdminNavigation.tsx, Mitarbeiterstatistik.tsx) — "erstmal so, langfristig eigene Seiten"
+  // laut Chat-Vorgabe.
   //
-  // Logo sitzt im linken Chip statt in der Admin-Nav (AdminNavigation.tsx) — Chat-Vorgabe:
-  // "Das Logo muss auch umplatziert werden".
+  // Logo sitzt im linken Chip statt in der Admin-Nav — Chat-Vorgabe: "Das Logo muss auch
+  // umplatziert werden".
   const router = useRouter();
 
   return (

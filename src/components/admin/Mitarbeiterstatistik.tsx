@@ -790,47 +790,28 @@ export function Mitarbeiterstatistik({
   objektkarteDaten?: ObjektkarteDaten;
 }) {
   const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
-  // null = kein Overlay offen, nur die Karte sichtbar — der von der Chat-Vorgabe gewünschte
-  // Grundzustand ("die Karte muss auf der ganzen Seite zu sehen sein ... als einziger Inhalt der
-  // Seite"), siehe AdminNavigation.tsx. Ein Klick auf den bereits offenen Punkt schließt ihn
-  // wieder (Toggle), siehe waehleAbschnitt unten.
-  const [abschnitt, setAbschnitt] = useState<string | null>(null);
+  const [abschnitt, setAbschnitt] = useState("uebersicht");
   const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>("vertrieb");
   const [zeitraum, setZeitraum] = useState<Zeitraum>("Jahr");
 
-  const waehleAbschnitt = (id: string) => {
-    setAbschnitt((aktuell) => (aktuell === id ? null : id));
-  };
-
   return (
-    // relative + h-screen w-screen: die Karte (Objektkarte.tsx, "absolute inset-0") und das
-    // Overlay-Panel unten füllen diesen Container komplett, statt in einem Flex-Layout
-    // nebeneinander/untereinander zu stehen — Chat-Vorgabe Oktober 2026: "die Karte muss auf der
-    // ganzen Seite zu sehen sein. Vielleicht nicht als Header sondern als einziger Inhalt der
-    // Seite".
-    <div className="relative h-screen w-screen overflow-hidden">
-      <Objektkarte daten={objektkarteDaten} />
+    // Chat-Vorgabe Oktober 2026: "die Karte soll in 2/3 der Ansicht auftauchen und dann ein
+    // Overlay auf dem 1/3 auf der rechten Seite. Im Overlay kann die Navi rein" — feste
+    // Zwei-Spalten-Aufteilung statt der vorherigen Vollbild-Karte mit schwebendem Overlay
+    // darüber: Die Karte (links, 2/3) bleibt dadurch IMMER vollständig und ungedeckt sichtbar,
+    // Navigation und der jeweils gewählte Inhalt leben zusammen im rechten Drittel.
+    <div className="flex h-screen w-screen overflow-hidden">
+      <div className="relative h-full w-2/3">
+        <Objektkarte daten={objektkarteDaten} />
+      </div>
 
-      {/* Minimal-Navigation, schwebend über der Karte — Chat-Vorgabe: "Die Navigation soll so
-          klein wie möglich zu sehen sein" (siehe AdminNavigation.tsx für die Begründung). */}
-      <AdminNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={waehleAbschnitt} />
-
-      {/* Vollbild-Overlay für Mitarbeiter/Leadquellen/Kontrolle/Übersicht — Chat-Vorgabe:
-          "erstmal als Overlay. Ich will aber dass die Karte langfristig das Zentrum der Daten
-          bildet. Für Mitarbeiter und alle anderen Daten will ich langfristig eine eigene Seite"
-          (dieser Overlay-Zustand ist also bewusst ein Zwischenschritt, keine Endlösung). Die
-          Karte bleibt im Hintergrund bestehen, das Overlay deckt sie nur ab. */}
-      {abschnitt !== null && (
-        <div className="absolute inset-0 z-30 overflow-y-auto bg-reinweiss">
-          <button
-            type="button"
-            onClick={() => setAbschnitt(null)}
-            className="fixed right-lg top-lg z-10 flex h-10 w-10 items-center justify-center rounded-full bg-stein text-walnuss shadow-md transition-colors hover:bg-sand"
-            title="Schließen"
-            aria-label="Schließen"
-          >
-            <Icon name="close" size={18} />
-          </button>
+      <div className="flex h-full w-1/3 flex-col overflow-hidden border-l border-walnuss/10 bg-reinweiss">
+        <AdminNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
+        {/* overflow-x-auto als Sicherheitsnetz: Tabellen wie MitarbeiterTabelle sind für die
+            volle Seitenbreite ausgelegt (siehe dort, feste Spaltenraster) und nicht für ein
+            schmales Drittel-Panel — bis sie dafür eigens angepasst sind, scrollen sie hier
+            innerhalb des Panels, statt das Flex-Layout von Karte/Panel zu sprengen. */}
+        <div className="flex-1 overflow-y-auto overflow-x-auto">
           {abschnitt === "uebersicht" && (
             <SectionShell label="Admin-Bereich" title="Auf einen Blick">
               <Infoboxen gesamt={gesamtKennzahlen} />
@@ -894,7 +875,7 @@ export function Mitarbeiterstatistik({
             </SectionShell>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
