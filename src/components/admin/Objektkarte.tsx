@@ -206,10 +206,28 @@ function erzeugeMarkerElement(ort: ReturnType<typeof formatiereKarte>["orte"][nu
   return el;
 }
 
-export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
+export function Objektkarte({
+  daten,
+  onPlzKlick,
+}: {
+  daten?: ObjektkarteDaten;
+  // Chat-Vorgabe Oktober 2026: "ich will dass jedes Mal wenn man in den einzelnen PLZ Bereich
+  // geht, auf der rechten Seite sich zu dieser PLZ öffnet" — wird im Klick-Handler unten mit PLZ
+  // und Ortsname der angeklickten Fläche aufgerufen (siehe Mitarbeiterstatistik.tsx).
+  onPlzKlick?: (plz: string, ort: string) => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const kartenRef = useRef<MaplibreMap | null>(null);
   const [bereit, setBereit] = useState(false);
+
+  // Ref statt direktem Zugriff auf die Prop im Klick-Handler unten: Der Effekt, der die Karte
+  // erzeugt, läuft bewusst nur einmal (leeres Dependency-Array, siehe Kommentar dort) — ohne
+  // diesen Ref würde der Handler dauerhaft die ERSTE übergebene onPlzKlick-Funktion aufrufen,
+  // selbst wenn Mitarbeiterstatistik.tsx bei einem Re-Render eine neue Funktionsinstanz übergibt.
+  const onPlzKlickRef = useRef(onPlzKlick);
+  useEffect(() => {
+    onPlzKlickRef.current = onPlzKlick;
+  }, [onPlzKlick]);
 
   useEffect(() => {
     if (!containerRef.current || kartenRef.current) return;
@@ -323,6 +341,9 @@ export function Objektkarte({ daten }: { daten?: ObjektkarteDaten }) {
       });
       karte.on("click", "plz-fill", (e) => {
         karte.easeTo({ center: e.lngLat, zoom: KLICK_ZOOM, duration: 500 });
+        const feature = e.features?.[0];
+        const plz = feature?.properties?.plz;
+        if (plz) onPlzKlickRef.current?.(String(plz), String(feature?.properties?.st ?? ""));
       });
 
       setBereit(true);

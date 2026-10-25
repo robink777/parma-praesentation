@@ -7,6 +7,7 @@ import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { Kontrolle } from "./Kontrolle";
 import { Leadquellen } from "./Leadquellen";
 import { Objektkarte } from "./Objektkarte";
+import { PlzObjekte } from "./PlzObjekte";
 import { AKQUISE_NAMEN, SETTING_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unternehmen";
 import { Icon } from "@/components/icons/Icon";
 import { formatiereBetrag } from "@/lib/berechnung";
@@ -793,6 +794,16 @@ export function Mitarbeiterstatistik({
   const [abschnitt, setAbschnitt] = useState("uebersicht");
   const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>("vertrieb");
   const [zeitraum, setZeitraum] = useState<Zeitraum>("Jahr");
+  // Zuletzt auf der Karte angeklickte PLZ-Fläche, für den "plz"-Navi-Bereich (siehe
+  // PlzObjekte.tsx) — Chat-Vorgabe Oktober 2026: "ich will dass jedes Mal wenn man in den
+  // einzelnen PLZ Bereich geht, auf der rechten Seite sich zu dieser PLZ öffnet". null, solange
+  // noch keine Fläche angeklickt wurde (siehe Leerzustand in PlzObjekte).
+  const [gewaehltePlz, setGewaehltePlz] = useState<{ plz: string; ort: string } | null>(null);
+
+  const handlePlzKlick = (plz: string, ort: string) => {
+    setGewaehltePlz({ plz, ort });
+    setAbschnitt("plz");
+  };
 
   return (
     // Chat-Vorgabe Oktober 2026: "die Karte soll in 2/3 der Ansicht auftauchen und dann ein
@@ -802,7 +813,7 @@ export function Mitarbeiterstatistik({
     // Navigation und der jeweils gewählte Inhalt leben zusammen im rechten Drittel.
     <div className="flex h-screen w-screen overflow-hidden">
       <div className="relative h-full w-2/3">
-        <Objektkarte daten={objektkarteDaten} />
+        <Objektkarte daten={objektkarteDaten} onPlzKlick={handlePlzKlick} />
       </div>
 
       <div className="flex h-full w-1/3 flex-col overflow-hidden border-l border-walnuss/10 bg-reinweiss">
@@ -872,6 +883,18 @@ export function Mitarbeiterstatistik({
           {abschnitt === "kontrolle" && (
             <SectionShell label="Admin-Bereich" title="Kontrolle">
               <Kontrolle objekte={kontrollObjekte} />
+            </SectionShell>
+          )}
+          {abschnitt === "plz" && (
+            <SectionShell
+              label="Admin-Bereich"
+              title={gewaehltePlz ? `${gewaehltePlz.plz} · ${gewaehltePlz.ort}` : "PLZ"}
+            >
+              <PlzObjekte
+                plz={gewaehltePlz?.plz ?? null}
+                ort={gewaehltePlz?.ort ?? null}
+                daten={objektkarteDaten}
+              />
             </SectionShell>
           )}
         </div>

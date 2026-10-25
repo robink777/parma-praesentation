@@ -9,6 +9,7 @@ import {
   ObjektDokument,
   ObjektkarteDaten,
   ObjektkartePlzEintrag,
+  ObjektkartePlzObjekt,
 } from "@/types";
 import { TEAM } from "@/data/unternehmen";
 import { distanzZwischenPlzKm } from "@/lib/geo";
@@ -1800,10 +1801,19 @@ export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
 
 interface RawObjektkarteRecord {
   id: string;
-  elements: { plz?: string; status2?: string };
+  elements: {
+    plz?: string;
+    status2?: string;
+    objekttitel?: string;
+    objektnr_extern?: string;
+    kaufpreis?: string | number;
+  };
 }
 
-const OBJEKTKARTE_FIELDS = ["Id", "plz", "status2"];
+// objekttitel/objektnr_extern/kaufpreis zusätzlich zu plz/status2 — Chat-Vorgabe Oktober 2026:
+// "ich will dass jedes Mal wenn man in den einzelnen PLZ Bereich geht, auf der rechten Seite
+// sich zu dieser PLZ öffnet. Liste an Objekten usw" (siehe ObjektkartePlzObjekt in @/types).
+const OBJEKTKARTE_FIELDS = ["Id", "plz", "status2", "objekttitel", "objektnr_extern", "kaufpreis"];
 
 async function ladeObjektkarteRecordsSeite(offset: number): Promise<RawObjektkarteRecord[]> {
   const result = await callOnOfficeApi<RawObjektkarteRecord>([
@@ -1864,17 +1874,30 @@ export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
 
     let eintrag = zaehlerJePlz.get(plz);
     if (!eintrag) {
-      eintrag = { plz, akquise: 0, verkaufen: 0, verkauft: 0 };
+      eintrag = { plz, akquise: 0, verkaufen: 0, verkauft: 0, objekte: [] };
       zaehlerJePlz.set(plz, eintrag);
     }
 
-    if (status2 === "verkauft") eintrag.verkauft++;
-    else if (status2 && VERKAUFEN_STATUS.has(status2)) eintrag.verkaufen++;
-    else if (status2 && AKQUISE_STATUS.has(status2)) eintrag.akquise++;
+    // Kategorie einmal ermitteln statt dreifach dieselbe status2-Prüfung zu wiederholen — sowohl
+    // für den Zähler als auch für den Objekt-Eintrag in der Liste (siehe ObjektkartePlzObjekt).
+    let kategorie: ObjektkartePlzObjekt["kategorie"] | null = null;
+    if (status2 === "verkauft") kategorie = "verkauft";
+    else if (status2 && VERKAUFEN_STATUS.has(status2)) kategorie = "verkaufen";
+    else if (status2 && AKQUISE_STATUS.has(status2)) kategorie = "akquise";
     // Andere/leere status2-Werte (z.B. ganz neue, noch unkategorisierte Objekte) zählen bewusst
-    // in keine der drei vom Nutzer genannten Kategorien — der PLZ-Eintrag selbst wird trotzdem
-    // angelegt, damit ein Objekt mit gültiger PLZ aber unbekanntem Status nicht fälschlich unter
-    // "ohnePlz" auftaucht.
+    // in keine der drei vom Nutzer genannten Kategorien und fehlen entsprechend auch in der
+    // Objektliste — der PLZ-Eintrag selbst wird trotzdem angelegt, damit ein Objekt mit gültiger
+    // PLZ aber unbekanntem Status nicht fälschlich unter "ohnePlz" auftaucht.
+    if (kategorie === null) continue;
+
+    eintrag[kategorie]++;
+    eintrag.objekte.push({
+      id: record.id,
+      titel: record.elements.objekttitel || `Immobilie ${record.id}`,
+      objektnr: record.elements.objektnr_extern || String(record.id),
+      preis: Number(record.elements.kaufpreis) || 0,
+      kategorie,
+    });
   }
 
   return { jePlz: [...zaehlerJePlz.values()], ohnePlz };

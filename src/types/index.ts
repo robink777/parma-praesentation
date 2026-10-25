@@ -410,6 +410,19 @@ export interface KontrollObjekt {
   probleme: string[];
 }
 
+// Einzelnes Objekt innerhalb einer PLZ-Fläche, für die Objektliste im "PLZ"-Navi-Bereich (siehe
+// components/admin/PlzObjekte.tsx) — Chat-Vorgabe Oktober 2026: "ich will dass jedes Mal wenn
+// man in den einzelnen PLZ Bereich geht, auf der rechten Seite sich zu dieser PLZ öffnet. Liste
+// an Objekten usw". Bewusst ein schlanker Auszug analog zu MitarbeiterObjekt/KontrollObjekt
+// (siehe dort), nicht der volle Immobilie-Typ.
+export interface ObjektkartePlzObjekt {
+  id: string;
+  titel: string;
+  objektnr: string;
+  preis: number;
+  kategorie: "akquise" | "verkaufen" | "verkauft";
+}
+
 // Objektzahlen je PLZ für die Objektkarte im Admin-Bereich (siehe onoffice/estate.ts,
 // ladeObjektkarteDaten, components/admin/Objektkarte.tsx) — Chat-Vorgabe Oktober 2026: "wo die
 // Objekte sind die wir a) akquirieren b) verkaufen und c) verkauft haben". Die drei Kategorien
@@ -420,6 +433,10 @@ export interface ObjektkartePlzEintrag {
   akquise: number;
   verkaufen: number;
   verkauft: number;
+  // Nur Objekte, die einer der drei Kategorien zugeordnet werden konnten (siehe Kommentar bei
+  // ladeObjektkarteDaten) — Objekte mit anderem/leerem status2 fließen weder in die Zähler oben
+  // noch hier in die Liste ein.
+  objekte: ObjektkartePlzObjekt[];
 }
 
 export interface ObjektkarteDaten {

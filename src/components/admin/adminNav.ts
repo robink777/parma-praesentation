@@ -8,13 +8,20 @@ import { NavItem } from "@/components/layout/nav";
 // je Status, siehe ladeKontrollObjekte), Chat-Vorgabe: "das mit den Objekten funktioniert
 // irgendwie immer noch nicht ... vielleicht als 3. Punkt in der Navigation".
 //
-// Kein "Objektkarte"-Punkt mehr (bis Oktober 2026 hier als eigener Reiter): Die Karte
-// (components/admin/Objektkarte.tsx) ist seit der Chat-Vorgabe "ich hätte gerne die Karte als
-// fixen Header-Bereich ... der Header soll immer da sein" ein permanenter Header über der
-// gesamten Admin-Fläche statt eines Navigationsziels (siehe Mitarbeiterstatistik.tsx).
+// Kein eigener "Objektkarte"-Punkt mehr (bis Oktober 2026 hier als eigener Reiter): Die Karte
+// (components/admin/Objektkarte.tsx) nimmt seit der Chat-Vorgabe "die Karte soll in 2/3 der
+// Ansicht auftauchen" die linken zwei Drittel der Admin-Fläche dauerhaft ein, statt eines
+// Navigationsziels im rechten Drittel-Panel (siehe Mitarbeiterstatistik.tsx).
+//
+// "plz" (siehe components/admin/PlzObjekte.tsx) wird nicht nur per Klick hier, sondern auch
+// automatisch aktiv, wenn auf der Karte eine PLZ-Fläche angeklickt wird — Chat-Vorgabe Oktober
+// 2026: "ich will einen weiteren Navi Bereich. Ich will dass jedes Mal wenn man in den
+// einzelnen PLZ Bereich geht, auf der rechten Seite sich zu dieser PLZ öffnet. Liste an
+// Objekten usw" (siehe onPlzKlick in Mitarbeiterstatistik.tsx).
 export const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "uebersicht", label: "Auf einen Blick", icon: "calculator" },
   { id: "mitarbeiter", label: "Mitarbeiter", icon: "team" },
   { id: "leadquellen", label: "Leadquellen", icon: "location" },
   { id: "kontrolle", label: "Kontrolle", icon: "warning" },
+  { id: "plz", label: "PLZ", icon: "building" },
 ];
