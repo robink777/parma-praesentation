@@ -552,6 +552,11 @@ export function Objektkarte({
     geladen: number;
     gesamt: number;
     uebersprungen: number;
+    // true, wenn Nominatim selbst mit 429 "Too many requests" geantwortet hat (siehe
+    // api/admin/geocode/route.ts) — bricht die Schleife unten ab, statt sich durch die
+    // restlichen Adressen zu kämpfen, die gegen den überlasteten Dienst ohnehin alle scheitern
+    // würden (live beobachtet Oktober 2026 nach intensivem Testen an einem Tag).
+    ueberlastet?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -597,11 +602,25 @@ export function Objektkarte({
               geocodeCache.set(objekt.adresse, koordinate);
               speichereGeocodeCacheInLocalStorage(geocodeCache);
             } else {
-              // Fehlerhafte Antwort (z.B. 401 nach abgelaufener Admin-Session) NICHT als "keine
-              // Koordinate gefunden" im Cache festhalten — ein erneuter Klick auf dieselbe PLZ
-              // soll es nochmal versuchen können, statt die Adresse dauerhaft als ungeocodierbar
-              // zu markieren.
+              // Fehlerhafte Antwort (z.B. 401 nach abgelaufener Admin-Session, oder 429 von
+              // Nominatim selbst — siehe api/admin/geocode/route.ts) NICHT als "keine Koordinate
+              // gefunden" im Cache festhalten — ein erneuter Klick auf dieselbe PLZ soll es
+              // nochmal versuchen können, statt die Adresse dauerhaft als ungeocodierbar zu
+              // markieren.
               koordinate = null;
+              // Bei "429 Too many requests" von Nominatim die restliche Liste gar nicht erst
+              // durchprobieren: Jede weitere Anfrage würde gegen den bereits überlasteten Dienst
+              // ohnehin nur erneut scheitern (live beobachtet Oktober 2026 nach vielen
+              // Testanfragen an einem Tag) — stattdessen sofort abbrechen und das transparent
+              // anzeigen (siehe Info-Chip), statt sich kommentarlos durch 60 Fehlschläge zu
+              // arbeiten.
+              if (antwort.status === 502) {
+                const fehlerDetails = await antwort.json().catch(() => null);
+                if (fehlerDetails?.ueberlastet) {
+                  setPinStatus({ geladen: i, gesamt: objekte.length, uebersprungen, ueberlastet: true });
+                  return;
+                }
+              }
             }
           } catch {
             koordinate = null;
@@ -688,17 +707,26 @@ export function Objektkarte({
           {/* Fortschritt beim Geocoding der Objekt-Pins — Chat-Vorgabe Oktober 2026: Pins "für
               die Immobilien, die wir als Adresse gelistet haben" erscheinen progressiv statt
               alle auf einmal nach einer langen Wartezeit (siehe Pin-Effekt oben). */}
-          {pinStatus && pinStatus.geladen < pinStatus.gesamt && (
+          {pinStatus?.ueberlastet && (
+            <p className="text-small text-anthrazit/50">
+              Geocoding-Dienst momentan überlastet — bitte in ein paar Minuten erneut versuchen
+              ({pinStatus.geladen}/{pinStatus.gesamt} Adressen geschafft)
+            </p>
+          )}
+          {!pinStatus?.ueberlastet && pinStatus && pinStatus.geladen < pinStatus.gesamt && (
             <p className="text-small text-anthrazit/50">
               Adressen werden geladen … {pinStatus.geladen}/{pinStatus.gesamt}
             </p>
           )}
-          {pinStatus && pinStatus.geladen >= pinStatus.gesamt && pinStatus.uebersprungen > 0 && (
-            <p className="text-small text-anthrazit/50">
-              {pinStatus.uebersprungen} weitere Objekte ohne Pin (zu viele für eine schnelle
-              Anzeige)
-            </p>
-          )}
+          {!pinStatus?.ueberlastet &&
+            pinStatus &&
+            pinStatus.geladen >= pinStatus.gesamt &&
+            pinStatus.uebersprungen > 0 && (
+              <p className="text-small text-anthrazit/50">
+                {pinStatus.uebersprungen} weitere Objekte ohne Pin (zu viele für eine schnelle
+                Anzeige)
+              </p>
+            )}
         </div>
       </div>
 
