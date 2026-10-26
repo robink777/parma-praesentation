@@ -813,7 +813,11 @@ export function Mitarbeiterstatistik({
     // Navigation und der jeweils gewählte Inhalt leben zusammen im rechten Drittel.
     <div className="flex h-screen w-screen overflow-hidden">
       <div className="relative h-full w-2/3">
-        <Objektkarte daten={objektkarteDaten} onPlzKlick={handlePlzKlick} />
+        <Objektkarte
+          daten={objektkarteDaten}
+          onPlzKlick={handlePlzKlick}
+          ausgewaehltePlz={gewaehltePlz?.plz ?? null}
+        />
       </div>
 
       <div className="flex h-full w-1/3 flex-col overflow-hidden border-l border-walnuss/10 bg-reinweiss">

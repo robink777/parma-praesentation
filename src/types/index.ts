@@ -421,6 +421,12 @@ export interface ObjektkartePlzObjekt {
   objektnr: string;
   preis: number;
   kategorie: "akquise" | "verkaufen" | "verkauft";
+  // Straße + Hausnummer + PLZ + Ort als ein geocodierbarer String, z.B. "Kölner Landstraße 12,
+  // 52351 Düren" — null, wenn Straße oder Hausnummer in onOffice nicht gepflegt sind. Grundlage
+  // für die Objekt-Pins auf der Karte (siehe api/admin/geocode/route.ts,
+  // components/admin/Objektkarte.tsx) — Chat-Vorgabe Oktober 2026: "für die Immobilien, die wir
+  // als Adresse gelistet haben, in der jeweiligen Postleitzahl die Pins setzen".
+  adresse: string | null;
 }
 
 // Objektzahlen je PLZ für die Objektkarte im Admin-Bereich (siehe onoffice/estate.ts,

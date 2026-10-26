@@ -1807,13 +1807,29 @@ interface RawObjektkarteRecord {
     objekttitel?: string;
     objektnr_extern?: string;
     kaufpreis?: string | number;
+    strasse?: string;
+    hausnummer?: string;
+    ort?: string;
   };
 }
 
 // objekttitel/objektnr_extern/kaufpreis zusätzlich zu plz/status2 — Chat-Vorgabe Oktober 2026:
 // "ich will dass jedes Mal wenn man in den einzelnen PLZ Bereich geht, auf der rechten Seite
 // sich zu dieser PLZ öffnet. Liste an Objekten usw" (siehe ObjektkartePlzObjekt in @/types).
-const OBJEKTKARTE_FIELDS = ["Id", "plz", "status2", "objekttitel", "objektnr_extern", "kaufpreis"];
+// strasse/hausnummer/ort zusätzlich für die Objekt-Pins auf der Karte (siehe
+// api/admin/geocode/route.ts), Chat-Vorgabe Oktober 2026: "für die Immobilien, die wir als
+// Adresse gelistet haben, in der jeweiligen Postleitzahl die Pins setzen".
+const OBJEKTKARTE_FIELDS = [
+  "Id",
+  "plz",
+  "status2",
+  "objekttitel",
+  "objektnr_extern",
+  "kaufpreis",
+  "strasse",
+  "hausnummer",
+  "ort",
+];
 
 async function ladeObjektkarteRecordsSeite(offset: number): Promise<RawObjektkarteRecord[]> {
   const result = await callOnOfficeApi<RawObjektkarteRecord>([
@@ -1890,6 +1906,16 @@ export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
     // PLZ aber unbekanntem Status nicht fälschlich unter "ohnePlz" auftaucht.
     if (kategorie === null) continue;
 
+    // adresse nur, wenn Straße UND Hausnummer gepflegt sind — ohne Hausnummer lässt sich kein
+    // verlässlicher Pin setzen (Chat-Vorgabe: "für die Immobilien, die wir als Adresse gelistet
+    // haben"), ein bloßer Straßenname würde beim Geocoding sonst nur den Straßenmittelpunkt oder
+    // gar nichts treffen.
+    const strasse = record.elements.strasse?.trim();
+    const hausnummer = record.elements.hausnummer?.trim();
+    const ort = record.elements.ort?.trim();
+    const adresse =
+      strasse && hausnummer ? `${strasse} ${hausnummer}, ${plz}${ort ? ` ${ort}` : ""}` : null;
+
     eintrag[kategorie]++;
     eintrag.objekte.push({
       id: record.id,
@@ -1897,6 +1923,7 @@ export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
       objektnr: record.elements.objektnr_extern || String(record.id),
       preis: Number(record.elements.kaufpreis) || 0,
       kategorie,
+      adresse,
     });
   }
 

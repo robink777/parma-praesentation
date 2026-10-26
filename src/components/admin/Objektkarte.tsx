@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 // JS-Klasse "Map" zu verschatten.
 import { Map as MaplibreMap, Marker, NavigationControl, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { ObjektkarteDaten } from "@/types";
+import { ObjektkarteDaten, ObjektkartePlzObjekt } from "@/types";
 import plzGeoJson from "@/data/geo/landkreis-dueren-plz.json";
 import plzOrte from "@/data/geo/landkreis-dueren-plz-orte.json";
 import kreisUmrissGeoJson from "@/data/geo/landkreis-dueren-umriss.json";
@@ -95,8 +95,26 @@ const KARTE_FIT_PADDING = 56;
 const PLZ_FUELLUNG_RUHE = 0.12;
 // Bei Hover bewusst nicht 100 %, sondern 60 % — darunter sollen Straßen/Orte der Kartenbasis
 // weiterhin durchscheinen (Chat-Vorgabe Oktober 2026: "100% Füllung ist zu viel ... man soll die
-// Straßen usw. noch sehen", nach 80% noch "immernoch recht viel").
+// Straßen usw. noch sehen", nach 80% noch "immernoch recht viel"). Dieselbe Deckkraft gilt auch
+// für die dauerhafte Auswahl-Hervorhebung (feature-state "selected", siehe unten) — Chat-Vorgabe:
+// "die Farbe des Postleitzahlbereichs halten, wenn das einmal angeklickt ist".
 const PLZ_FUELLUNG_HOVER = 0.6;
+
+// Höchstzahl an Objekten, die beim Klick auf eine PLZ-Fläche als einzelne Pins geocodiert werden
+// — Nominatim erlaubt nur ~1 Anfrage/Sekunde (siehe api/admin/geocode/route.ts), bei PLZ-Flächen
+// mit sehr vielen Objekten (in diesem Landkreis bis über 100) wäre ein ungedeckeltes Geocoding
+// sonst eine mehrminütige Warteschlange. Objekte darüber hinaus bleiben ohne Pin (siehe
+// Lade-Chip in der Komponente unten, zeigt das transparent an statt sie kommentarlos wegzulassen).
+const MAX_GEOCODE_PRO_PLZ = 60;
+
+// PLZ -> Feature-Id in der "plz"-Quelle (siehe generateId:true dort) — MapLibre vergibt bei
+// generateId die Id nach Array-Index, ein einmaliger Aufbau aus demselben Array genügt deshalb,
+// das auch die Quelle selbst speist. Für Feature-State (Hover/Auswahl), nicht für die Anzeige.
+const plzZuFeatureId = new Map(
+  (plzGeoJson as GeoJSON.FeatureCollection<GeoJSON.Polygon, PlzFeatureProps>).features.map(
+    (feature, index) => [feature.properties.plz, index]
+  )
+);
 
 const KARTENSTIL: StyleSpecification = {
   version: 8,
@@ -206,15 +224,34 @@ function erzeugeMarkerElement(ort: ReturnType<typeof formatiereKarte>["orte"][nu
   return el;
 }
 
+// Kleiner, einzelner Objekt-Pin (nicht die große Stat-Karte oben) — Chat-Vorgabe Oktober 2026:
+// "für die Immobilien, die wir als Adresse gelistet haben, in der jeweiligen Postleitzahl die
+// Pins setzen, wenn ich anklicke". title = native Browser-Tooltip bei Hover, keine eigene
+// Popup-Komponente nötig für diesen einfachen Anwendungsfall.
+function erzeugePinElement(objekt: ObjektkartePlzObjekt) {
+  const el = document.createElement("div");
+  el.title = `${objekt.titel} · ${objekt.objektnr}`;
+  el.style.cssText = `width:13px;height:13px;border-radius:50%;background:${FARBE[objekt.kategorie]};border:2px solid #FCFCFB;box-shadow:0 1px 5px rgba(80,63,61,0.45);`;
+  return el;
+}
+
 export function Objektkarte({
   daten,
   onPlzKlick,
+  ausgewaehltePlz,
 }: {
   daten?: ObjektkarteDaten;
   // Chat-Vorgabe Oktober 2026: "ich will dass jedes Mal wenn man in den einzelnen PLZ Bereich
   // geht, auf der rechten Seite sich zu dieser PLZ öffnet" — wird im Klick-Handler unten mit PLZ
   // und Ortsname der angeklickten Fläche aufgerufen (siehe Mitarbeiterstatistik.tsx).
   onPlzKlick?: (plz: string, ort: string) => void;
+  // Von Mitarbeiterstatistik.tsx kontrolliert (dort als gewaehltePlz.plz geführt) statt hier
+  // intern aus dem Klick-Handler mitgeführt — Chat-Vorgabe Oktober 2026: "die Farbe des
+  // Postleitzahlbereichs halten, wenn das einmal angeklickt ist" + "die Pins setzen, wenn ich
+  // anklicke". Steuert sowohl die dauerhafte Hervorhebung der Fläche als auch die Objekt-Pins
+  // (siehe die beiden Effekte unten), damit beides zum tatsächlich angezeigten "PLZ"-Navi-Bereich
+  // passt, auch wenn die Auswahl künftig von woanders als einem Kartenklick ausgelöst wird.
+  ausgewaehltePlz?: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const kartenRef = useRef<MaplibreMap | null>(null);
@@ -295,8 +332,20 @@ export function Objektkarte({
           // Chat-Vorgabe Oktober 2026: "der Kreis komplett in der Akzentfarbe ... mit geringer
           // Deckkraft. Wenn man drüber geht mit der Maus, soll der Bereich volle Deckkraft
           // haben." — über Feature-State je PLZ-Fläche gesteuert (siehe mousemove/mouseleave
-          // unten), nicht global, damit nur die gerade überfahrene Fläche hervortritt.
-          "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], PLZ_FUELLUNG_HOVER, PLZ_FUELLUNG_RUHE],
+          // unten), nicht global, damit nur die gerade überfahrene Fläche hervortritt. "selected"
+          // zusätzlich zu "hover" — Chat-Vorgabe: "die Farbe des Postleitzahlbereichs halten,
+          // wenn das einmal angeklickt ist" (siehe Effekt weiter unten, der "selected" anhand der
+          // ausgewaehltePlz-Prop setzt, unabhängig vom Mauszeiger).
+          "fill-opacity": [
+            "case",
+            [
+              "any",
+              ["boolean", ["feature-state", "hover"], false],
+              ["boolean", ["feature-state", "selected"], false],
+            ],
+            PLZ_FUELLUNG_HOVER,
+            PLZ_FUELLUNG_RUHE,
+          ],
           "fill-opacity-transition": { duration: 150 },
         },
       });
@@ -369,6 +418,10 @@ export function Objektkarte({
 
     const marker: Marker[] = [];
     for (const ort of orte) {
+      // Die ausgewählte PLZ zeigt stattdessen einzelne Objekt-Pins (siehe Effekt weiter unten) —
+      // beides gleichzeitig (die große Stat-Karte UND Dutzende Pins an derselben Stelle) wäre
+      // unübersichtlich.
+      if (ort.plz === ausgewaehltePlz) continue;
       marker.push(
         new Marker({ element: erzeugeMarkerElement(ort), anchor: "bottom" })
           .setLngLat(ort.label)
@@ -379,7 +432,114 @@ export function Objektkarte({
     return () => {
       marker.forEach((m) => m.remove());
     };
-  }, [bereit, orte]);
+  }, [bereit, orte, ausgewaehltePlz]);
+
+  // Dauerhafte Hervorhebung der ausgewählten PLZ-Fläche (feature-state "selected", siehe
+  // fill-opacity oben) — Chat-Vorgabe Oktober 2026: "die Farbe des Postleitzahlbereichs halten,
+  // wenn das einmal angeklickt ist". Läuft unabhängig vom Pin-Effekt unten, damit die
+  // Hervorhebung sofort sitzt, auch während die Pins noch geocodiert werden.
+  const ausgewaehlteFlaecheIdRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const karte = kartenRef.current;
+    if (!karte || !bereit) return;
+
+    if (ausgewaehlteFlaecheIdRef.current !== undefined) {
+      karte.setFeatureState({ source: "plz", id: ausgewaehlteFlaecheIdRef.current }, { selected: false });
+    }
+    const neueId = ausgewaehltePlz ? plzZuFeatureId.get(ausgewaehltePlz) : undefined;
+    if (neueId !== undefined) {
+      karte.setFeatureState({ source: "plz", id: neueId }, { selected: true });
+    }
+    ausgewaehlteFlaecheIdRef.current = neueId;
+  }, [ausgewaehltePlz, bereit]);
+
+  // Objekt-Pins für die ausgewählte PLZ — Chat-Vorgabe Oktober 2026: "für die Immobilien, die wir
+  // als Adresse gelistet haben, in der jeweiligen Postleitzahl die Pins setzen, wenn ich
+  // anklicke". Geocodiert progressiv (ein Pin erscheint, sobald seine Adresse aufgelöst ist)
+  // statt alle auf einmal nach einer langen Wartezeit — siehe api/admin/geocode/route.ts für den
+  // Grund (Nominatim-Rate-Limit, ~1 Anfrage/Sekunde). geocodeCacheRef hält bereits aufgelöste
+  // Adressen über einen Wechsel der Auswahl hinweg fest, damit ein erneuter Klick auf dieselbe
+  // PLZ nicht erneut geocodiert.
+  const geocodeCacheRef = useRef(new Map<string, { lat: number; lon: number } | null>());
+  const pinMarkerRef = useRef<Marker[]>([]);
+  const [pinStatus, setPinStatus] = useState<{
+    geladen: number;
+    gesamt: number;
+    uebersprungen: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const karte = kartenRef.current;
+    if (!karte || !bereit) return;
+
+    let abgebrochen = false;
+    pinMarkerRef.current.forEach((m) => m.remove());
+    pinMarkerRef.current = [];
+    setPinStatus(null);
+
+    if (!ausgewaehltePlz) return;
+
+    const alleMitAdresse = (
+      daten?.jePlz.find((e) => e.plz === ausgewaehltePlz)?.objekte ?? []
+    ).filter((o): o is ObjektkartePlzObjekt & { adresse: string } => o.adresse !== null);
+    const objekte = alleMitAdresse.slice(0, MAX_GEOCODE_PRO_PLZ);
+    const uebersprungen = alleMitAdresse.length - objekte.length;
+    if (objekte.length === 0) return;
+
+    setPinStatus({ geladen: 0, gesamt: objekte.length, uebersprungen });
+
+    (async () => {
+      for (let i = 0; i < objekte.length; i++) {
+        if (abgebrochen) return;
+        const objekt = objekte[i];
+        let koordinate = geocodeCacheRef.current.get(objekt.adresse);
+        if (koordinate === undefined) {
+          try {
+            const antwort = await fetch(`/api/admin/geocode?adresse=${encodeURIComponent(objekt.adresse)}`);
+            if (antwort.ok) {
+              const ergebnis = (await antwort.json()) as { lat: unknown; lon: unknown };
+              // typeof-Prüfung statt "!== null": eine fehlgeschlagene Anfrage (z.B. abgelaufene
+              // Admin-Session) liefert hier keine lat/lon-Felder, nicht explizit null — ohne
+              // diese Prüfung landet "undefined" als Koordinate im Marker und MapLibre wirft
+              // "Invalid LngLat object: (NaN, NaN)" (live beobachtet Oktober 2026).
+              koordinate =
+                typeof ergebnis.lat === "number" && typeof ergebnis.lon === "number"
+                  ? { lat: ergebnis.lat, lon: ergebnis.lon }
+                  : null;
+              geocodeCacheRef.current.set(objekt.adresse, koordinate);
+            } else {
+              // Fehlerhafte Antwort (z.B. 401 nach abgelaufener Admin-Session) NICHT als "keine
+              // Koordinate gefunden" im Cache festhalten — ein erneuter Klick auf dieselbe PLZ
+              // soll es nochmal versuchen können, statt die Adresse dauerhaft als ungeocodierbar
+              // zu markieren.
+              koordinate = null;
+            }
+          } catch {
+            koordinate = null;
+          }
+          // Nominatims Nutzungsrichtlinie erlaubt max. 1 Anfrage/Sekunde — die Pause nur nach
+          // einem tatsächlichen Netzwerk-Aufruf, nicht bei einem Cache-Treffer.
+          if (!abgebrochen && i < objekte.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1100));
+          }
+        }
+        if (abgebrochen) return;
+
+        if (koordinate) {
+          pinMarkerRef.current.push(
+            new Marker({ element: erzeugePinElement(objekt), anchor: "center" })
+              .setLngLat([koordinate.lon, koordinate.lat])
+              .addTo(karte)
+          );
+        }
+        setPinStatus({ geladen: i + 1, gesamt: objekte.length, uebersprungen });
+      }
+    })();
+
+    return () => {
+      abgebrochen = true;
+    };
+  }, [ausgewaehltePlz, bereit, daten]);
 
   // Die Karte nimmt die linken zwei Drittel des Admin-Bereichs ein, nicht mehr nur einen Header
   // oder einen eigenen Reiter (Chat-Vorgabe Oktober 2026, in mehreren Schritten verfeinert, zuletzt:
@@ -425,6 +585,20 @@ export function Objektkarte({
             </p>
           ) : (
             <p className="text-small text-anthrazit/50">Objektzahlen nicht geladen</p>
+          )}
+          {/* Fortschritt beim Geocoding der Objekt-Pins — Chat-Vorgabe Oktober 2026: Pins "für
+              die Immobilien, die wir als Adresse gelistet haben" erscheinen progressiv statt
+              alle auf einmal nach einer langen Wartezeit (siehe Pin-Effekt oben). */}
+          {pinStatus && pinStatus.geladen < pinStatus.gesamt && (
+            <p className="text-small text-anthrazit/50">
+              Adressen werden geladen … {pinStatus.geladen}/{pinStatus.gesamt}
+            </p>
+          )}
+          {pinStatus && pinStatus.geladen >= pinStatus.gesamt && pinStatus.uebersprungen > 0 && (
+            <p className="text-small text-anthrazit/50">
+              {pinStatus.uebersprungen} weitere Objekte ohne Pin (zu viele für eine schnelle
+              Anzeige)
+            </p>
           )}
         </div>
       </div>
