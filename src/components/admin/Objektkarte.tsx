@@ -116,6 +116,43 @@ const plzZuFeatureId = new Map(
   )
 );
 
+// Pause zwischen zwei Nominatim-Anfragen in Millisekunden — Chat-Vorgabe Oktober 2026: "Die
+// Ladedauer ist extrem lang. Kannst du das beschleunigen" (zuvor 1100ms). Weiter herunter wäre
+// riskant: Nominatims Nutzungsrichtlinie nennt ~1 Anfrage/Sekunde als Obergrenze, eine spürbar
+// schnellere Dauergeschwindigkeit könnte den kostenlosen Dienst für die ganze Kanzlei sperren.
+// Der wirksamere Hebel ist stattdessen GEOCODE_CACHE_LOCALSTORAGE (siehe unten): einmal
+// aufgelöste Adressen bleiben dauerhaft im Browser gespeichert, ein erneuter Klick auf dieselbe
+// PLZ — auch in einer späteren Sitzung — geocodiert dann gar nicht erst neu.
+const GEOCODE_PAUSE_MS = 600;
+
+// localStorage-Schlüssel für den dauerhaften Geocoding-Cache (siehe GEOCODE_PAUSE_MS oben) — lädt
+// bereits in einer früheren Sitzung aufgelöste Adressen sofort, ohne erneut gegen Nominatim zu
+// fragen. typeof window-Prüfung: diese Funktionen laufen auch beim Server-Rendering der
+// Client-Komponente, wo kein localStorage existiert.
+const GEOCODE_CACHE_LOCALSTORAGE_KEY = "parma-admin-objektkarte-geocode-cache";
+
+function ladeGeocodeCacheAusLocalStorage(): Map<string, { lat: number; lon: number } | null> {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const roh = window.localStorage.getItem(GEOCODE_CACHE_LOCALSTORAGE_KEY);
+    if (!roh) return new Map();
+    return new Map(JSON.parse(roh) as [string, { lat: number; lon: number } | null][]);
+  } catch {
+    return new Map();
+  }
+}
+
+function speichereGeocodeCacheInLocalStorage(
+  cache: Map<string, { lat: number; lon: number } | null>
+) {
+  try {
+    window.localStorage.setItem(GEOCODE_CACHE_LOCALSTORAGE_KEY, JSON.stringify([...cache.entries()]));
+  } catch {
+    // z.B. Privater Modus oder voller Speicher — die Karte funktioniert weiterhin, nur ohne
+    // dauerhaften Cache über diese Sitzung hinaus.
+  }
+}
+
 const KARTENSTIL: StyleSpecification = {
   version: 8,
   glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
@@ -458,9 +495,16 @@ export function Objektkarte({
   // anklicke". Geocodiert progressiv (ein Pin erscheint, sobald seine Adresse aufgelöst ist)
   // statt alle auf einmal nach einer langen Wartezeit — siehe api/admin/geocode/route.ts für den
   // Grund (Nominatim-Rate-Limit, ~1 Anfrage/Sekunde). geocodeCacheRef hält bereits aufgelöste
-  // Adressen über einen Wechsel der Auswahl hinweg fest, damit ein erneuter Klick auf dieselbe
-  // PLZ nicht erneut geocodiert.
-  const geocodeCacheRef = useRef(new Map<string, { lat: number; lon: number } | null>());
+  // Adressen fest UND beginnt mit dem Stand aus localStorage (siehe
+  // ladeGeocodeCacheAusLocalStorage oben) — ein erneuter Klick auf dieselbe PLZ geocodiert dann
+  // weder innerhalb derselben Sitzung noch in einer späteren erneut.
+  const geocodeCacheRef = useRef<Map<string, { lat: number; lon: number } | null> | null>(null);
+  if (geocodeCacheRef.current === null) {
+    geocodeCacheRef.current = ladeGeocodeCacheAusLocalStorage();
+  }
+  // Nicht-null-Alias: die Initialisierung oben garantiert bereits vor dem ersten Effekt einen
+  // Wert, TypeScript kann das über den Ref-Zugriff hinweg aber nicht selbst nachverfolgen.
+  const geocodeCache = geocodeCacheRef.current;
   const pinMarkerRef = useRef<Marker[]>([]);
   const [pinStatus, setPinStatus] = useState<{
     geladen: number;
@@ -492,7 +536,7 @@ export function Objektkarte({
       for (let i = 0; i < objekte.length; i++) {
         if (abgebrochen) return;
         const objekt = objekte[i];
-        let koordinate = geocodeCacheRef.current.get(objekt.adresse);
+        let koordinate = geocodeCache.get(objekt.adresse);
         if (koordinate === undefined) {
           try {
             const antwort = await fetch(`/api/admin/geocode?adresse=${encodeURIComponent(objekt.adresse)}`);
@@ -506,7 +550,8 @@ export function Objektkarte({
                 typeof ergebnis.lat === "number" && typeof ergebnis.lon === "number"
                   ? { lat: ergebnis.lat, lon: ergebnis.lon }
                   : null;
-              geocodeCacheRef.current.set(objekt.adresse, koordinate);
+              geocodeCache.set(objekt.adresse, koordinate);
+              speichereGeocodeCacheInLocalStorage(geocodeCache);
             } else {
               // Fehlerhafte Antwort (z.B. 401 nach abgelaufener Admin-Session) NICHT als "keine
               // Koordinate gefunden" im Cache festhalten — ein erneuter Klick auf dieselbe PLZ
@@ -520,7 +565,7 @@ export function Objektkarte({
           // Nominatims Nutzungsrichtlinie erlaubt max. 1 Anfrage/Sekunde — die Pause nur nach
           // einem tatsächlichen Netzwerk-Aufruf, nicht bei einem Cache-Treffer.
           if (!abgebrochen && i < objekte.length - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 1100));
+            await new Promise((resolve) => setTimeout(resolve, GEOCODE_PAUSE_MS));
           }
         }
         if (abgebrochen) return;
