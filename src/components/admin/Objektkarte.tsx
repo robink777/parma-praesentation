@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 // Named statt Default-Import: maplibre-gl 6 exportiert keinen Default mehr (siehe dist/
 // maplibre-gl.d.ts) — "Map" bewusst zu "MaplibreMap" umbenannt, um nicht die eingebaute
 // JS-Klasse "Map" zu verschatten.
-import { Map as MaplibreMap, Marker, NavigationControl, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
+import { Map as MaplibreMap, Marker, NavigationControl, Popup, setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { ObjektkarteDaten, ObjektkartePlzObjekt } from "@/types";
 import plzGeoJson from "@/data/geo/landkreis-dueren-plz.json";
@@ -263,13 +263,50 @@ function erzeugeMarkerElement(ort: ReturnType<typeof formatiereKarte>["orte"][nu
 
 // Kleiner, einzelner Objekt-Pin (nicht die große Stat-Karte oben) — Chat-Vorgabe Oktober 2026:
 // "für die Immobilien, die wir als Adresse gelistet haben, in der jeweiligen Postleitzahl die
-// Pins setzen, wenn ich anklicke". title = native Browser-Tooltip bei Hover, keine eigene
-// Popup-Komponente nötig für diesen einfachen Anwendungsfall.
+// Pins setzen, wenn ich anklicke". title = native Browser-Tooltip bei Hover (kurzer Hinweis),
+// der Klick-Handler für das ausführlichere Popup wird dort gesetzt, wo der Pin erzeugt wird
+// (siehe Pin-Effekt unten) — dort ist "karte" bereits im Scope.
 function erzeugePinElement(objekt: ObjektkartePlzObjekt) {
   const el = document.createElement("div");
   el.title = `${objekt.titel} · ${objekt.objektnr}`;
-  el.style.cssText = `width:13px;height:13px;border-radius:50%;background:${FARBE[objekt.kategorie]};border:2px solid #FCFCFB;box-shadow:0 1px 5px rgba(80,63,61,0.45);`;
+  el.style.cssText = `width:13px;height:13px;border-radius:50%;background:${FARBE[objekt.kategorie]};border:2px solid #FCFCFB;box-shadow:0 1px 5px rgba(80,63,61,0.45);cursor:pointer;`;
   return el;
+}
+
+const PIN_KATEGORIE_LABEL: Record<ObjektkartePlzObjekt["kategorie"], string> = {
+  akquise: "Akquise",
+  verkaufen: "Verkaufen",
+  verkauft: "Verkauft",
+};
+
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Inhalt des Popups, das beim Klick auf einen Objekt-Pin erscheint — Chat-Vorgabe Oktober 2026:
+// "kannst du aber beim Klicken auf die Standorte der Objekte ein paar relevante Daten zeigen".
+// Titel/Objektnummer/Adresse kommen aus onOffice (siehe ObjektkartePlzObjekt) und werden deshalb
+// escaped, bevor sie per setHTML eingesetzt werden — auch wenn es firmeneigene Daten sind, kein
+// ungeprüftes HTML aus einer externen Quelle in den DOM einsetzen.
+function erzeugePinPopupHtml(objekt: ObjektkartePlzObjekt): string {
+  const preisText =
+    objekt.preis > 0 ? `${new Intl.NumberFormat("de-DE").format(objekt.preis)} €` : "–";
+  return `
+    <div style="font-family:Inter,system-ui,sans-serif;min-width:180px;max-width:220px;">
+      <p style="margin:0 0 4px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.06em;color:#503F3D;opacity:0.6;">${escapeHtml(objekt.objektnr)}</p>
+      <p style="margin:0 0 6px;font-family:'Roboto Slab',serif;font-weight:700;font-size:14px;line-height:1.3;color:#503F3D;">${escapeHtml(objekt.titel)}</p>
+      ${objekt.adresse ? `<p style="margin:0 0 8px;font-size:12px;line-height:1.4;color:#503F3D;opacity:0.8;">${escapeHtml(objekt.adresse)}</p>` : ""}
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${FARBE[objekt.kategorie]};flex-shrink:0;"></span>
+        <span style="font-size:12px;color:#503F3D;">${PIN_KATEGORIE_LABEL[objekt.kategorie]}</span>
+        <span style="margin-left:auto;font-family:'Roboto Slab',serif;font-weight:700;font-size:13px;color:#503F3D;white-space:nowrap;">${preisText}</span>
+      </div>
+    </div>
+  `;
 }
 
 export function Objektkarte({
@@ -506,6 +543,11 @@ export function Objektkarte({
   // Wert, TypeScript kann das über den Ref-Zugriff hinweg aber nicht selbst nachverfolgen.
   const geocodeCache = geocodeCacheRef.current;
   const pinMarkerRef = useRef<Marker[]>([]);
+  // Popup, das beim Klick auf einen Pin erscheint (siehe unten) — Chat-Vorgabe Oktober 2026:
+  // "beim Klicken auf die Standorte der Objekte ein paar relevante Daten zeigen". Hier als Ref
+  // statt pro Pin ein eigenes zu verwalten, damit immer nur EIN Popup gleichzeitig offen ist: ein
+  // Klick auf den nächsten Pin schließt das vorherige, statt mehrere übereinander zu stapeln.
+  const offenesPinPopupRef = useRef<Popup | null>(null);
   const [pinStatus, setPinStatus] = useState<{
     geladen: number;
     gesamt: number;
@@ -519,6 +561,8 @@ export function Objektkarte({
     let abgebrochen = false;
     pinMarkerRef.current.forEach((m) => m.remove());
     pinMarkerRef.current = [];
+    offenesPinPopupRef.current?.remove();
+    offenesPinPopupRef.current = null;
     setPinStatus(null);
 
     if (!ausgewaehltePlz) return;
@@ -571,11 +615,21 @@ export function Objektkarte({
         if (abgebrochen) return;
 
         if (koordinate) {
-          pinMarkerRef.current.push(
-            new Marker({ element: erzeugePinElement(objekt), anchor: "center" })
-              .setLngLat([koordinate.lon, koordinate.lat])
-              .addTo(karte)
-          );
+          const lngLat: [number, number] = [koordinate.lon, koordinate.lat];
+          const marker = new Marker({ element: erzeugePinElement(objekt), anchor: "center" })
+            .setLngLat(lngLat)
+            .addTo(karte);
+          // stopPropagation: ohne das würde der Klick zusätzlich bis zur Karte durchreichen und
+          // dort ggf. den Klick-Zoom/die PLZ-Auswahl der darunterliegenden Fläche auslösen.
+          marker.getElement().addEventListener("click", (e) => {
+            e.stopPropagation();
+            offenesPinPopupRef.current?.remove();
+            offenesPinPopupRef.current = new Popup({ closeButton: true, offset: 14, maxWidth: "240px" })
+              .setLngLat(lngLat)
+              .setHTML(erzeugePinPopupHtml(objekt))
+              .addTo(karte);
+          });
+          pinMarkerRef.current.push(marker);
         }
         setPinStatus({ geladen: i + 1, gesamt: objekte.length, uebersprungen });
       }
