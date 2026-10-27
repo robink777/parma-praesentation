@@ -16,6 +16,7 @@ import {
   LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
   MitarbeiterObjekt,
+  NeuzugaengeKennzahlen,
   ObjektGesamtKennzahlen,
   ObjektkarteDaten,
   TeamMitglied,
@@ -108,10 +109,27 @@ function teileTeamAuf(): {
 // Objektvolumen gesamt") — Aufbau nach dem bestehenden Kennzahlen-Karten-Muster aus
 // Unternehmen.tsx (Card + zentrierte Icon/Wert/Label-Spalte), damit die Admin-Seite optisch zum
 // Rest der Anwendung passt, statt ein neues Kartenmuster einzuführen.
-function Infoboxen({ gesamt }: { gesamt?: ObjektGesamtKennzahlen }) {
+function Infoboxen({
+  gesamt,
+  neuzugaenge,
+}: {
+  gesamt?: ObjektGesamtKennzahlen;
+  neuzugaenge?: NeuzugaengeKennzahlen;
+}) {
   const fehltAnzahl = gesamt?.provisionsvorlaufFehltAnzahl ?? 0;
   const jahr = aktuellesJahr();
   const verkauftFehltAnzahl = gesamt?.provisionsvolumenVerkauftJahrFehltAnzahl ?? 0;
+
+  // Neuzugänge der letzten 7 Tage (Oktober 2026 Chat-Vorgabe: "eine Ansicht bei der ich auf einen
+  // Blick sehe, wieviele Objekte und wieviele Kunden in einer Woche angelegt worden sind") —
+  // bewusst als eigene, oberste Reihe statt in die bestehenden Blöcke gemischt: anders als
+  // jahresEintraege/eintraege unten (Bestandssnapshots bzw. laufendes Kalenderjahr) ist das hier
+  // ein rollierendes 7-Tage-Fenster und zieht Kunden aus dem Adress- statt dem Objekt-Modul
+  // (siehe NeuzugaengeKennzahlen in types/index.ts).
+  const wocheEintraege = [
+    { label: "Neue Objekte (7 Tage)", wert: formatWert(neuzugaenge?.neueObjekte ?? null), icon: "house" as const },
+    { label: "Neue Kunden (7 Tage)", wert: formatWert(neuzugaenge?.neueKunden ?? null), icon: "contact" as const },
+  ];
 
   const eintraege = [
     { label: "In Aufarbeitung gesamt", wert: formatWert(gesamt?.aufarbeitungGesamt ?? null), icon: "building" as const },
@@ -155,6 +173,23 @@ function Infoboxen({ gesamt }: { gesamt?: ObjektGesamtKennzahlen }) {
   return (
     <div className="mb-sm">
       <div className="grid grid-cols-2 gap-[8px]">
+        {wocheEintraege.map((eintrag) => (
+          <Card compact key={eintrag.label}>
+            <div className="flex items-center gap-xs">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-reinweiss text-walnuss">
+                <Icon name={eintrag.icon} size={15} />
+              </span>
+              <div className="min-w-0">
+                <p className="label leading-snug">{eintrag.label}</p>
+                <p className="font-slab text-lg font-bold leading-tight text-walnuss">
+                  {eintrag.wert}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+      <div className="mt-[8px] grid grid-cols-2 gap-[8px]">
         {jahresEintraege.map((eintrag) => (
           <Card compact key={eintrag.label}>
             <div className="flex items-center gap-xs">
@@ -709,12 +744,14 @@ export function Mitarbeiterstatistik({
   kontrollObjekte,
   leadquellenKennzahlen,
   objektkarteDaten,
+  neuzugaengeKennzahlen,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
   kontrollObjekte?: KontrollObjekt[];
   leadquellenKennzahlen?: LeadquellenKennzahlen;
   objektkarteDaten?: ObjektkarteDaten;
+  neuzugaengeKennzahlen?: NeuzugaengeKennzahlen;
 }) {
   const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
   const [abschnitt, setAbschnitt] = useState("uebersicht");
@@ -751,7 +788,7 @@ export function Mitarbeiterstatistik({
         <div className="flex-1 overflow-y-auto">
           {abschnitt === "uebersicht" && (
             <SectionShell label="Admin-Bereich" title="Auf einen Blick" compact>
-              <Infoboxen gesamt={gesamtKennzahlen} />
+              <Infoboxen gesamt={gesamtKennzahlen} neuzugaenge={neuzugaengeKennzahlen} />
             </SectionShell>
           )}
           {abschnitt === "mitarbeiter" && (

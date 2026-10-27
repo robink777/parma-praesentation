@@ -2,6 +2,7 @@ import { Mitarbeiterstatistik } from "@/components/admin/Mitarbeiterstatistik";
 import { ONOFFICE_MODE } from "@/lib/onoffice/config";
 import {
   ladeMitarbeiterKennzahlen,
+  ladeNeuzugaengeKennzahlen,
   ladeObjektGesamtKennzahlen,
 } from "@/lib/onoffice/mitarbeiterstatistik";
 import { ladeKontrollObjekte, ladeLeadquellenKennzahlen, ladeObjektkarteDaten } from "@/lib/onoffice/estate";
@@ -9,6 +10,7 @@ import {
   KontrollObjekt,
   LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
+  NeuzugaengeKennzahlen,
   ObjektGesamtKennzahlen,
   ObjektkarteDaten,
 } from "@/types";
@@ -33,9 +35,10 @@ export default async function AdminPage() {
   let kontrollObjekte: KontrollObjekt[] | undefined;
   let leadquellenKennzahlen: LeadquellenKennzahlen | undefined;
   let objektkarteDaten: ObjektkarteDaten | undefined;
+  let neuzugaengeKennzahlen: NeuzugaengeKennzahlen | undefined;
 
   if (ONOFFICE_MODE === "live") {
-    // Alle fünf Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
+    // Alle sechs Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
     // voneinander, ein sequenzielles await würde die Ladezeit der Seite unnötig verlängern.
     // Trotzdem einzeln abgesichert (separate try/catch statt einem gemeinsamen um das
     // Promise.all) — schlägt einer der Abrufe fehl, sollen die übrigen trotzdem angezeigt werden
@@ -46,6 +49,7 @@ export default async function AdminPage() {
       kontrollErgebnis,
       leadquellenErgebnis,
       objektkarteErgebnis,
+      neuzugaengeErgebnis,
     ] = await Promise.all([
       ladeMitarbeiterKennzahlen().catch((error) => {
         console.error("Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:", error);
@@ -70,12 +74,17 @@ export default async function AdminPage() {
         console.error("Live-Abruf der Objektkarte aus OnOffice fehlgeschlagen:", error);
         return undefined;
       }),
+      ladeNeuzugaengeKennzahlen().catch((error) => {
+        console.error("Live-Abruf der Neuzugänge aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
     ]);
     kennzahlen = kennzahlenErgebnis;
     gesamtKennzahlen = gesamtKennzahlenErgebnis;
     kontrollObjekte = kontrollErgebnis;
     leadquellenKennzahlen = leadquellenErgebnis;
     objektkarteDaten = objektkarteErgebnis;
+    neuzugaengeKennzahlen = neuzugaengeErgebnis;
   }
 
   // Kein SectionShell-Wrapper mehr — Mitarbeiterstatistik baut seit August 2026 ihr eigenes
@@ -88,6 +97,7 @@ export default async function AdminPage() {
       kontrollObjekte={kontrollObjekte}
       leadquellenKennzahlen={leadquellenKennzahlen}
       objektkarteDaten={objektkarteDaten}
+      neuzugaengeKennzahlen={neuzugaengeKennzahlen}
     />
   );
 }

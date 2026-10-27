@@ -1,5 +1,10 @@
 import { AKQUISE_NAMEN, TEAM } from "@/data/unternehmen";
-import { MitarbeiterKennzahlen, MitarbeiterObjekt, ObjektGesamtKennzahlen } from "@/types";
+import {
+  MitarbeiterKennzahlen,
+  MitarbeiterObjekt,
+  NeuzugaengeKennzahlen,
+  ObjektGesamtKennzahlen,
+} from "@/types";
 import {
   AKQUISE_TERMINARTEN,
   ladeAlleAktivenObjekte,
@@ -10,6 +15,8 @@ import {
   zaehleAktiveKunden,
   zaehleAktiveObjekte,
   zaehleBesichtigungen,
+  zaehleNeueKunden,
+  zaehleNeueObjekte,
   zaehleObjekteInAufarbeitung,
   zaehleTermine,
   zaehleTermineNachArt,
@@ -68,6 +75,34 @@ export function ermittleJahresDatumsfenster() {
     vonJahr: `${jahr}-01-01`,
     bisJahr: `${jahr}-12-31`,
   };
+}
+
+// Datumsfenster "letzte 7 Tage" (heute minus 7 Tage bis heute, ohne Uhrzeitanteil) für die
+// "Neuzugänge"-Kennzahl (siehe NeuzugaengeKennzahlen in types/index.ts, Oktober 2026
+// Chat-Vorgabe: "wieviele Objekte und wieviele Kunden in einer Woche angelegt worden sind") —
+// gleiches "YYYY-MM-DD"-Format wie ermittleJahresDatumsfenster oben, das für reine Datumsfelder
+// (erstellt_am/Eintragsdatum sind beide type "date" im Feldkatalog, live gegen den Account
+// geprüft Oktober 2026) zuverlässig funktioniert.
+function ermittleWochenDatumsfenster() {
+  const heute = new Date();
+  const vor7Tagen = new Date(heute);
+  vor7Tagen.setDate(vor7Tagen.getDate() - 7);
+  const formatiere = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { vonWoche: formatiere(vor7Tagen) };
+}
+
+// Lädt die Neuzugänge-Kennzahlen für die "Auf einen Blick"-Seite (siehe NeuzugaengeKennzahlen,
+// Chat-Vorgabe Oktober 2026). Beide Zählungen unabhängig per .catch(() => null) abgesichert,
+// analog zum Muster bei ladeMitarbeiterKennzahlen oben — schlägt eine der beiden fehl, zeigt nur
+// diese eine Kachel "–" statt der gesamten Seite.
+export async function ladeNeuzugaengeKennzahlen(): Promise<NeuzugaengeKennzahlen> {
+  const { vonWoche } = ermittleWochenDatumsfenster();
+  const [neueObjekte, neueKunden] = await Promise.all([
+    zaehleNeueObjekte(vonWoche).catch(() => null),
+    zaehleNeueKunden(vonWoche).catch(() => null),
+  ]);
+  return { neueObjekte, neueKunden };
 }
 
 // Aggregiert die Mitarbeiterstatistik-Kennzahlen (siehe MitarbeiterKennzahlen in types/index.ts

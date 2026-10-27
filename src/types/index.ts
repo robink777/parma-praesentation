@@ -389,6 +389,18 @@ export interface ObjektGesamtKennzahlen {
   provisionsvolumenVerkauftJahrFehltAnzahl: number;
 }
 
+// Unternehmensweite Neuzugänge der letzten 7 Tage für die "Auf einen Blick"-Seite im
+// Admin-Bereich (siehe zaehleNeueObjekte/zaehleNeueKunden in onoffice/estate.ts, Oktober 2026
+// Chat-Vorgabe: "eine Ansicht bei der ich auf einen Blick sehe, wieviele Objekte und wieviele
+// Kunden in einer Woche angelegt worden sind"). Bewusst ein eigener, schlanker Typ statt einer
+// Erweiterung von ObjektGesamtKennzahlen (das ausschließlich Objekt-Bestandsdaten bündelt) —
+// "Kunden" stammt aus dem Adress-Modul, nicht aus dem Objekt-Bestand, beides gehört hier aber
+// inhaltlich als EIN "Neuzugänge"-Block zusammen.
+export interface NeuzugaengeKennzahlen {
+  neueObjekte: number | null;
+  neueKunden: number | null;
+}
+
 // Ein Objekt mit mindestens einer erkannten Dateninkonsistenz in OnOffice, für die "Kontrolle"-
 // Seite im Admin-Bereich (siehe ladeKontrollObjekte in onoffice/estate.ts, Chat-Vorgabe August
 // 2026: "eine Kontrollseite einrichten wo in jedem Status nachgeschaut werden soll ob alles

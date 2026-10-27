@@ -2323,6 +2323,54 @@ export async function zaehleAktiveKunden(benutzername: string): Promise<number> 
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
+// Zählt Objekte, die seit einem bestimmten Datum in OnOffice ANGELEGT wurden (Feld "erstellt_am",
+// System-Zeitstempel bei Objekterstellung, live per get_field_definitions/search_estates
+// bestätigt — Oktober 2026) — für die "Auf einen Blick"-Kennzahl "Neue Objekte (7 Tage)"
+// (Chat-Vorgabe: "eine Ansicht bei der ich auf einen Blick sehe, wieviele Objekte und wieviele
+// Kunden in einer Woche angelegt worden sind"). Gleiches listlimit:1 + meta.cntabsolute-Muster
+// wie zaehleVerkaufteObjekte oben.
+export async function zaehleNeueObjekte(von: string): Promise<number> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id"],
+        filter: { erstellt_am: [{ op: ">=", val: von }] },
+        listlimit: 1,
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
+// Zählt Adressen (Kunden/Kontakte jeder Art), die seit einem bestimmten Datum in OnOffice
+// angelegt wurden — Feld "Eintragsdatum", NICHT "kunde_seit" (das ist ein manuell gepflegtes
+// Datum, kein Anlegezeitpunkt: live gegen den Account geprüft, Oktober 2026 — Eintragsdatum
+// trägt echte Uhrzeiten und steigt mit jedem neu angelegten Datensatz). resourcetype "address"
+// braucht "Name" statt "Id" als data-Feld (siehe Kommentar bei zaehleAktiveKunden oben) —
+// gleiches listlimit:1 + meta.cntabsolute-Muster.
+export async function zaehleNeueKunden(von: string): Promise<number> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "address",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Name"],
+        filter: { Eintragsdatum: [{ op: ">=", val: von }] },
+        listlimit: 1,
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
 // Ermittelt die zuletzt vergebene Kundennummer (KdNr, Feld im address-Modul) für die
 // "Kunden"-Kennzahl im "Über uns"-Reiter (siehe Unternehmen.tsx). WICHTIG: Der sortby-Parameter
 // wird von der onOffice-API für resourcetype "address" in diesem Account nachweislich ignoriert
