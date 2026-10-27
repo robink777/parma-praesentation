@@ -726,12 +726,12 @@ export function Mitarbeiterstatistik({
         <AdminNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
         <div className="flex-1 overflow-y-auto">
           {abschnitt === "uebersicht" && (
-            <SectionShell label="Admin-Bereich" title="Auf einen Blick">
+            <SectionShell label="Admin-Bereich" title="Auf einen Blick" compact>
               <Infoboxen gesamt={gesamtKennzahlen} />
             </SectionShell>
           )}
           {abschnitt === "mitarbeiter" && (
-            <SectionShell label="Admin-Bereich" title="Mitarbeiter">
+            <SectionShell label="Admin-Bereich" title="Mitarbeiter" compact>
               <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
                 Auslastung des Teams als Entscheidungsgrundlage dafür, wer ein Objekt nach der
                 Akquise übernimmt.
@@ -778,12 +778,12 @@ export function Mitarbeiterstatistik({
             </SectionShell>
           )}
           {abschnitt === "leadquellen" && (
-            <SectionShell label="Admin-Bereich" title="Leadquellen">
+            <SectionShell label="Admin-Bereich" title="Leadquellen" compact>
               <Leadquellen kennzahlen={leadquellenKennzahlen} />
             </SectionShell>
           )}
           {abschnitt === "kontrolle" && (
-            <SectionShell label="Admin-Bereich" title="Kontrolle">
+            <SectionShell label="Admin-Bereich" title="Kontrolle" compact>
               <Kontrolle objekte={kontrollObjekte} />
             </SectionShell>
           )}
@@ -791,6 +791,7 @@ export function Mitarbeiterstatistik({
             <SectionShell
               label="Admin-Bereich"
               title={gewaehltePlz ? `${gewaehltePlz.plz} · ${gewaehltePlz.ort}` : "PLZ"}
+              compact
             >
               <PlzObjekte
                 plz={gewaehltePlz?.plz ?? null}
