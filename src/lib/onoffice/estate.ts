@@ -1803,6 +1803,7 @@ interface RawObjektkarteRecord {
   id: string;
   elements: {
     plz?: string;
+    status?: string;
     status2?: string;
     objekttitel?: string;
     objektnr_extern?: string;
@@ -1819,9 +1820,14 @@ interface RawObjektkarteRecord {
 // strasse/hausnummer/ort zusätzlich für die Objekt-Pins auf der Karte (siehe
 // api/admin/geocode/route.ts), Chat-Vorgabe Oktober 2026: "für die Immobilien, die wir als
 // Adresse gelistet haben, in der jeweiligen Postleitzahl die Pins setzen".
+// "status" (Status 1: Aktiv/Inaktiv/Archiviert) zusätzlich zu "status2" — Chat-Vorgabe Oktober
+// 2026: "Prüfe bitte die Zahlen. Ich glaube wir haben mehr aktive Objekte! Status 1 = Aktiv,
+// Status 2 = kein Status oder Aktive Vermarktung" (siehe Kategorisierung in
+// ladeObjektkarteDaten unten für die genaue Zuordnung).
 const OBJEKTKARTE_FIELDS = [
   "Id",
   "plz",
+  "status",
   "status2",
   "objekttitel",
   "objektnr_extern",
@@ -1856,25 +1862,33 @@ async function ladeObjektkarteRecordsSeite(offset: number): Promise<RawObjektkar
 // Objektkarte.tsx, Chat-Vorgabe Oktober 2026: "zeigt wo die Objekte sind die wir a) akquirieren
 // b) verkaufen und c) verkauft haben").
 //
-// KORREKTUR Oktober 2026 ("die Zahlen können im Großen und Ganzen nicht stimmen"): Die
+// KORREKTUR 1 Oktober 2026 ("die Zahlen können im Großen und Ganzen nicht stimmen"): Die
 // ursprüngliche AKQUISE_STATUS-Liste (nur in_akquise/vorbereitung) beruhte auf einer früheren,
 // unvollständigen Erinnerung an die status2-Werte. Ein erneuter Abgleich gegen den echten
 // Feldkatalog (get_field_definitions, Oktober 2026) zeigt 19 permitted_values für status2, davon
-// allein SIEBEN mit "Akquise"-Label, die bis jetzt komplett unter den Tisch fielen (Nachfass,
+// allein SIEBEN mit "Akquise"-Label, die bis dahin komplett unter den Tisch fielen (Nachfass,
 // ReAkquise, Vertragstermin, Auftrag, Nur Bewertung) — betroffene Objekte zählten nirgends in den
-// drei Kategorien, obwohl sie inhaltlich mitten in der Akquise-Pipeline stehen:
-//   - akquirieren: in_akquise, vorbereitung (wie bisher) PLUS die fünf weiteren "Akquise -
-//     ..."-Unterstufen (siehe AKQUISE_STATUS unten) — NICHT "Akquise - Absage"
-//     (ind_Schl_4903): das ist eine abgelehnte/beendete Akquise, keine aktive Pipeline mehr.
-//   - verkaufen: aktive_vermarktung UND reserviert (unverändert — ein reserviertes Objekt wird
-//     noch aktiv verkauft, der Notarvertrag steht nur noch aus).
-//   - verkauft: verkauft (unverändert — NICHT fremd_verkauft_vermietet, das ist ein Verkauf/eine
-//     Vermietung durch Dritte, nicht durch Parma).
-// Bewusst weiterhin NICHT in einer der drei Kategorien (eigene Einschätzung, bei Bedarf
-// korrigierbar): marktbeobachtung/ind_Schl_5775/ind_Schl_5779 ("Marktbeobachtung" — noch vor der
-// eigentlichen Akquise-Ansprache), ind_Schl_5767 ("Fremdobjekt - Parma Finanz GmbH" — kein
-// eigenes Immobilien-Portfolio-Objekt), status2obj_aktiv/status2obj_inaktiv (onOffice selbst
-// markiert diese beiden als Gruppenköpfe "nicht auswählen").
+// drei Kategorien, obwohl sie inhaltlich mitten in der Akquise-Pipeline stehen. AKQUISE_STATUS um
+// die fünf fehlenden Werte erweitert — NICHT "Akquise - Absage" (ind_Schl_4903): abgelehnt/
+// beendet, keine aktive Pipeline mehr.
+//
+// KORREKTUR 2 Oktober 2026 ("ich glaube wir haben mehr aktive Objekte! Status 1 = Aktiv, Status 2
+// = kein Status oder Aktive Vermarktung"): Live-Stichprobe bestätigte das — von 95 Objekten mit
+// status=1 (Aktiv) hatten 61 GAR KEINEN status2-Wert gesetzt. "verkaufen" verließ sich bisher
+// ausschließlich auf status2 (aktive_vermarktung/reserviert) und ließ dadurch alle Objekte mit
+// leerem status2 komplett unter den Tisch fallen, obwohl sie laut status (Status 1) aktiv
+// vermarktet werden. Die Kategorisierung prüft deshalb jetzt status (Status 1) als Signal für
+// "verkaufen", nicht mehr nur status2 — mit Akquise-Status2-Werten weiterhin Vorrang (ein Objekt
+// mit status2=in_akquise bleibt "akquise", selbst falls status=1 versehentlich gesetzt ist):
+//   1. status2 = verkauft → "verkauft" (NICHT fremd_verkauft_vermietet: Verkauf/Vermietung durch
+//      Dritte, nicht durch Parma).
+//   2. status2 ist eine der acht Akquise-Unterstufen (siehe AKQUISE_STATUS) → "akquise".
+//   3. status (Status 1) = "1" (Aktiv) → "verkaufen" — deckt damit sowohl leeres status2 als
+//      auch aktive_vermarktung/reserviert/status2obj_aktiv ab, ohne jeden denkbaren status2-Wert
+//      einzeln auflisten zu müssen.
+//   4. sonst: keine der drei Kategorien (z.B. status=2/0 ohne erkannten Akquise-Status2 — etwa
+//      Marktbeobachtung, Fremdobjekt Parma Finanz, oder schlicht noch nicht kategorisierte
+//      Alt-/Inaktiv-Datensätze).
 // Paginiert wie ladeKontrollObjekte oben (GESAMT_OBJEKT_LISTLIMIT-Schritte).
 export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
   const alle: RawObjektkarteRecord[] = [];
@@ -1895,8 +1909,6 @@ export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
     "ind_Schl_5547", // Akquise - Nachfass
     "ind_Schl_5545", // Akquise - Nur Bewertung
   ]);
-  const VERKAUFEN_STATUS = new Set(["aktive_vermarktung", "reserviert"]);
-
   const zaehlerJePlz = new Map<string, ObjektkartePlzEintrag>();
   let ohnePlz = 0;
 
@@ -1914,16 +1926,20 @@ export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
       zaehlerJePlz.set(plz, eintrag);
     }
 
-    // Kategorie einmal ermitteln statt dreifach dieselbe status2-Prüfung zu wiederholen — sowohl
-    // für den Zähler als auch für den Objekt-Eintrag in der Liste (siehe ObjektkartePlzObjekt).
+    // Kategorie einmal ermitteln statt dreifach dieselbe Prüfung zu wiederholen — sowohl für den
+    // Zähler als auch für den Objekt-Eintrag in der Liste (siehe ObjektkartePlzObjekt). status2
+    // hat Vorrang vor status (Status 1): ein Objekt, das erkennbar noch in der Akquise- oder
+    // bereits verkauft-Pipeline steckt, soll dort bleiben, selbst wenn status=1 (Aktiv)
+    // abweichend/versehentlich gesetzt ist (siehe Korrektur 2 oben).
     let kategorie: ObjektkartePlzObjekt["kategorie"] | null = null;
     if (status2 === "verkauft") kategorie = "verkauft";
-    else if (status2 && VERKAUFEN_STATUS.has(status2)) kategorie = "verkaufen";
     else if (status2 && AKQUISE_STATUS.has(status2)) kategorie = "akquise";
-    // Andere/leere status2-Werte (z.B. ganz neue, noch unkategorisierte Objekte) zählen bewusst
-    // in keine der drei vom Nutzer genannten Kategorien und fehlen entsprechend auch in der
-    // Objektliste — der PLZ-Eintrag selbst wird trotzdem angelegt, damit ein Objekt mit gültiger
-    // PLZ aber unbekanntem Status nicht fälschlich unter "ohnePlz" auftaucht.
+    else if (record.elements.status === "1") kategorie = "verkaufen";
+    // Weder status2 noch status (Status 1) liefern hier eine der drei vom Nutzer genannten
+    // Kategorien (z.B. Marktbeobachtung, Fremdobjekt Parma Finanz, oder ein inaktiver/
+    // archivierter Altdatensatz ohne erkannten Akquise-Status2) — der PLZ-Eintrag selbst wird
+    // trotzdem angelegt, damit ein Objekt mit gültiger PLZ aber unbekanntem Status nicht
+    // fälschlich unter "ohnePlz" auftaucht.
     if (kategorie === null) continue;
 
     // adresse nur, wenn Straße UND Hausnummer gepflegt sind — ohne Hausnummer lässt sich kein
