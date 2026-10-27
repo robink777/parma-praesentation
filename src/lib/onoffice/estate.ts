@@ -1854,15 +1854,27 @@ async function ladeObjektkarteRecordsSeite(offset: number): Promise<RawObjektkar
 
 // Objektzahlen je PLZ für die Objektkarte im Admin-Bereich (siehe components/admin/
 // Objektkarte.tsx, Chat-Vorgabe Oktober 2026: "zeigt wo die Objekte sind die wir a) akquirieren
-// b) verkaufen und c) verkauft haben"). onOffice kennt dafür fünf status2-Werte (siehe
-// permitted_values, Live-Feldkatalog geprüft September 2026) — auf die drei vom Nutzer genannten
-// Kategorien gebündelt, statt Objekte in weiteren, nicht genannten Stufen (vorbereitung,
-// reserviert) kommentarlos von der Karte verschwinden zu lassen:
-//   - akquirieren: in_akquise (Erstansprache/Bewertung) UND vorbereitung (bereits beauftragt,
-//     Vermarktung aber noch nicht gestartet — gehört inhaltlich noch zur Akquise-Pipeline)
-//   - verkaufen: aktive_vermarktung UND reserviert (ein reserviertes Objekt wird noch aktiv
-//     verkauft, der Notarvertrag steht nur noch aus)
-//   - verkauft: verkauft
+// b) verkaufen und c) verkauft haben").
+//
+// KORREKTUR Oktober 2026 ("die Zahlen können im Großen und Ganzen nicht stimmen"): Die
+// ursprüngliche AKQUISE_STATUS-Liste (nur in_akquise/vorbereitung) beruhte auf einer früheren,
+// unvollständigen Erinnerung an die status2-Werte. Ein erneuter Abgleich gegen den echten
+// Feldkatalog (get_field_definitions, Oktober 2026) zeigt 19 permitted_values für status2, davon
+// allein SIEBEN mit "Akquise"-Label, die bis jetzt komplett unter den Tisch fielen (Nachfass,
+// ReAkquise, Vertragstermin, Auftrag, Nur Bewertung) — betroffene Objekte zählten nirgends in den
+// drei Kategorien, obwohl sie inhaltlich mitten in der Akquise-Pipeline stehen:
+//   - akquirieren: in_akquise, vorbereitung (wie bisher) PLUS die fünf weiteren "Akquise -
+//     ..."-Unterstufen (siehe AKQUISE_STATUS unten) — NICHT "Akquise - Absage"
+//     (ind_Schl_4903): das ist eine abgelehnte/beendete Akquise, keine aktive Pipeline mehr.
+//   - verkaufen: aktive_vermarktung UND reserviert (unverändert — ein reserviertes Objekt wird
+//     noch aktiv verkauft, der Notarvertrag steht nur noch aus).
+//   - verkauft: verkauft (unverändert — NICHT fremd_verkauft_vermietet, das ist ein Verkauf/eine
+//     Vermietung durch Dritte, nicht durch Parma).
+// Bewusst weiterhin NICHT in einer der drei Kategorien (eigene Einschätzung, bei Bedarf
+// korrigierbar): marktbeobachtung/ind_Schl_5775/ind_Schl_5779 ("Marktbeobachtung" — noch vor der
+// eigentlichen Akquise-Ansprache), ind_Schl_5767 ("Fremdobjekt - Parma Finanz GmbH" — kein
+// eigenes Immobilien-Portfolio-Objekt), status2obj_aktiv/status2obj_inaktiv (onOffice selbst
+// markiert diese beiden als Gruppenköpfe "nicht auswählen").
 // Paginiert wie ladeKontrollObjekte oben (GESAMT_OBJEKT_LISTLIMIT-Schritte).
 export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
   const alle: RawObjektkarteRecord[] = [];
@@ -1874,7 +1886,15 @@ export async function ladeObjektkarteDaten(): Promise<ObjektkarteDaten> {
     offset += GESAMT_OBJEKT_LISTLIMIT;
   }
 
-  const AKQUISE_STATUS = new Set(["in_akquise", "vorbereitung"]);
+  const AKQUISE_STATUS = new Set([
+    "in_akquise",
+    "vorbereitung",
+    "ind_Schl_4905", // Akquise - Vertragstermin
+    "ind_Schl_5461", // Akquise – Auftrag
+    "ind_Schl_5459", // Akquise – ReAkquise
+    "ind_Schl_5547", // Akquise - Nachfass
+    "ind_Schl_5545", // Akquise - Nur Bewertung
+  ]);
   const VERKAUFEN_STATUS = new Set(["aktive_vermarktung", "reserviert"]);
 
   const zaehlerJePlz = new Map<string, ObjektkartePlzEintrag>();
