@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { AdminNav } from "./AdminNavigation";
 import { ADMIN_NAV_ITEMS } from "./adminNav";
@@ -24,37 +24,17 @@ import {
 // Deutsches Tausendertrennzeichen, analog zu Unternehmen.tsx.
 const zahlenformat = new Intl.NumberFormat("de-DE");
 
-// Spaltenbreiten je Objektzeile innerhalb einer aufgeklappten Gruppe (siehe ObjektGruppe unten)
-// — von links nach rechts: Titelbild, Objektnummer, Preis, Vermarktungsdauer, Provisionsvorlauf
-// (fünfte Spalte, Juli 2026 Chat-Vorgabe: "bitte pro Objekt und einmal gesamt" — etwas breiter als
-// die übrigen Zahlenspalten, da hier bei fehlenden OnOffice-Werten zusätzlich ein Hinweis-Icon
-// samt Text erscheint, siehe ObjektZeile).
-const OBJEKT_GRID_COLS = "grid-cols-[48px_minmax(0,1fr)_110px_110px_160px]";
-
-// Feste Spaltenbreiten (siehe Objektdaten.tsx/InteressentZeile für dasselbe Muster) statt
-// justify-between, damit Kopf- und Datenzeilen unabhängig von ihrem jeweiligen Inhalt exakt
-// bündig bleiben. Die Namensspalte bekommt den meisten Platz (1.2fr); Termine/Besichtigungen
-// bekommen je Zeitraum (30 Tage, Jahr) eine EIGENE Spalte statt einer zusammengefassten
-// "81 / 456"-Darstellung (siehe Chat-Vorgabe) — dadurch acht Spalten statt vorher sechs. Die
-// erste, schmale Spalte (28px) ist neu und nimmt den Auf-/Zuklapp-Button auf (siehe Chat-Vorgabe:
-// Dropdown je Mitarbeiter mit der Objektliste). Letzte Spalte (100px, Juli 2026 Chat-Vorgabe:
-// "die Zahl der verkauften Objekte pro Mitarbeiter in diesem Jahr") für "Verkauft {Jahr}".
-const KENNZAHLEN_GRID_COLS =
-  "grid-cols-[28px_minmax(0,1.2fr)_110px_110px_90px_90px_100px_100px_100px_100px]";
-
-// Schlankere Spaltenraster für Vertrieb/Akquise/Setting (August 2026 Chat-Vorgabe: "die Option
-// einbauen dass man von 30T zu Jahr wechseln kann damit die Tabelle etwas schlanker ist") — statt
-// je einer eigenen Spalte für 30-Tage- UND Jahres-Wert zeigen diese drei Reiter nur EINE Spalte je
-// Kennzahl, deren Zeitraum über einen Umschalter (siehe ZeitraumSchalter unten) gemeinsam
-// gesteuert wird. "Weitere Mitarbeiter" ist davon bewusst ausgenommen (vom Nutzer nicht genannt)
-// und behält weiterhin KENNZAHLEN_GRID_COLS mit beiden Spalten nebeneinander.
-const KENNZAHLEN_GRID_COLS_STANDARD_SCHLANK =
-  "grid-cols-[28px_minmax(0,1.2fr)_110px_110px_100px_100px_100px_100px]";
-// Eine Spalte mehr als vorher für die neue Quote-Spalte (siehe akquiseQuoteErstZuZweit unten,
-// August 2026 Chat-Vorgabe: "gib die Prozentzahl also die Quote aus. Wie ist die Quote von 1.
-// Termin zu 2. Termin?").
-const KENNZAHLEN_GRID_COLS_AKQUISE_SCHLANK =
-  "grid-cols-[28px_minmax(0,1.2fr)_110px_110px_100px_100px_100px_100px]";
+// Oktober 2026 Chat-Vorgabe: "kontrolliere die gesamte Optik ... ganz viele Werte werden optisch
+// nicht gut abgebildet. Ich hätte gerne im Gesamten mehr Freiflächen. Die Ausgabe der Daten soll
+// ordentlicher aussehen" — die Tabelle lebt seit der 2/3-Karte+1/3-Panel-Aufteilung (siehe
+// Mitarbeiterstatistik-Hauptkomponente unten) in einer ca. 400-480px schmalen Spalte. Die
+// vorherigen starren CSS-Grid-Spalten (bis zu zehn Stück á 90-160px, siehe Git-Historie) brauchten
+// dafür über 800px Mindestbreite und waren nur per Horizontal-Scroll erreichbar — in der Praxis
+// sah man nur Name + eine abgeschnittene Spalte. Ersetzt durch ein umbrechendes
+// Label-über-Wert-Raster (siehe Metrik/baueMetriken/KennzahlenZeile unten), das bei jeder Breite
+// lesbar bleibt, keinen Horizontal-Scroll braucht und durch den Grid-Gap von selbst mehr
+// Weißraum zwischen den Werten schafft. Dieselbe Idee gilt für die Objektliste je Mitarbeiter
+// (siehe ObjektZeile weiter unten).
 
 function formatWert(n: number | null): string {
   return n === null ? "–" : zahlenformat.format(n);
@@ -237,67 +217,91 @@ type KennzahlenModus = "standard" | "akquise";
 // undefined = "Weitere Mitarbeiter"-Fall, zeigt weiterhin beide Zeitfenster nebeneinander.
 type Zeitraum = "30T" | "Jahr";
 
-function KennzahlenKopfzeile({ modus, zeitraum }: { modus: KennzahlenModus; zeitraum?: Zeitraum }) {
-  const gridCols = zeitraum
-    ? modus === "akquise"
-      ? KENNZAHLEN_GRID_COLS_AKQUISE_SCHLANK
-      : KENNZAHLEN_GRID_COLS_STANDARD_SCHLANK
-    : KENNZAHLEN_GRID_COLS;
-
+// Jeder Wert trägt sein Label direkt bei sich, statt sich über eine separate, positionsabhängige
+// Kopfzeile zu erschließen (siehe Kommentar oben bei der Datei-Einleitung) — dadurch bleibt jede
+// einzelne Metrik auch dann verständlich, wenn das umgebende Raster umbricht.
+function Metrik({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={`grid ${gridCols} items-end gap-xs border-b border-anthrazit/10 pb-xs`}>
-      <span aria-hidden="true" />
-      <span className="label">Mitarbeiter</span>
-      <span className="label text-left">Aktive Objekte</span>
-      <span className="label text-left">Aufarbeitung</span>
-      {modus === "akquise" ? (
-        zeitraum ? (
-          <>
-            <span className="label text-left">Erst</span>
-            <span className="label text-left">Zweit</span>
-            <span className="label text-left" title="Zweittermine Jahr ÷ Ersttermine Jahr">
-              Quote 1→2
-            </span>
-            <span className="label text-left">Vertrag</span>
-          </>
-        ) : (
-          <>
-            <span className="label text-left">Erst 30T</span>
-            <span className="label text-left">Erst Jahr</span>
-            <span className="label text-left">Zweit 30T</span>
-            <span className="label text-left">Zweit Jahr</span>
-            <span className="label text-left">Vertrag 30T</span>
-            <span className="label text-left">Vertrag Jahr</span>
-          </>
-        )
-      ) : zeitraum ? (
-        <>
-          <span className="label text-left">Termine</span>
-          <span className="label text-left">Besicht.</span>
-          <span className="label text-left">Kunden aktiv</span>
-          <span className="label text-left">Verkauft</span>
-        </>
-      ) : (
-        <>
-          <span className="label text-left">Termine 30T</span>
-          <span className="label text-left">Termine Jahr</span>
-          <span className="label text-left">Besicht. 30T</span>
-          <span className="label text-left">Besicht. Jahr</span>
-          <span className="label text-left">Kunden aktiv</span>
-          <span className="label text-left">Verkauft</span>
-        </>
-      )}
+    <div className="flex min-w-[84px] flex-col gap-[2px]">
+      <span className="label text-anthrazit/40">{label}</span>
+      <span className="font-mono text-sm text-anthrazit">{children}</span>
     </div>
   );
 }
 
-// Eine Objektzeile innerhalb einer aufgeklappten Gruppe (siehe ObjektGruppe unten) — von links
-// nach rechts: Titelbild, Objektnummer, Preis, Vermarktungsdauer (Chat-Vorgabe).
+// Baut die Liste der anzuzeigenden Kennzahlen (Label + formatierter Wert) in der passenden
+// Reihenfolge — dieselbe modus-/zeitraum-Verzweigung, die zuvor doppelt zwischen
+// KennzahlenKopfzeile und KennzahlenZeile gepflegt werden musste (siehe Git-Historie), jetzt an
+// einer einzigen Stelle.
+function baueMetriken(
+  k: MitarbeiterKennzahlen,
+  modus: KennzahlenModus,
+  zeitraum?: Zeitraum
+): { label: string; wert: string }[] {
+  const basis = [
+    { label: "Aktive Objekte", wert: formatWert(k.aktiveObjekte) },
+    { label: "Aufarbeitung", wert: formatWert(k.objekteInAufarbeitung) },
+  ];
+
+  if (modus === "akquise") {
+    // zeitraum ist im Akquise-Reiter in der Praxis immer gesetzt (siehe Mitarbeiterstatistik
+    // unten — der ZeitraumSchalter steuert alle drei Reiter außer "Weitere Mitarbeiter"); der
+    // Fallback auf "Jahr" ist nur eine Absicherung gegen den optionalen Typ.
+    const z = zeitraum ?? "Jahr";
+    return [
+      ...basis,
+      {
+        label: z === "30T" ? "Erst 30T" : "Erst Jahr",
+        wert: formatWert(z === "30T" ? k.akquiseErsttermin30Tage : k.akquiseErsttermineJahr),
+      },
+      {
+        label: z === "30T" ? "Zweit 30T" : "Zweit Jahr",
+        wert: formatWert(z === "30T" ? k.akquiseZweittermin30Tage : k.akquiseZweittermineJahr),
+      },
+      { label: "Quote 1→2", wert: formatProzent(akquiseQuoteErstZuZweit(k)) },
+      {
+        label: z === "30T" ? "Vertrag 30T" : "Vertrag Jahr",
+        wert: formatWert(
+          z === "30T" ? k.akquiseVertragstermin30Tage : k.akquiseVertragstermineJahr
+        ),
+      },
+    ];
+  }
+
+  if (zeitraum) {
+    return [
+      ...basis,
+      {
+        label: zeitraum === "30T" ? "Termine 30T" : "Termine Jahr",
+        wert: formatWert(zeitraum === "30T" ? k.termine30Tage : k.termineJahr),
+      },
+      {
+        label: zeitraum === "30T" ? "Besicht. 30T" : "Besicht. Jahr",
+        wert: formatWert(zeitraum === "30T" ? k.besichtigungen30Tage : k.besichtigungenJahr),
+      },
+      { label: "Kunden aktiv", wert: formatWert(k.kundenAktiv) },
+      { label: "Verkauft", wert: formatWert(k.verkaufteObjekteJahr) },
+    ];
+  }
+
+  return [
+    ...basis,
+    { label: "Termine 30T", wert: formatWert(k.termine30Tage) },
+    { label: "Termine Jahr", wert: formatWert(k.termineJahr) },
+    { label: "Besicht. 30T", wert: formatWert(k.besichtigungen30Tage) },
+    { label: "Besicht. Jahr", wert: formatWert(k.besichtigungenJahr) },
+    { label: "Kunden aktiv", wert: formatWert(k.kundenAktiv) },
+    { label: "Verkauft", wert: formatWert(k.verkaufteObjekteJahr) },
+  ];
+}
+
+// Eine Objektzeile innerhalb einer aufgeklappten Gruppe (siehe ObjektGruppe unten) — Titelbild
+// links, Objektnummer + die übrigen Werte (Preis, Vermarktungsdauer, Provisionsvorlauf,
+// Chat-Vorgabe) als umbrechende Zeile darunter statt in starren Spalten, aus demselben Grund wie
+// bei KennzahlenZeile oben (schmales 1/3-Panel).
 function ObjektZeile({ objekt }: { objekt: MitarbeiterObjekt }) {
   return (
-    <div
-      className={`grid ${OBJEKT_GRID_COLS} items-center gap-sm border-b border-anthrazit/5 py-xs last:border-b-0`}
-    >
+    <div className="flex items-center gap-sm border-b border-anthrazit/5 py-xs last:border-b-0">
       <div className="h-9 w-12 shrink-0 overflow-hidden rounded bg-stein">
         {objekt.titelbildUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- externe OnOffice-Bild-URL, kein lokaler Import möglich
@@ -308,27 +312,30 @@ function ObjektZeile({ objekt }: { objekt: MitarbeiterObjekt }) {
           />
         )}
       </div>
-      <span className="min-w-0 truncate font-mono text-sm text-anthrazit">{objekt.objektnr}</span>
-      <span className="text-left font-mono text-sm text-anthrazit">
-        {formatiereBetrag(objekt.preis)}
-      </span>
-      <span className="text-left font-mono text-sm text-anthrazit">
-        {objekt.vermarktungsdauerTage === null
-          ? "–"
-          : `${zahlenformat.format(objekt.vermarktungsdauerTage)} Tage`}
-      </span>
-      <span className="text-left font-mono text-sm text-anthrazit">
-        {objekt.provisionsvorlaufFehlt ? (
-          <DatenFehltHinweis titel="Außen-/Innen-Provision" />
-        ) : objekt.provisionsvorlauf === null ? (
-          // Vermietungsobjekte (siehe mapMitarbeiterVermietung in onoffice/estate.ts): kein
-          // Hinweis-Icon, da hier grundsätzlich kein Provisionsvorlauf erwartet wird (anders als
-          // bei Kaufobjekten mit fehlenden OnOffice-Werten, siehe provisionsvorlaufFehlt oben).
-          "–"
-        ) : (
-          formatiereBetrag(objekt.provisionsvorlauf)
-        )}
-      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-[2px]">
+        <span className="truncate font-mono text-sm text-anthrazit">{objekt.objektnr}</span>
+        <div className="flex flex-wrap gap-x-sm gap-y-[2px] text-small text-anthrazit/60">
+          <span>{formatiereBetrag(objekt.preis)}</span>
+          <span>
+            {objekt.vermarktungsdauerTage === null
+              ? "–"
+              : `${zahlenformat.format(objekt.vermarktungsdauerTage)} Tage`}
+          </span>
+          <span>
+            {objekt.provisionsvorlaufFehlt ? (
+              <DatenFehltHinweis titel="Außen-/Innen-Provision" />
+            ) : objekt.provisionsvorlauf === null ? (
+              // Vermietungsobjekte (siehe mapMitarbeiterVermietung in onoffice/estate.ts): kein
+              // Hinweis-Icon, da hier grundsätzlich kein Provisionsvorlauf erwartet wird (anders
+              // als bei Kaufobjekten mit fehlenden OnOffice-Werten, siehe provisionsvorlaufFehlt
+              // oben).
+              "–"
+            ) : (
+              formatiereBetrag(objekt.provisionsvorlauf)
+            )}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -366,15 +373,6 @@ function ObjektGruppe({ titel, objekte }: { titel: string; objekte: MitarbeiterO
           <p className="py-xs pl-5 text-small text-anthrazit/40">Keine Objekte</p>
         ) : (
           <div className="pl-5">
-            <div
-              className={`grid ${OBJEKT_GRID_COLS} gap-sm border-b border-anthrazit/5 pb-[2px]`}
-            >
-              <span aria-hidden="true" />
-              <span className="label text-left">Objekt</span>
-              <span className="label text-left">Preis</span>
-              <span className="label text-left">Vermarktung</span>
-              <span className="label text-left">Provisionsvorlauf</span>
-            </div>
             {objekte.map((objekt) => (
               <ObjektZeile key={objekt.id} objekt={objekt} />
             ))}
@@ -513,11 +511,7 @@ function KennzahlenZeile({
   const [wurdeGeoeffnet, setWurdeGeoeffnet] = useState(false);
 
   const k = kennzahlen ?? LEERE_KENNZAHLEN;
-  const gridCols = zeitraum
-    ? modus === "akquise"
-      ? KENNZAHLEN_GRID_COLS_AKQUISE_SCHLANK
-      : KENNZAHLEN_GRID_COLS_STANDARD_SCHLANK
-    : KENNZAHLEN_GRID_COLS;
+  const metriken = baueMetriken(k, modus, zeitraum);
 
   function umschalten() {
     setOffen((bisher) => !bisher);
@@ -525,115 +519,31 @@ function KennzahlenZeile({
   }
 
   return (
-    <div className="border-b border-anthrazit/10 last:border-b-0">
-      <div className={`grid ${gridCols} items-center gap-xs py-sm`}>
-        <button
-          type="button"
-          onClick={umschalten}
-          aria-expanded={offen}
-          aria-label={`Objektliste von ${mitglied.name} ${offen ? "einklappen" : "ausklappen"}`}
-          className="flex h-6 w-6 items-center justify-center text-anthrazit/40 transition-colors hover:text-anthrazit"
-        >
-          <Icon
-            name="chevronRight"
-            size={16}
-            className={`transition-transform ${offen ? "rotate-90" : ""}`}
-          />
-        </button>
+    <div className="border-b border-anthrazit/10 py-sm last:border-b-0">
+      <button
+        type="button"
+        onClick={umschalten}
+        aria-expanded={offen}
+        aria-label={`Objektliste von ${mitglied.name} ${offen ? "einklappen" : "ausklappen"}`}
+        className="flex w-full items-center gap-xs text-left"
+      >
+        <Icon
+          name="chevronRight"
+          size={16}
+          className={`shrink-0 text-anthrazit/40 transition-transform ${offen ? "rotate-90" : ""}`}
+        />
         {/* Nur der Name, keine Rolle/Titel mehr (siehe Chat-Vorgabe) */}
         <p className="min-w-0 truncate font-medium text-anthrazit">{mitglied.name}</p>
-        <span className="text-left font-mono text-sm text-anthrazit">
-          {formatWert(k.aktiveObjekte)}
-        </span>
-        <span className="text-left font-mono text-sm text-anthrazit">
-          {formatWert(k.objekteInAufarbeitung)}
-        </span>
-        {modus === "akquise" ? (
-          zeitraum ? (
-            <>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(
-                  zeitraum === "30T" ? k.akquiseErsttermin30Tage : k.akquiseErsttermineJahr
-                )}
-              </span>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(
-                  zeitraum === "30T" ? k.akquiseZweittermin30Tage : k.akquiseZweittermineJahr
-                )}
-              </span>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatProzent(akquiseQuoteErstZuZweit(k))}
-              </span>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(
-                  zeitraum === "30T"
-                    ? k.akquiseVertragstermin30Tage
-                    : k.akquiseVertragstermineJahr
-                )}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(k.akquiseErsttermin30Tage)}
-              </span>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(k.akquiseErsttermineJahr)}
-              </span>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(k.akquiseZweittermin30Tage)}
-              </span>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(k.akquiseZweittermineJahr)}
-              </span>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(k.akquiseVertragstermin30Tage)}
-              </span>
-              <span className="text-left font-mono text-sm text-anthrazit">
-                {formatWert(k.akquiseVertragstermineJahr)}
-              </span>
-            </>
-          )
-        ) : zeitraum ? (
-          <>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(zeitraum === "30T" ? k.termine30Tage : k.termineJahr)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(zeitraum === "30T" ? k.besichtigungen30Tage : k.besichtigungenJahr)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.kundenAktiv)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.verkaufteObjekteJahr)}
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.termine30Tage)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.termineJahr)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.besichtigungen30Tage)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.besichtigungenJahr)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.kundenAktiv)}
-            </span>
-            <span className="text-left font-mono text-sm text-anthrazit">
-              {formatWert(k.verkaufteObjekteJahr)}
-            </span>
-          </>
-        )}
+      </button>
+      <div className="mt-sm flex flex-wrap gap-x-md gap-y-sm pl-6">
+        {metriken.map((metrik) => (
+          <Metrik key={metrik.label} label={metrik.label}>
+            {metrik.wert}
+          </Metrik>
+        ))}
       </div>
       {wurdeGeoeffnet && (
-        <div className={`border-t border-anthrazit/5 pl-8 ${offen ? "block" : "hidden"}`}>
+        <div className={`mt-sm border-t border-anthrazit/5 pl-6 ${offen ? "block" : "hidden"}`}>
           <MitarbeiterObjekte name={mitglied.name} />
         </div>
       )}
@@ -642,9 +552,8 @@ function KennzahlenZeile({
 }
 
 // Eine der vier Reiter-Listen (Vertrieb/Akquise/Setting/Weitere Mitarbeiter, siehe teileTeamAuf
-// oben) als eigene Karte mit eigener Kopfzeile — dieselbe Tabellenstruktur für alle vier, nur
-// "modus" schaltet zwischen dem Standard-Spaltenschema und dem Akquise-Spaltenschema um (siehe
-// KennzahlenKopfzeile/KennzahlenZeile oben).
+// oben) als eigene Karte — dieselbe Zeilenstruktur für alle vier, nur "modus" schaltet zwischen
+// dem Standard- und dem Akquise-Kennzahlensatz um (siehe baueMetriken/KennzahlenZeile oben).
 function MitarbeiterTabelle({
   titel,
   mitglieder,
@@ -658,26 +567,19 @@ function MitarbeiterTabelle({
   modus?: KennzahlenModus;
   zeitraum?: Zeitraum;
 }) {
-  // Schlankere Mindestbreite bei aktivem Zeitraum-Umschalter — die Tabelle hat dann zwei bis drei
-  // Datenspalten weniger (siehe KENNZAHLEN_GRID_COLS_STANDARD_SCHLANK/_AKQUISE_SCHLANK oben).
-  const minBreite = zeitraum ? "min-w-[820px]" : "min-w-[1010px]";
-
   return (
     <Card>
       <h3 className="mb-sm font-slab text-lg font-bold text-anthrazit">{titel}</h3>
-      <div className="overflow-x-auto">
-        <div className={`flex ${minBreite} flex-col`}>
-          <KennzahlenKopfzeile modus={modus} zeitraum={zeitraum} />
-          {mitglieder.map((mitglied) => (
-            <KennzahlenZeile
-              key={mitglied.name}
-              mitglied={mitglied}
-              kennzahlen={kennzahlen?.[mitglied.name]}
-              modus={modus}
-              zeitraum={zeitraum}
-            />
-          ))}
-        </div>
+      <div className="flex flex-col">
+        {mitglieder.map((mitglied) => (
+          <KennzahlenZeile
+            key={mitglied.name}
+            mitglied={mitglied}
+            kennzahlen={kennzahlen?.[mitglied.name]}
+            modus={modus}
+            zeitraum={zeitraum}
+          />
+        ))}
       </div>
     </Card>
   );
@@ -762,7 +664,7 @@ function ZeitraumSchalter({
 // vier Reiter ("Vertrieb"/"Akquise"/"Setting"/"Weitere Mitarbeiter", siehe teileTeamAuf/
 // VERTRIEB_NAMEN/AKQUISE_NAMEN/SETTING_NAMEN in data/unternehmen.ts). Vertrieb/Setting/Weitere
 // Mitarbeiter zeigen dieselben fünf Auslastungs-Kennzahlen, Akquise zeigt stattdessen die drei
-// Akquise-Terminarten (siehe KennzahlenKopfzeile/KennzahlenZeile, modus="akquise"). Die
+// Akquise-Terminarten (siehe baueMetriken/KennzahlenZeile, modus="akquise"). Die
 // unternehmensweiten Infoboxen (siehe Infoboxen oben, Chat-Vorgabe) und die Mitarbeiter-Tabellen
 // liegen in getrennten, per Sidebar wählbaren Abschnitten (ADMIN_NAV_ITEMS, siehe
 // admin/adminNav.ts) statt einer einzigen langen Scroll-Seite — dieselbe Sidebar-Komponente wie
@@ -822,11 +724,7 @@ export function Mitarbeiterstatistik({
 
       <div className="flex h-full w-1/3 flex-col overflow-hidden border-l border-walnuss/10 bg-reinweiss">
         <AdminNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
-        {/* overflow-x-auto als Sicherheitsnetz: Tabellen wie MitarbeiterTabelle sind für die
-            volle Seitenbreite ausgelegt (siehe dort, feste Spaltenraster) und nicht für ein
-            schmales Drittel-Panel — bis sie dafür eigens angepasst sind, scrollen sie hier
-            innerhalb des Panels, statt das Flex-Layout von Karte/Panel zu sprengen. */}
-        <div className="flex-1 overflow-y-auto overflow-x-auto">
+        <div className="flex-1 overflow-y-auto">
           {abschnitt === "uebersicht" && (
             <SectionShell label="Admin-Bereich" title="Auf einen Blick">
               <Infoboxen gesamt={gesamtKennzahlen} />
