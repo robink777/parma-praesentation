@@ -20,8 +20,11 @@ export function AdminNav({
   activeId: string;
   onSelect: (id: string) => void;
 }) {
+  // Oktober 2026 Chat-Vorgabe: "wenn es nötig ist müssen wir die Navi noch mehr verkleinern" —
+  // kleinere Schrift/Icons und engere Abstände als zuvor (bewusst unter der CI-Spacing-Skala,
+  // siehe Nutzerfreigabe für den Admin-Bereich), damit mehr vom Panel für Inhalt bleibt.
   return (
-    <nav className="flex shrink-0 flex-wrap gap-xs border-b border-walnuss/10 p-sm">
+    <nav className="flex shrink-0 flex-wrap gap-[2px] border-b border-walnuss/10 p-xs">
       {navItems.map((item) => {
         const aktiv = item.id === activeId;
         return (
@@ -29,13 +32,13 @@ export function AdminNav({
             key={item.id}
             type="button"
             onClick={() => onSelect(item.id)}
-            className={`flex items-center gap-xs rounded-sm px-sm py-xs text-[14px] transition-colors ${
+            className={`flex items-center gap-[4px] rounded-sm px-[6px] py-[4px] text-small transition-colors ${
               aktiv
                 ? "bg-stein font-medium text-walnuss"
                 : "text-walnuss/60 hover:bg-stein/60 hover:text-walnuss"
             }`}
           >
-            <Icon name={item.icon} size={16} />
+            <Icon name={item.icon} size={13} />
             <span>{item.label}</span>
           </button>
         );

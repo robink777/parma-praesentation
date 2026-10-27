@@ -24,6 +24,19 @@ const config: Config = {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
         mono: ["var(--font-plex-mono)", "monospace"],
       },
+      // "Body" (16/26) und "Small" (13/20) aus der CI-Typo-Hierarchie (Markenhandbuch Abschnitt
+      // 4) — bislang NICHT als Tailwind-Theme-Werte definiert, obwohl `text-body`/`text-small` an
+      // über 120 Stellen im Code verwendet werden. Da Tailwind nur Utilities für bekannte
+      // Theme-Keys erzeugt, griffen beide Klassen bisher ins Leere (der Browser fiel auf die
+      // geerbte Standardgröße 16px/24px zurück) — gefunden bei der Oktober-2026-"Optik"-Prüfung
+      // über getComputedStyle() im Live-Browser. Diese Ergänzung macht `text-small` (und
+      // `text-body`, das zufällig schon ungefähr richtig aussah, aber mit falschem Leading) an
+      // allen bestehenden Stellen rückwirkend korrekt — ohne dass jede einzelne Stelle angefasst
+      // werden muss.
+      fontSize: {
+        small: ["13px", { lineHeight: "20px" }],
+        body: ["16px", { lineHeight: "26px" }],
+      },
       spacing: {
         xs: "8px",
         sm: "16px",

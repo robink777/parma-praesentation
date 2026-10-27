@@ -146,49 +146,73 @@ function Infoboxen({ gesamt }: { gesamt?: ObjektGesamtKennzahlen }) {
     },
   ];
 
-  // Provisionsvorlauf gesamt (Juli 2026 Chat-Vorgabe) bekommt eine eigene Reihe unter den vier
-  // übrigen Infoboxen, in der Breite auf die vier Boxen darüber angeglichen (Nutzerwunsch) statt
-  // als fünfte, schmalere Box im selben Grid — dadurch bleibt Platz für die Hinweiszeile, wenn
-  // nicht alle Objekte einen auswertbaren Wert liefern.
+  // Oktober 2026 Chat-Vorgabe ("Schriften kleiner, Gliederung logischer, nicht scrollen müssen",
+  // mit Referenz-Screenshot eines dichten Dashboard-Templates): die bisherigen zentrierten
+  // Icon/Wert/Label-Karten (28px-Icon, 30px-Zahl, volle Kartenbreite pro Kennzahl) waren für ein
+  // schmales 1/3-Panel deutlich zu raumgreifend. Jetzt horizontale, kompakte KPI-Karten (Icon
+  // links in kleinem Kreis, Label+Wert gestapelt rechts) nach dem Vorbild des Referenz-Dashboards
+  // — zwei Karten pro Reihe statt einer, deutlich geringere Zeilenhöhe pro Kennzahl.
   return (
-    <div className="mb-lg">
-      <div className="grid grid-cols-1 gap-sm md:grid-cols-3">
+    <div className="mb-sm">
+      <div className="grid grid-cols-2 gap-[8px]">
         {jahresEintraege.map((eintrag) => (
-          <Card key={eintrag.label} className="text-center">
-            <Icon name={eintrag.icon} size={28} className="mx-auto mb-xs text-walnuss" />
-            <p className="font-slab text-3xl font-bold text-walnuss">{eintrag.wert}</p>
-            <p className="label mt-xs">{eintrag.label}</p>
+          <Card compact key={eintrag.label}>
+            <div className="flex items-center gap-xs">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-reinweiss text-walnuss">
+                <Icon name={eintrag.icon} size={15} />
+              </span>
+              <div className="min-w-0">
+                <p className="label leading-snug">{eintrag.label}</p>
+                <p className="font-slab text-lg font-bold leading-tight text-walnuss">
+                  {eintrag.wert}
+                </p>
+              </div>
+            </div>
             {"hinweisAnzahl" in eintrag && (eintrag.hinweisAnzahl ?? 0) > 0 && (
-              <p className="mt-xs flex items-center justify-center gap-[3px] text-anthrazit/50">
-                <Icon name="warning" size={12} />
+              <p className="mt-[4px] flex items-center gap-[3px] text-anthrazit/50">
+                <Icon name="warning" size={11} />
                 <span className="text-small italic">
-                  {zahlenformat.format(eintrag.hinweisAnzahl ?? 0)} Objekte ohne Angabe
+                  {zahlenformat.format(eintrag.hinweisAnzahl ?? 0)} ohne Angabe
                 </span>
               </p>
             )}
           </Card>
         ))}
       </div>
-      <div className="mt-sm grid grid-cols-2 gap-sm md:grid-cols-4">
+      <div className="mt-[8px] grid grid-cols-2 gap-[8px]">
         {eintraege.map((eintrag) => (
-          <Card key={eintrag.label} className="text-center">
-            <Icon name={eintrag.icon} size={28} className="mx-auto mb-xs text-walnuss" />
-            <p className="font-slab text-3xl font-bold text-walnuss">{eintrag.wert}</p>
-            <p className="label mt-xs">{eintrag.label}</p>
+          <Card compact key={eintrag.label}>
+            <div className="flex items-center gap-xs">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-reinweiss text-walnuss">
+                <Icon name={eintrag.icon} size={15} />
+              </span>
+              <div className="min-w-0">
+                <p className="label leading-snug">{eintrag.label}</p>
+                <p className="font-slab text-lg font-bold leading-tight text-walnuss">
+                  {eintrag.wert}
+                </p>
+              </div>
+            </div>
           </Card>
         ))}
       </div>
-      <Card className="mt-sm text-center">
-        <Icon name="handshake" size={28} className="mx-auto mb-xs text-walnuss" />
-        <p className="font-slab text-3xl font-bold text-walnuss">
-          {formatBetrag(gesamt?.provisionsvorlaufGesamt ?? null)}
-        </p>
-        <p className="label mt-xs">Provisionsvorlauf gesamt</p>
+      <Card compact className="mt-[8px]">
+        <div className="flex items-center gap-xs">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-reinweiss text-walnuss">
+            <Icon name="handshake" size={15} />
+          </span>
+          <div className="min-w-0">
+            <p className="label leading-snug">Provisionsvorlauf gesamt</p>
+            <p className="font-slab text-lg font-bold leading-tight text-walnuss">
+              {formatBetrag(gesamt?.provisionsvorlaufGesamt ?? null)}
+            </p>
+          </div>
+        </div>
         {fehltAnzahl > 0 && (
-          <p className="mt-xs flex items-center justify-center gap-[3px] text-anthrazit/50">
-            <Icon name="warning" size={12} />
+          <p className="mt-[4px] flex items-center gap-[3px] text-anthrazit/50">
+            <Icon name="warning" size={11} />
             <span className="text-small italic">
-              {zahlenformat.format(fehltAnzahl)} Objekte ohne Angabe
+              {zahlenformat.format(fehltAnzahl)} ohne Angabe
             </span>
           </p>
         )}
@@ -222,9 +246,9 @@ type Zeitraum = "30T" | "Jahr";
 // einzelne Metrik auch dann verständlich, wenn das umgebende Raster umbricht.
 function Metrik({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-[84px] flex-col gap-[2px]">
+    <div className="flex min-w-[68px] flex-col gap-[1px]">
       <span className="label text-anthrazit/40">{label}</span>
-      <span className="font-mono text-sm text-anthrazit">{children}</span>
+      <span className="font-mono text-small text-anthrazit">{children}</span>
     </div>
   );
 }
@@ -519,23 +543,23 @@ function KennzahlenZeile({
   }
 
   return (
-    <div className="border-b border-anthrazit/10 py-sm last:border-b-0">
+    <div className="border-b border-anthrazit/10 py-[8px] last:border-b-0">
       <button
         type="button"
         onClick={umschalten}
         aria-expanded={offen}
         aria-label={`Objektliste von ${mitglied.name} ${offen ? "einklappen" : "ausklappen"}`}
-        className="flex w-full items-center gap-xs text-left"
+        className="flex w-full items-center gap-[4px] text-left"
       >
         <Icon
           name="chevronRight"
-          size={16}
+          size={14}
           className={`shrink-0 text-anthrazit/40 transition-transform ${offen ? "rotate-90" : ""}`}
         />
         {/* Nur der Name, keine Rolle/Titel mehr (siehe Chat-Vorgabe) */}
-        <p className="min-w-0 truncate font-medium text-anthrazit">{mitglied.name}</p>
+        <p className="min-w-0 truncate text-small font-medium text-anthrazit">{mitglied.name}</p>
       </button>
-      <div className="mt-sm flex flex-wrap gap-x-md gap-y-sm pl-6">
+      <div className="mt-[6px] flex flex-wrap gap-x-sm gap-y-[6px] pl-[18px]">
         {metriken.map((metrik) => (
           <Metrik key={metrik.label} label={metrik.label}>
             {metrik.wert}
@@ -543,7 +567,7 @@ function KennzahlenZeile({
         ))}
       </div>
       {wurdeGeoeffnet && (
-        <div className={`mt-sm border-t border-anthrazit/5 pl-6 ${offen ? "block" : "hidden"}`}>
+        <div className={`mt-xs border-t border-anthrazit/5 pl-[18px] ${offen ? "block" : "hidden"}`}>
           <MitarbeiterObjekte name={mitglied.name} />
         </div>
       )}
@@ -568,8 +592,8 @@ function MitarbeiterTabelle({
   zeitraum?: Zeitraum;
 }) {
   return (
-    <Card>
-      <h3 className="mb-sm font-slab text-lg font-bold text-anthrazit">{titel}</h3>
+    <Card compact>
+      <h3 className="mb-xs font-slab text-base font-bold text-anthrazit">{titel}</h3>
       <div className="flex flex-col">
         {mitglieder.map((mitglied) => (
           <KennzahlenZeile
@@ -607,13 +631,13 @@ function MitarbeiterReiterleiste({
   onSelect: (reiter: MitarbeiterReiter) => void;
 }) {
   return (
-    <div className="mb-lg flex flex-wrap gap-xs border-b border-anthrazit/10">
+    <div className="mb-xs flex flex-wrap gap-[2px] border-b border-anthrazit/10">
       {MITARBEITER_REITER.map((reiter) => (
         <button
           key={reiter.id}
           type="button"
           onClick={() => onSelect(reiter.id)}
-          className={`border-b-2 px-md py-xs text-small font-medium transition-colors ${
+          className={`border-b-2 px-xs py-[4px] text-small font-medium transition-colors ${
             aktiv === reiter.id
               ? "border-messing text-anthrazit"
               : "border-transparent text-anthrazit/50 hover:text-anthrazit"
@@ -732,7 +756,7 @@ export function Mitarbeiterstatistik({
           )}
           {abschnitt === "mitarbeiter" && (
             <SectionShell label="Admin-Bereich" title="Mitarbeiter" compact>
-              <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
+              <p className="mb-xs max-w-[65ch] text-small text-anthrazit/60">
                 Auslastung des Teams als Entscheidungsgrundlage dafür, wer ein Objekt nach der
                 Akquise übernimmt.
               </p>

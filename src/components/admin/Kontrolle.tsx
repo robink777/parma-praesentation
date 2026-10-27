@@ -11,9 +11,9 @@ const zahlenformat = new Intl.NumberFormat("de-DE");
 // Probleme gleichzeitig haben, eine Gruppierung würde es dann mehrfach zeigen.
 function KontrollZeile({ objekt }: { objekt: KontrollObjekt }) {
   return (
-    <div className="flex flex-col gap-xs border-b border-anthrazit/5 py-sm last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-[4px] border-b border-anthrazit/5 py-xs last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <p className="truncate font-medium text-anthrazit">{objekt.titel}</p>
+        <p className="truncate text-small font-medium text-anthrazit">{objekt.titel}</p>
         <p className="mt-[2px] text-small text-anthrazit/60">
           {objekt.objektnr} · {objekt.statusLabel}
           {objekt.mitarbeiter && ` · ${objekt.mitarbeiter}`}
@@ -44,7 +44,7 @@ function KontrollZeile({ objekt }: { objekt: KontrollObjekt }) {
 export function Kontrolle({ objekte }: { objekte?: KontrollObjekt[] }) {
   if (objekte === undefined) {
     return (
-      <Card className="text-center">
+      <Card compact className="text-center">
         <p className="text-small text-anthrazit/50">
           Kontrolldaten konnten nicht geladen werden.
         </p>
@@ -54,9 +54,9 @@ export function Kontrolle({ objekte }: { objekte?: KontrollObjekt[] }) {
 
   if (objekte.length === 0) {
     return (
-      <Card className="flex flex-col items-center gap-sm py-2xl text-center">
-        <Icon name="check" size={32} className="text-anthrazit/40" />
-        <p className="max-w-[50ch] text-body text-anthrazit/70">
+      <Card compact className="flex flex-col items-center gap-xs py-md text-center">
+        <Icon name="check" size={24} className="text-anthrazit/40" />
+        <p className="max-w-[50ch] text-small text-anthrazit/70">
           Keine Auffälligkeiten gefunden — alle geprüften Objekte sind in OnOffice vollständig und
           widerspruchsfrei hinterlegt.
         </p>
@@ -66,12 +66,12 @@ export function Kontrolle({ objekte }: { objekte?: KontrollObjekt[] }) {
 
   return (
     <>
-      <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
+      <p className="mb-xs max-w-[65ch] text-small text-anthrazit/60">
         {zahlenformat.format(objekte.length)} Objekt{objekte.length === 1 ? "" : "e"} mit
         erkannten Auffälligkeiten — fehlende Provisionsangabe, ein Status, der einem bereits
         gesetzten Verkaufsdatum widerspricht, oder ein möglicherweise doppelt angelegtes Objekt.
       </p>
-      <Card>
+      <Card compact>
         <div className="flex flex-col">
           {objekte.map((objekt) => (
             <KontrollZeile key={objekt.id} objekt={objekt} />

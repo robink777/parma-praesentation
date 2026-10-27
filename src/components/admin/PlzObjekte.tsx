@@ -28,18 +28,18 @@ const KATEGORIE_FARBE: Record<ObjektkartePlzObjekt["kategorie"], string> = {
 
 function ObjektZeile({ objekt }: { objekt: ObjektkartePlzObjekt }) {
   return (
-    <div className="flex items-center justify-between gap-sm border-b border-anthrazit/5 py-sm last:border-b-0">
+    <div className="flex flex-wrap items-center justify-between gap-x-sm gap-y-[2px] border-b border-anthrazit/5 py-xs last:border-b-0">
       <div className="min-w-0">
-        <p className="truncate font-medium text-anthrazit">{objekt.titel}</p>
-        <p className="mt-[2px] text-small text-anthrazit/60">{objekt.objektnr}</p>
+        <p className="truncate text-small font-medium text-anthrazit">{objekt.titel}</p>
+        <p className="mt-[1px] text-small text-anthrazit/50">{objekt.objektnr}</p>
       </div>
-      <div className="flex shrink-0 items-center gap-sm">
+      <div className="flex shrink-0 items-center gap-xs">
         <span className="text-small text-anthrazit/70">
           {objekt.preis > 0 ? waehrungformat.format(objekt.preis) : "–"}
         </span>
-        <span className="inline-flex items-center gap-[4px] whitespace-nowrap rounded-sm bg-stein px-xs py-[2px] text-small text-anthrazit/70">
+        <span className="inline-flex items-center gap-[4px] whitespace-nowrap rounded-sm bg-stein px-xs py-[1px] text-small text-anthrazit/70">
           <span
-            className="inline-block h-[7px] w-[7px] shrink-0 rounded-full"
+            className="inline-block h-[6px] w-[6px] shrink-0 rounded-full"
             style={{ background: KATEGORIE_FARBE[objekt.kategorie] }}
           />
           {KATEGORIE_LABEL[objekt.kategorie]}
@@ -60,7 +60,7 @@ export function PlzObjekte({
 }) {
   if (!plz) {
     return (
-      <Card className="text-center">
+      <Card compact className="text-center">
         <p className="text-small text-anthrazit/50">
           Auf eine PLZ-Fläche in der Karte klicken, um die zugehörigen Objekte hier zu sehen.
         </p>
@@ -70,7 +70,7 @@ export function PlzObjekte({
 
   if (daten === undefined) {
     return (
-      <Card className="text-center">
+      <Card compact className="text-center">
         <p className="text-small text-anthrazit/50">Objektzahlen konnten nicht geladen werden.</p>
       </Card>
     );
@@ -80,7 +80,7 @@ export function PlzObjekte({
 
   if (objekte.length === 0) {
     return (
-      <Card className="text-center">
+      <Card compact className="text-center">
         <p className="text-small text-anthrazit/50">
           Keine Objekte in {plz}
           {ort && ` · ${ort}`}.
@@ -91,11 +91,11 @@ export function PlzObjekte({
 
   return (
     <>
-      <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
+      <p className="mb-xs max-w-[65ch] text-small text-anthrazit/60">
         {zahlenformat.format(objekte.length)} Objekt{objekte.length === 1 ? "" : "e"} in {plz}
         {ort && ` · ${ort}`}.
       </p>
-      <Card>
+      <Card compact>
         <div className="flex flex-col">
           {objekte.map((objekt) => (
             <ObjektZeile key={objekt.id} objekt={objekt} />

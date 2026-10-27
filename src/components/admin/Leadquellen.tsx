@@ -19,12 +19,12 @@ function HerkunftZeile({
 }) {
   const breite = maxAnzahl === 0 ? 0 : Math.max(4, Math.round((anzahl / maxAnzahl) * 100));
   return (
-    <div className="flex items-center gap-sm py-[3px]">
-      <span className="w-[220px] shrink-0 truncate text-small text-anthrazit">{label}</span>
-      <div className="h-4 flex-1 overflow-hidden rounded-sm bg-stein">
+    <div className="flex items-center gap-xs py-[2px]">
+      <span className="w-[110px] shrink-0 truncate text-small text-anthrazit">{label}</span>
+      <div className="h-[10px] flex-1 overflow-hidden rounded-sm bg-stein">
         <div className="h-full rounded-sm bg-walnuss" style={{ width: `${breite}%` }} />
       </div>
-      <span className="w-10 shrink-0 text-right font-mono text-small text-anthrazit/70">
+      <span className="w-9 shrink-0 text-right font-mono text-small text-anthrazit/70">
         {zahlenformat.format(anzahl)}
       </span>
     </div>
@@ -43,7 +43,7 @@ function HerkunftZeile({
 export function Leadquellen({ kennzahlen }: { kennzahlen?: LeadquellenKennzahlen }) {
   if (kennzahlen === undefined) {
     return (
-      <Card className="text-center">
+      <Card compact className="text-center">
         <p className="text-small text-anthrazit/50">
           Leadquellen-Daten konnten nicht geladen werden.
         </p>
@@ -57,40 +57,44 @@ export function Leadquellen({ kennzahlen }: { kennzahlen?: LeadquellenKennzahlen
 
   return (
     <>
-      <p className="mb-lg max-w-[65ch] text-body text-anthrazit/70">
+      <p className="mb-xs max-w-[65ch] text-small text-anthrazit/60">
         Woher die Eigentümer-Kontakte unserer {zahlenformat.format(objekteGesamt)} Objekte
         stammen, ausgewertet über das Feld "Herkunft Kontakt" an der jeweiligen Adresse.
       </p>
 
       {(objekteOhneEigentuemer > 0 || eigentuemerOhneHerkunft > 0) && (
-        <div className="mb-lg grid grid-cols-1 gap-sm sm:grid-cols-2">
+        <div className="mb-xs grid grid-cols-1 gap-[8px] sm:grid-cols-2">
           {objekteOhneEigentuemer > 0 && (
-            <Card className="text-center">
-              <Icon name="warning" size={24} className="mx-auto mb-xs text-anthrazit/50" />
-              <p className="font-slab text-2xl font-bold text-anthrazit">
-                {zahlenformat.format(objekteOhneEigentuemer)}
-              </p>
-              <p className="label mt-xs">Objekte ohne verknüpften Eigentümer</p>
+            <Card compact className="flex items-center gap-xs">
+              <Icon name="warning" size={18} className="shrink-0 text-anthrazit/50" />
+              <div className="min-w-0">
+                <p className="font-slab text-lg font-bold leading-tight text-anthrazit">
+                  {zahlenformat.format(objekteOhneEigentuemer)}
+                </p>
+                <p className="label">Ohne verknüpften Eigentümer</p>
+              </div>
             </Card>
           )}
           {eigentuemerOhneHerkunft > 0 && (
-            <Card className="text-center">
-              <Icon name="warning" size={24} className="mx-auto mb-xs text-anthrazit/50" />
-              <p className="font-slab text-2xl font-bold text-anthrazit">
-                {zahlenformat.format(eigentuemerOhneHerkunft)}
-              </p>
-              <p className="label mt-xs">
-                von {zahlenformat.format(eigentuemerGesamt)} Eigentümern ohne Herkunftsangabe
-              </p>
+            <Card compact className="flex items-center gap-xs">
+              <Icon name="warning" size={18} className="shrink-0 text-anthrazit/50" />
+              <div className="min-w-0">
+                <p className="font-slab text-lg font-bold leading-tight text-anthrazit">
+                  {zahlenformat.format(eigentuemerOhneHerkunft)}
+                </p>
+                <p className="label">
+                  von {zahlenformat.format(eigentuemerGesamt)} ohne Herkunft
+                </p>
+              </div>
             </Card>
           )}
         </div>
       )}
 
-      <Card>
-        <h3 className="mb-sm font-slab text-lg font-bold text-anthrazit">Herkunft der Kontakte</h3>
+      <Card compact>
+        <h3 className="mb-xs font-slab text-base font-bold text-anthrazit">Herkunft der Kontakte</h3>
         {herkunftVerteilung.length === 0 ? (
-          <p className="py-sm text-small text-anthrazit/50">
+          <p className="py-xs text-small text-anthrazit/50">
             Für keinen der verknüpften Eigentümer ist bisher eine Herkunft hinterlegt.
           </p>
         ) : (
