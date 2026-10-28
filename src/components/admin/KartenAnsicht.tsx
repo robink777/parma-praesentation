@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { HauptbereichSwitcher } from "./HauptbereichSwitcher";
 import { Objektkarte } from "./Objektkarte";
 import { ObjektkarteDaten } from "@/types";
+import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
 
 // Hauptbereich "Karte" (siehe app/admin/page.tsx) — seit der Aufteilung in zwei echte
 // Hauptbereiche (Oktober 2026 Chat-Vorgabe, siehe HauptbereichSwitcher.tsx) nimmt die Karte jetzt
@@ -18,6 +19,7 @@ import { ObjektkarteDaten } from "@/types";
 // unverändert — nur wer ihn aufruft ändert sich.
 export function KartenAnsicht({ daten }: { daten?: ObjektkarteDaten }) {
   const router = useRouter();
+  useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">

@@ -1,5 +1,4 @@
 import { Icon, IconName } from "@/components/icons/Icon";
-import { formatiereBetrag } from "@/lib/berechnung";
 import { NeuzugaengeWoche, ObjektGesamtKennzahlen } from "@/types";
 import { Neuzugaenge } from "./Neuzugaenge";
 
@@ -14,8 +13,20 @@ function formatTage(n: number | null): string {
   return n === null ? "–" : `${zahlenformat.format(n)} Tage`;
 }
 
+// Kompakte Notation ("28,3 Mio. €" statt "28.274.000 €") statt der zentralen formatiereBetrag()
+// — eine KPI-Kachel ist für den Überblick auf einen Blick da, nicht für den exakten Euro-Betrag,
+// und der volle Betrag würde die Kachelbreite auf dem TV-Dashboard sprengen (siehe Uebersicht()
+// unten, Oktober 2026 Chat-Vorgabe "alle Infos die nicht auf eine Seite passen fliegen raus").
+const betragKompaktFormat = new Intl.NumberFormat("de-DE", {
+  style: "currency",
+  currency: "EUR",
+  notation: "compact",
+  compactDisplay: "short",
+  maximumFractionDigits: 1,
+});
+
 function formatBetrag(n: number | null): string {
-  return n === null ? "–" : formatiereBetrag(n);
+  return n === null ? "–" : betragKompaktFormat.format(n);
 }
 
 function aktuellesJahr(): number {
@@ -59,23 +70,25 @@ function KpiKachel({
   hinweisAnzahl?: number;
 }) {
   return (
-    <div className="rounded-lg bg-reinweiss p-md shadow-[0_1px_4px_rgba(80,63,61,0.08)]">
+    <div className="min-w-0 rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
       <div className="flex items-center gap-sm">
         <span
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${AKZENT_KLASSEN[akzent]}`}
+          className={`flex h-[clamp(32px,5.5vh,48px)] w-[clamp(32px,5.5vh,48px)] shrink-0 items-center justify-center rounded-full ${AKZENT_KLASSEN[akzent]}`}
         >
-          <Icon name={icon} size={24} />
+          <Icon name={icon} size={20} />
         </span>
         <div className="min-w-0">
-          <p className="font-mono text-[12px] font-medium uppercase tracking-label text-anthrazit/50">
+          <p className="line-clamp-2 font-mono text-[10px] font-medium uppercase leading-snug tracking-[0.06em] text-anthrazit/50">
             {label}
           </p>
-          <p className="font-slab text-3xl font-bold leading-tight text-anthrazit">{wert}</p>
+          <p className="truncate font-slab text-[clamp(16px,3vh,28px)] font-bold leading-tight text-anthrazit">
+            {wert}
+          </p>
         </div>
       </div>
       {hinweisAnzahl !== undefined && hinweisAnzahl > 0 && (
-        <p className="mt-xs flex items-center gap-[4px] text-small text-anthrazit/50">
-          <Icon name="warning" size={13} />
+        <p className="mt-xs flex items-center gap-[4px] truncate text-small text-anthrazit/50">
+          <Icon name="warning" size={13} className="shrink-0" />
           {zahlenformat.format(hinweisAnzahl)} ohne Angabe
         </p>
       )}
@@ -159,13 +172,13 @@ export function Uebersicht({
   ];
 
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-md md:grid-cols-4">
+    <div className="flex h-full min-h-0 flex-col gap-sm">
+      <div className="grid shrink-0 grid-cols-2 gap-sm md:grid-cols-4">
         {kacheln.map((kachel) => (
           <KpiKachel key={kachel.label} {...kachel} />
         ))}
       </div>
-      <div className="mt-lg rounded-lg bg-reinweiss p-lg shadow-[0_1px_4px_rgba(80,63,61,0.08)]">
+      <div className="min-h-0 flex-1 rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
         <Neuzugaenge verlauf={neuzugaengeVerlauf} />
       </div>
     </div>

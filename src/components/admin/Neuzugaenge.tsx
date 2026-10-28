@@ -55,9 +55,16 @@ function Balkendiagramm({
   const balkenbreite = gruppenbreite * 0.55;
 
   return (
-    <div>
-      <p className="mb-xs font-slab text-lg font-bold text-anthrazit">{titel}</p>
-      <svg viewBox={`0 0 ${CHART_BREITE} ${CHART_HOEHE}`} className="h-auto w-full" role="img" aria-label={titel}>
+    <div className="flex h-full min-h-0 flex-col">
+      <p className="mb-xs shrink-0 font-slab text-lg font-bold text-anthrazit">{titel}</p>
+      <div className="min-h-0 flex-1">
+      <svg
+        viewBox={`0 0 ${CHART_BREITE} ${CHART_HOEHE}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="h-full w-full"
+        role="img"
+        aria-label={titel}
+      >
         {durchschnitt !== null && (
           <>
             <line
@@ -121,7 +128,8 @@ function Balkendiagramm({
           );
         })}
       </svg>
-      <p className="mt-[2px] text-small text-anthrazit/40">
+      </div>
+      <p className="mt-[2px] shrink-0 text-small text-anthrazit/40">
         {einheit} je Kalenderwoche · * aktuelle Woche, noch nicht abgeschlossen
       </p>
     </div>
@@ -141,7 +149,7 @@ export function Neuzugaenge({ verlauf }: { verlauf?: NeuzugaengeWoche[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
+    <div className="grid h-full min-h-0 grid-cols-1 gap-md md:grid-cols-2">
       <Balkendiagramm
         titel="Neue Objekte"
         einheit="Objekte"
