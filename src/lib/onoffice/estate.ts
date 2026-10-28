@@ -2323,13 +2323,15 @@ export async function zaehleAktiveKunden(benutzername: string): Promise<number> 
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
-// Zählt Objekte, die seit einem bestimmten Datum in OnOffice ANGELEGT wurden (Feld "erstellt_am",
+// Zählt Objekte, die in einem Datumsfenster in OnOffice ANGELEGT wurden (Feld "erstellt_am",
 // System-Zeitstempel bei Objekterstellung, live per get_field_definitions/search_estates
-// bestätigt — Oktober 2026) — für die "Auf einen Blick"-Kennzahl "Neue Objekte (7 Tage)"
-// (Chat-Vorgabe: "eine Ansicht bei der ich auf einen Blick sehe, wieviele Objekte und wieviele
-// Kunden in einer Woche angelegt worden sind"). Gleiches listlimit:1 + meta.cntabsolute-Muster
-// wie zaehleVerkaufteObjekte oben.
-export async function zaehleNeueObjekte(von: string): Promise<number> {
+// bestätigt — Oktober 2026) — Grundlage für den "Neuzugänge"-Navi-Punkt im Admin-Bereich (siehe
+// ladeNeuzugaengeVerlauf in mitarbeiterstatistik.ts, Chat-Vorgabe: "wieviele Objekte und wieviele
+// Kunden in einer Woche angelegt worden sind"). bis optional — ohne bis "seit von bis heute"
+// (offenes Fenster), mit bis ein abgeschlossenes Wochenfenster (siehe Datumsfilter-Muster bei
+// zaehleVerkaufteObjekteFuerMitarbeiter oben). Gleiches listlimit:1 + meta.cntabsolute-Muster wie
+// zaehleVerkaufteObjekte oben.
+export async function zaehleNeueObjekte(von: string, bis?: string): Promise<number> {
   const result = await callOnOfficeApi([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
@@ -2339,7 +2341,11 @@ export async function zaehleNeueObjekte(von: string): Promise<number> {
       cacheable: false,
       parameters: {
         data: ["Id"],
-        filter: { erstellt_am: [{ op: ">=", val: von }] },
+        filter: {
+          erstellt_am: bis
+            ? [{ op: ">=", val: von }, { op: "<=", val: bis }]
+            : [{ op: ">=", val: von }],
+        },
         listlimit: 1,
       },
     },
@@ -2347,13 +2353,13 @@ export async function zaehleNeueObjekte(von: string): Promise<number> {
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
-// Zählt Adressen (Kunden/Kontakte jeder Art), die seit einem bestimmten Datum in OnOffice
-// angelegt wurden — Feld "Eintragsdatum", NICHT "kunde_seit" (das ist ein manuell gepflegtes
-// Datum, kein Anlegezeitpunkt: live gegen den Account geprüft, Oktober 2026 — Eintragsdatum
-// trägt echte Uhrzeiten und steigt mit jedem neu angelegten Datensatz). resourcetype "address"
-// braucht "Name" statt "Id" als data-Feld (siehe Kommentar bei zaehleAktiveKunden oben) —
-// gleiches listlimit:1 + meta.cntabsolute-Muster.
-export async function zaehleNeueKunden(von: string): Promise<number> {
+// Zählt Adressen (Kunden/Kontakte jeder Art), die in einem Datumsfenster in OnOffice angelegt
+// wurden — Feld "Eintragsdatum", NICHT "kunde_seit" (das ist ein manuell gepflegtes Datum, kein
+// Anlegezeitpunkt: live gegen den Account geprüft, Oktober 2026 — Eintragsdatum trägt echte
+// Uhrzeiten und steigt mit jedem neu angelegten Datensatz). bis optional, gleiches Muster wie
+// zaehleNeueObjekte oben. resourcetype "address" braucht "Name" statt "Id" als data-Feld (siehe
+// Kommentar bei zaehleAktiveKunden oben) — gleiches listlimit:1 + meta.cntabsolute-Muster.
+export async function zaehleNeueKunden(von: string, bis?: string): Promise<number> {
   const result = await callOnOfficeApi([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
@@ -2363,7 +2369,11 @@ export async function zaehleNeueKunden(von: string): Promise<number> {
       cacheable: false,
       parameters: {
         data: ["Name"],
-        filter: { Eintragsdatum: [{ op: ">=", val: von }] },
+        filter: {
+          Eintragsdatum: bis
+            ? [{ op: ">=", val: von }, { op: "<=", val: bis }]
+            : [{ op: ">=", val: von }],
+        },
         listlimit: 1,
       },
     },

@@ -18,8 +18,14 @@ import { NavItem } from "@/components/layout/nav";
 // 2026: "ich will einen weiteren Navi Bereich. Ich will dass jedes Mal wenn man in den
 // einzelnen PLZ Bereich geht, auf der rechten Seite sich zu dieser PLZ öffnet. Liste an
 // Objekten usw" (siehe onPlzKlick in Mitarbeiterstatistik.tsx).
+//
+// "neuzugaenge" (siehe components/admin/Neuzugaenge.tsx) kam zuletzt dazu — erst zwei Kacheln
+// auf "uebersicht", auf Nutzerwunsch dann durch einen eigenen Reiter mit Wochen-Verlauf ersetzt
+// (Chat-Vorgabe Oktober 2026: "ein eigener Reiter mit mehr Verlauf"). Direkt hinter "uebersicht"
+// einsortiert, da beide denselben "auf einen Blick"-Überblickscharakter haben.
 export const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "uebersicht", label: "Auf einen Blick", icon: "calculator" },
+  { id: "neuzugaenge", label: "Neuzugänge", icon: "timeline" },
   { id: "mitarbeiter", label: "Mitarbeiter", icon: "team" },
   { id: "leadquellen", label: "Leadquellen", icon: "location" },
   { id: "kontrolle", label: "Kontrolle", icon: "warning" },

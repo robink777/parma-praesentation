@@ -389,14 +389,20 @@ export interface ObjektGesamtKennzahlen {
   provisionsvolumenVerkauftJahrFehltAnzahl: number;
 }
 
-// Unternehmensweite Neuzugänge der letzten 7 Tage für die "Auf einen Blick"-Seite im
-// Admin-Bereich (siehe zaehleNeueObjekte/zaehleNeueKunden in onoffice/estate.ts, Oktober 2026
-// Chat-Vorgabe: "eine Ansicht bei der ich auf einen Blick sehe, wieviele Objekte und wieviele
-// Kunden in einer Woche angelegt worden sind"). Bewusst ein eigener, schlanker Typ statt einer
-// Erweiterung von ObjektGesamtKennzahlen (das ausschließlich Objekt-Bestandsdaten bündelt) —
-// "Kunden" stammt aus dem Adress-Modul, nicht aus dem Objekt-Bestand, beides gehört hier aber
-// inhaltlich als EIN "Neuzugänge"-Block zusammen.
-export interface NeuzugaengeKennzahlen {
+// Eine Kalenderwoche im Neuzugänge-Verlauf (siehe ladeNeuzugaengeVerlauf in
+// onoffice/mitarbeiterstatistik.ts, eigener "Neuzugänge"-Navi-Punkt im Admin-Bereich) — Oktober
+// 2026 Chat-Vorgabe: erst als zwei Kacheln auf "Auf einen Blick", dann auf Nutzerwunsch durch
+// einen "eigenen Reiter mit mehr Verlauf" ersetzt ("Statt nur 2 Kacheln ... ein eigener Reiter
+// mit mehr Verlauf (z.B. Wochen-Trend, letzte 4-8 Wochen)"). Bewusst ein eigener, schlanker Typ
+// statt einer Erweiterung von ObjektGesamtKennzahlen (das ausschließlich Objekt-Bestandsdaten
+// bündelt) — "Kunden" stammt aus dem Adress-Modul, nicht aus dem Objekt-Bestand, beides gehört
+// hier aber inhaltlich als EIN "Neuzugänge"-Block zusammen. von/bis im Format "YYYY-MM-DD"
+// (Montag-Sonntag der jeweiligen Kalenderwoche), label die fertig formatierte Anzeige
+// ("20.10.–26.10." bzw. mit Zusatz "(laufend)" für die noch nicht abgeschlossene aktuelle Woche).
+export interface NeuzugaengeWoche {
+  von: string;
+  bis: string;
+  label: string;
   neueObjekte: number | null;
   neueKunden: number | null;
 }

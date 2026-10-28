@@ -2,7 +2,7 @@ import { AKQUISE_NAMEN, TEAM } from "@/data/unternehmen";
 import {
   MitarbeiterKennzahlen,
   MitarbeiterObjekt,
-  NeuzugaengeKennzahlen,
+  NeuzugaengeWoche,
   ObjektGesamtKennzahlen,
 } from "@/types";
 import {
@@ -77,32 +77,75 @@ export function ermittleJahresDatumsfenster() {
   };
 }
 
-// Datumsfenster "letzte 7 Tage" (heute minus 7 Tage bis heute, ohne Uhrzeitanteil) für die
-// "Neuzugänge"-Kennzahl (siehe NeuzugaengeKennzahlen in types/index.ts, Oktober 2026
-// Chat-Vorgabe: "wieviele Objekte und wieviele Kunden in einer Woche angelegt worden sind") —
-// gleiches "YYYY-MM-DD"-Format wie ermittleJahresDatumsfenster oben, das für reine Datumsfelder
-// (erstellt_am/Eintragsdatum sind beide type "date" im Feldkatalog, live gegen den Account
-// geprüft Oktober 2026) zuverlässig funktioniert.
-function ermittleWochenDatumsfenster() {
-  const heute = new Date();
-  const vor7Tagen = new Date(heute);
-  vor7Tagen.setDate(vor7Tagen.getDate() - 7);
-  const formatiere = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  return { vonWoche: formatiere(vor7Tagen) };
+// Anzahl Kalenderwochen im "Neuzugänge"-Verlauf (siehe ladeNeuzugaengeVerlauf unten) — Chat-Vorgabe
+// Oktober 2026 nannte als Spanne "letzte 4-8 Wochen"; 8 gewählt, damit auch kurzfristige
+// Schwankungen (z.B. eine einzelne flaue Woche) im Gesamtbild nicht überbewertet wirken.
+const NEUZUGAENGE_WOCHEN_ANZAHL = 8;
+
+// Montag der Kalenderwoche eines Datums (Mo-So-Woche, wie in Deutschland üblich) — Date.getDay()
+// liefert 0=So...6=Sa, bei Sonntag muss daher 6 Tage ZURÜCK statt vorwärts gerechnet werden.
+function montagDerWoche(datum: Date): Date {
+  const montag = new Date(datum);
+  montag.setHours(0, 0, 0, 0);
+  const wochentag = montag.getDay();
+  const differenzZuMontag = wochentag === 0 ? -6 : 1 - wochentag;
+  montag.setDate(montag.getDate() + differenzZuMontag);
+  return montag;
 }
 
-// Lädt die Neuzugänge-Kennzahlen für die "Auf einen Blick"-Seite (siehe NeuzugaengeKennzahlen,
-// Chat-Vorgabe Oktober 2026). Beide Zählungen unabhängig per .catch(() => null) abgesichert,
-// analog zum Muster bei ladeMitarbeiterKennzahlen oben — schlägt eine der beiden fehl, zeigt nur
-// diese eine Kachel "–" statt der gesamten Seite.
-export async function ladeNeuzugaengeKennzahlen(): Promise<NeuzugaengeKennzahlen> {
-  const { vonWoche } = ermittleWochenDatumsfenster();
-  const [neueObjekte, neueKunden] = await Promise.all([
-    zaehleNeueObjekte(vonWoche).catch(() => null),
-    zaehleNeueKunden(vonWoche).catch(() => null),
-  ]);
-  return { neueObjekte, neueKunden };
+// "YYYY-MM-DD" für den OnOffice-Datumsfilter (siehe zaehleNeueObjekte/zaehleNeueKunden in
+// estate.ts) — ohne Uhrzeitanteil, analog zu ermittleJahresDatumsfenster oben.
+function formatiereDatumIso(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// "20.10." für die Anzeige-Beschriftung je Wochenzeile (siehe Neuzugaenge.tsx).
+function formatiereDatumKurz(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`;
+}
+
+// Lädt den Neuzugänge-Verlauf (Objekte/Kunden je Kalenderwoche, neueste zuerst) für den
+// "Neuzugänge"-Navi-Punkt im Admin-Bereich (siehe NeuzugaengeWoche in types/index.ts) — Oktober
+// 2026 Chat-Vorgabe: ursprünglich zwei Kacheln auf "Auf einen Blick" (rollierende 7 Tage), auf
+// Nutzerwunsch durch einen "eigenen Reiter mit mehr Verlauf (z.B. Wochen-Trend, letzte 4-8
+// Wochen)" ersetzt — deshalb jetzt ECHTE Kalenderwochen (Montag-Sonntag) statt eines rollierenden
+// Fensters, damit Wochen vergleichbar und die Beschriftung ("20.10.–26.10.") nachvollziehbar
+// bleibt. Die aktuelle, noch nicht abgeschlossene Woche bleibt in der Liste (sonst würde "diese
+// Woche" komplett fehlen) und bekommt stattdessen den Zusatz "(laufend)" in ihrem label.
+//
+// Pro Woche BEIDE Zählungen gleichzeitig (Promise.all) UND alle Wochen gleichzeitig
+// (Promise.all außen) statt nacheinander — unabhängige Abrufe, ein sequenzielles await würde die
+// Ladezeit unnötig auf 2 × NEUZUGAENGE_WOCHEN_ANZAHL Abrufe hintereinander strecken. Jede
+// Zählung einzeln per .catch(() => null) abgesichert (Muster wie ladeMitarbeiterKennzahlen oben)
+// — schlägt eine einzelne Woche/Kennzahl fehl, zeigt nur diese Zelle "–" statt der ganzen Liste.
+export async function ladeNeuzugaengeVerlauf(): Promise<NeuzugaengeWoche[]> {
+  const montagAktuelleWoche = montagDerWoche(new Date());
+
+  const wochen = Array.from({ length: NEUZUGAENGE_WOCHEN_ANZAHL }, (_, i) => {
+    const von = new Date(montagAktuelleWoche);
+    von.setDate(von.getDate() - 7 * i);
+    const bis = new Date(von);
+    bis.setDate(bis.getDate() + 6);
+    return { von, bis, istAktuelleWoche: i === 0 };
+  });
+
+  return Promise.all(
+    wochen.map(async ({ von, bis, istAktuelleWoche }) => {
+      const vonStr = formatiereDatumIso(von);
+      const bisStr = formatiereDatumIso(bis);
+      const [neueObjekte, neueKunden] = await Promise.all([
+        zaehleNeueObjekte(vonStr, bisStr).catch(() => null),
+        zaehleNeueKunden(vonStr, bisStr).catch(() => null),
+      ]);
+      return {
+        von: vonStr,
+        bis: bisStr,
+        label: `${formatiereDatumKurz(von)}–${formatiereDatumKurz(bis)}${istAktuelleWoche ? " (laufend)" : ""}`,
+        neueObjekte,
+        neueKunden,
+      };
+    })
+  );
 }
 
 // Aggregiert die Mitarbeiterstatistik-Kennzahlen (siehe MitarbeiterKennzahlen in types/index.ts

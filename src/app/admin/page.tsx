@@ -2,7 +2,7 @@ import { Mitarbeiterstatistik } from "@/components/admin/Mitarbeiterstatistik";
 import { ONOFFICE_MODE } from "@/lib/onoffice/config";
 import {
   ladeMitarbeiterKennzahlen,
-  ladeNeuzugaengeKennzahlen,
+  ladeNeuzugaengeVerlauf,
   ladeObjektGesamtKennzahlen,
 } from "@/lib/onoffice/mitarbeiterstatistik";
 import { ladeKontrollObjekte, ladeLeadquellenKennzahlen, ladeObjektkarteDaten } from "@/lib/onoffice/estate";
@@ -10,7 +10,7 @@ import {
   KontrollObjekt,
   LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
-  NeuzugaengeKennzahlen,
+  NeuzugaengeWoche,
   ObjektGesamtKennzahlen,
   ObjektkarteDaten,
 } from "@/types";
@@ -35,7 +35,7 @@ export default async function AdminPage() {
   let kontrollObjekte: KontrollObjekt[] | undefined;
   let leadquellenKennzahlen: LeadquellenKennzahlen | undefined;
   let objektkarteDaten: ObjektkarteDaten | undefined;
-  let neuzugaengeKennzahlen: NeuzugaengeKennzahlen | undefined;
+  let neuzugaengeVerlauf: NeuzugaengeWoche[] | undefined;
 
   if (ONOFFICE_MODE === "live") {
     // Alle sechs Abrufe GLEICHZEITIG (Promise.all) statt nacheinander — sie sind unabhängig
@@ -49,7 +49,7 @@ export default async function AdminPage() {
       kontrollErgebnis,
       leadquellenErgebnis,
       objektkarteErgebnis,
-      neuzugaengeErgebnis,
+      neuzugaengeVerlaufErgebnis,
     ] = await Promise.all([
       ladeMitarbeiterKennzahlen().catch((error) => {
         console.error("Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:", error);
@@ -74,8 +74,8 @@ export default async function AdminPage() {
         console.error("Live-Abruf der Objektkarte aus OnOffice fehlgeschlagen:", error);
         return undefined;
       }),
-      ladeNeuzugaengeKennzahlen().catch((error) => {
-        console.error("Live-Abruf der Neuzugänge aus OnOffice fehlgeschlagen:", error);
+      ladeNeuzugaengeVerlauf().catch((error) => {
+        console.error("Live-Abruf des Neuzugänge-Verlaufs aus OnOffice fehlgeschlagen:", error);
         return undefined;
       }),
     ]);
@@ -84,7 +84,7 @@ export default async function AdminPage() {
     kontrollObjekte = kontrollErgebnis;
     leadquellenKennzahlen = leadquellenErgebnis;
     objektkarteDaten = objektkarteErgebnis;
-    neuzugaengeKennzahlen = neuzugaengeErgebnis;
+    neuzugaengeVerlauf = neuzugaengeVerlaufErgebnis;
   }
 
   // Kein SectionShell-Wrapper mehr — Mitarbeiterstatistik baut seit August 2026 ihr eigenes
@@ -97,7 +97,7 @@ export default async function AdminPage() {
       kontrollObjekte={kontrollObjekte}
       leadquellenKennzahlen={leadquellenKennzahlen}
       objektkarteDaten={objektkarteDaten}
-      neuzugaengeKennzahlen={neuzugaengeKennzahlen}
+      neuzugaengeVerlauf={neuzugaengeVerlauf}
     />
   );
 }
