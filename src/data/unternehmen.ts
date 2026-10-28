@@ -178,16 +178,20 @@ export const TEAM: TeamMitglied[] = [
 // Listen (Vertrieb UND Akquise) — laut Chat-Vorgabe nicht aus Vertrieb entfernt, sondern
 // zusätzlich für Akquise vorgesehen. Alle TEAM-Mitglieder, die in keiner der drei Listen stehen,
 // landen weiterhin in "Weitere Mitarbeiter" (siehe teileTeamAuf in Mitarbeiterstatistik.tsx).
+// Oktober 2026 Chat-Vorgabe: "leon ist im vertrieb und jacy ist in der akquise, die bitte noch
+// tauschen" — Jacqueline Henot wechselt komplett von Vertrieb zu Akquise (auf Nutzerwunsch NICHT
+// wie Axel in beiden Listen, siehe unten), Leon Otten rückt dafür von "Weitere Mitarbeiter" in
+// Vertrieb auf.
 export const VERTRIEB_NAMEN = [
   "Vanessa Krifft",
-  "Jacqueline Henot",
   "Kira Woldt",
   "Dawid Parma",
   "Axel Wehmeier",
   "Stanimira Georgieva",
+  "Leon Otten",
 ];
 
-export const AKQUISE_NAMEN = ["Daniel Parma", "Robin Kolbe", "Axel Wehmeier"];
+export const AKQUISE_NAMEN = ["Daniel Parma", "Robin Kolbe", "Axel Wehmeier", "Jacqueline Henot"];
 
 // "Kathi" = Katharina Becker (siehe TEAM oben).
 export const SETTING_NAMEN = ["Sarah Barth", "Katharina Becker"];
