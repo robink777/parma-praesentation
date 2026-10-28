@@ -659,15 +659,14 @@ export function Objektkarte({
     };
   }, [ausgewaehltePlz, bereit, daten]);
 
-  // Die Karte ist seit Oktober 2026 ein eigener, vollflächiger Hauptbereich (Chat-Vorgabe:
-  // "zwei Hauptbereiche ... Kartenbereich und ... Statistik", siehe KartenAnsicht.tsx) — bis dahin
-  // teilte sie sich die Admin-Fläche fest mit einem rechten 1/3-Panel (siehe Git-Historie: "die
-  // Karte soll in 2/3 der Ansicht auftauchen"). Objektkarte füllt per absolute inset-0 die GANZE
-  // zur Verfügung stehende Fläche; Label, Objektzahlen und Legende liegen als schwebende,
-  // halbtransparente Chips über der Karte statt sie durch ein gestapeltes Layout zu verkleinern.
-  // Mitarbeiter/Leadquellen/Kontrolle/Übersicht/PLZ leben jetzt im separaten Statistik-
-  // Hauptbereich (StatistikAnsicht.tsx, app/admin/statistik/page.tsx) statt in einem Panel neben
-  // der Karte — ein Klick auf eine PLZ-Fläche navigiert dorthin (siehe KartenAnsicht.tsx).
+  // Objektkarte füllt per "absolute inset-0" die GANZE Fläche ihres Elternelements — das ist seit
+  // Oktober 2026 kein voller Bildschirm mehr, sondern die reinweiße Karte, die KarteBereich.tsx
+  // für den "Karte"-Navi-Punkt bereitstellt (3/4 Breite, Rest ist die PLZ-Objektliste daneben).
+  // Label, Objektzahlen und Legende bleiben als schwebende, halbtransparente Chips über der Karte
+  // statt sie durch ein gestapeltes Layout zu verkleinern — funktioniert unabhängig von der
+  // tatsächlichen Containergröße. Ein Klick auf eine PLZ-Fläche ruft onPlzKlick auf, das
+  // KarteBereich.tsx direkt in lokalen State überführt (kein Routenwechsel mehr nötig, seit Karte
+  // und PLZ-Liste wieder auf derselben Seite leben).
   //
   // Logo sitzt im linken Chip statt in der Admin-Nav — Chat-Vorgabe: "Das Logo muss auch
   // umplatziert werden".

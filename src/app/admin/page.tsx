@@ -1,24 +1,91 @@
-import { KartenAnsicht } from "@/components/admin/KartenAnsicht";
+import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { ONOFFICE_MODE } from "@/lib/onoffice/config";
-import { ladeObjektkarteDaten } from "@/lib/onoffice/estate";
-import { ObjektkarteDaten } from "@/types";
+import {
+  ladeMitarbeiterKennzahlen,
+  ladeNeuzugaengeVerlauf,
+  ladeObjektGesamtKennzahlen,
+} from "@/lib/onoffice/mitarbeiterstatistik";
+import { ladeKontrollObjekte, ladeLeadquellenKennzahlen, ladeObjektkarteDaten } from "@/lib/onoffice/estate";
+import {
+  KontrollObjekt,
+  LeadquellenKennzahlen,
+  MitarbeiterKennzahlen,
+  NeuzugaengeWoche,
+  ObjektGesamtKennzahlen,
+  ObjektkarteDaten,
+} from "@/types";
 
 // Admin-Bereich, zusätzlich zur App-weiten Anmeldung durch ein zweites, separates Passwort
-// geschützt (siehe middleware.ts, lib/auth.ts, admin/login/page.tsx). Hauptbereich "Karte" — seit
-// Oktober 2026 (Chat-Vorgabe: "zwei Hauptbereiche ... Kartenbereich und ... Statistik") eine
-// eigene, schlanke Route statt der früheren Karte+Panel-Kombiseite: Der zweite Hauptbereich
-// "Statistik" (Mitarbeiter/Leadquellen/Kontrolle/PLZ/Neuzugänge) lebt jetzt unter
-// app/admin/statistik/page.tsx mit eigenem, größerem Datenabruf — diese Seite hier lädt deshalb
-// NUR noch, was die Karte selbst braucht.
+// geschützt (siehe middleware.ts, lib/auth.ts, admin/login/page.tsx). EINE Seite für das gesamte
+// Dashboard (Übersicht/Karte/Mitarbeiter/Leadquellen/Kontrolle, siehe AdminDashboard.tsx) — bis
+// Oktober 2026 kurzzeitig auf zwei Routen aufgeteilt (siehe Git-Historie, app/admin/statistik/),
+// direkt danach wieder zusammengeführt (Chat-Vorgabe: "Damit können wir uns den Bereich
+// 'Karten/Statistik/Finanz' sparen").
 export default async function AdminPage() {
+  let kennzahlen: Record<string, MitarbeiterKennzahlen> | undefined;
+  let gesamtKennzahlen: ObjektGesamtKennzahlen | undefined;
+  let kontrollObjekte: KontrollObjekt[] | undefined;
+  let leadquellenKennzahlen: LeadquellenKennzahlen | undefined;
   let objektkarteDaten: ObjektkarteDaten | undefined;
+  let neuzugaengeVerlauf: NeuzugaengeWoche[] | undefined;
 
   if (ONOFFICE_MODE === "live") {
-    objektkarteDaten = await ladeObjektkarteDaten().catch((error) => {
-      console.error("Live-Abruf der Objektkarte aus OnOffice fehlgeschlagen:", error);
-      return undefined;
-    });
+    // Sechs Abrufe gleichzeitig (Promise.all), jeder einzeln per .catch() abgesichert — ein
+    // einzelner fehlgeschlagener Abruf (z.B. transienter OnOffice-Verbindungsfehler trotz Retry,
+    // siehe onoffice/client.ts) soll nicht die ganze Seite abstürzen lassen, sondern nur den
+    // betroffenen Abschnitt in seinen eigenen "nicht geladen"-Zustand versetzen.
+    const [
+      kennzahlenErgebnis,
+      gesamtKennzahlenErgebnis,
+      kontrollErgebnis,
+      leadquellenErgebnis,
+      objektkarteErgebnis,
+      neuzugaengeVerlaufErgebnis,
+    ] = await Promise.all([
+      ladeMitarbeiterKennzahlen().catch((error) => {
+        console.error("Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+      ladeObjektGesamtKennzahlen().catch((error) => {
+        console.error(
+          "Live-Abruf der unternehmensweiten Objekt-Gesamtkennzahlen aus OnOffice fehlgeschlagen:",
+          error
+        );
+        return undefined;
+      }),
+      ladeKontrollObjekte().catch((error) => {
+        console.error("Live-Abruf der Kontrollobjekte aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+      ladeLeadquellenKennzahlen().catch((error) => {
+        console.error("Live-Abruf der Leadquellen aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+      ladeObjektkarteDaten().catch((error) => {
+        console.error("Live-Abruf der Objektkarte aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+      ladeNeuzugaengeVerlauf().catch((error) => {
+        console.error("Live-Abruf des Neuzugänge-Verlaufs aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
+    ]);
+    kennzahlen = kennzahlenErgebnis;
+    gesamtKennzahlen = gesamtKennzahlenErgebnis;
+    kontrollObjekte = kontrollErgebnis;
+    leadquellenKennzahlen = leadquellenErgebnis;
+    objektkarteDaten = objektkarteErgebnis;
+    neuzugaengeVerlauf = neuzugaengeVerlaufErgebnis;
   }
 
-  return <KartenAnsicht daten={objektkarteDaten} />;
+  return (
+    <AdminDashboard
+      kennzahlen={kennzahlen}
+      gesamtKennzahlen={gesamtKennzahlen}
+      kontrollObjekte={kontrollObjekte}
+      leadquellenKennzahlen={leadquellenKennzahlen}
+      objektkarteDaten={objektkarteDaten}
+      neuzugaengeVerlauf={neuzugaengeVerlauf}
+    />
+  );
 }

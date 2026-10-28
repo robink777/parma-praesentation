@@ -1,29 +1,26 @@
 import { NavItem } from "@/components/layout/nav";
 
-// Sekundär-Navigationspunkte INNERHALB des Statistik-Hauptbereichs (siehe StatistikNav.tsx) —
-// seit Oktober 2026 nicht mehr die einzige Navi-Ebene im Admin-Bereich: Karte und Statistik sind
-// jetzt eigene Hauptbereiche (siehe HauptbereichSwitcher.tsx), diese fünf Punkte sitzen
-// ausschließlich innerhalb von "Statistik". "Leadquellen" (Herkunft-Übersicht, siehe
+// Navigationspunkte des Admin-Dashboards (siehe StatistikNav.tsx). Bis Oktober 2026 kurzzeitig
+// auf zwei getrennte Hauptbereiche (Karte/Statistik, eigene Routen) aufgeteilt — Chat-Vorgabe
+// direkt danach wollte das wieder zusammen: "Neben Übersicht hätte ich gerne den Navi Punkt
+// Karte. Damit können wir uns den Bereich 'Karten/Statistik/Finanz' sparen" — Karte ist deshalb
+// jetzt wieder ein normaler Punkt hier, kein eigener Hauptbereich-Umschalter mehr (siehe
+// AdminDashboard.tsx, KarteBereich.tsx). "Leadquellen" (Herkunft-Übersicht, siehe
 // onoffice/estate.ts, ladeLeadquellenKennzahlen) bewusst zwischen "Mitarbeiter" und "Kontrolle"
 // einsortiert, Chat-Vorgabe: "Mach zwischen Mitarbeiter und Kontrolle bitte noch eine Kachel mit
 // Leadquellen". "Kontrolle" (Datenqualität je Status, siehe ladeKontrollObjekte), Chat-Vorgabe:
 // "das mit den Objekten funktioniert irgendwie immer noch nicht ... vielleicht als 3. Punkt in
 // der Navigation".
 //
-// "plz" (siehe components/admin/PlzObjekte.tsx) wird nicht nur per Klick hier, sondern auch
-// automatisch aktiv, wenn auf der Karte (jetzt eigener Hauptbereich, siehe KartenAnsicht.tsx)
-// eine PLZ-Fläche angeklickt wird — Chat-Vorgabe Oktober 2026: "ich will einen weiteren Navi
-// Bereich. Ich will dass jedes Mal wenn man in den einzelnen PLZ Bereich geht, auf der rechten
-// Seite sich zu dieser PLZ öffnet. Liste an Objekten usw" (siehe StatistikAnsicht.tsx).
-//
-// Kein eigener "neuzugaenge"-Punkt mehr: Die Neuzugänge-Wochenansicht (vormals ein eigener Punkt,
-// davor zwei Kacheln auf "uebersicht") ist jetzt fest Teil von "uebersicht" selbst (siehe
-// Uebersicht.tsx) — Chat-Vorgabe Oktober 2026 wollte die Statistik-Seite insgesamt als EINEN auf
-// einen Blick lesbaren TV-Dashboard-Landingscreen, nicht als weiteren Klickschritt.
+// Kein eigener "plz"-Punkt mehr: Die PLZ-Objektliste (vormals eigener Reiter, siehe Git-Historie
+// PlzObjekte.tsx) lebt jetzt fest als rechtes Viertel neben der Karte selbst (Chat-Vorgabe
+// Oktober 2026: "die PLZ Navi kannst du oben auch raus nehmen und dann bei Karte in die ganz
+// rechte 1/4 des Bildes legen") — ein Klick auf eine PLZ-Fläche aktualisiert sie direkt, ohne
+// Reiterwechsel.
 export const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: "uebersicht", label: "Übersicht", icon: "eye" },
+  { id: "karte", label: "Karte", icon: "location" },
   { id: "mitarbeiter", label: "Mitarbeiter", icon: "team" },
   { id: "leadquellen", label: "Leadquellen", icon: "globe" },
   { id: "kontrolle", label: "Kontrolle", icon: "warning" },
-  { id: "plz", label: "PLZ", icon: "building" },
 ];

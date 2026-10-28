@@ -96,7 +96,7 @@ function KpiKachel({
   );
 }
 
-// Landing-Screen des Statistik-Hauptbereichs (siehe StatistikAnsicht.tsx) — fusioniert die
+// Landing-Screen des Admin-Dashboards (siehe AdminDashboard.tsx) — fusioniert die
 // früheren "Auf einen Blick"-Infoboxen und die frühere eigene "Neuzugänge"-Seite zu EINEM, groß
 // und farbig gestalteten TV-Dashboard (Oktober 2026 Chat-Vorgabe: "ich hole jetzt mal ein
 // bisschen aus ... alle Unternehmenszahlen ... auf einem großen Bildschirm"). Acht KPI-Kacheln,

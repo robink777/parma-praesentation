@@ -7,7 +7,7 @@ import { Icon } from "@/components/icons/Icon";
 import { formatiereBetrag } from "@/lib/berechnung";
 import { MitarbeiterKennzahlen, MitarbeiterObjekt, TeamMitglied } from "@/types";
 
-// "Mitarbeiter"-Baustein des Statistik-Hauptbereichs (siehe StatistikAnsicht.tsx) — bis Oktober
+// "Mitarbeiter"-Baustein des Admin-Dashboards (siehe AdminDashboard.tsx) — bis Oktober
 // 2026 Teil der Alleskönner-Komponente "Mitarbeiterstatistik" (Karte + komplettes Statistik-Panel
 // in einer Datei, siehe Git-Historie), seither auf eine eigene Route aufgeteilt (Chat-Vorgabe:
 // "zwei Hauptbereiche ... Kartenbereich und ... Statistik"). Die komplette Fach-/Abruflogik hier
