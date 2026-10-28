@@ -659,16 +659,15 @@ export function Objektkarte({
     };
   }, [ausgewaehltePlz, bereit, daten]);
 
-  // Die Karte nimmt die linken zwei Drittel des Admin-Bereichs ein, nicht mehr nur einen Header
-  // oder einen eigenen Reiter (Chat-Vorgabe Oktober 2026, in mehreren Schritten verfeinert, zuletzt:
-  // "die Karte soll in 2/3 der Ansicht auftauchen und dann ein Overlay auf dem 1/3 auf der
-  // rechten Seite. Im Overlay kann die Navi rein" — siehe Mitarbeiterstatistik.tsx für die
-  // Zwei-Spalten-Aufteilung). Objektkarte füllt dabei per absolute inset-0 ihre eigene Spalte
-  // komplett; Label, Objektzahlen und Legende liegen als schwebende, halbtransparente Chips über
-  // der Karte statt sie durch ein gestapeltes Layout zu verkleinern. Navigation und die übrigen
-  // Bereiche (Mitarbeiter/Leadquellen/Kontrolle/Übersicht) leben im rechten Drittel-Panel
-  // (AdminNavigation.tsx, Mitarbeiterstatistik.tsx) — "erstmal so, langfristig eigene Seiten"
-  // laut Chat-Vorgabe.
+  // Die Karte ist seit Oktober 2026 ein eigener, vollflächiger Hauptbereich (Chat-Vorgabe:
+  // "zwei Hauptbereiche ... Kartenbereich und ... Statistik", siehe KartenAnsicht.tsx) — bis dahin
+  // teilte sie sich die Admin-Fläche fest mit einem rechten 1/3-Panel (siehe Git-Historie: "die
+  // Karte soll in 2/3 der Ansicht auftauchen"). Objektkarte füllt per absolute inset-0 die GANZE
+  // zur Verfügung stehende Fläche; Label, Objektzahlen und Legende liegen als schwebende,
+  // halbtransparente Chips über der Karte statt sie durch ein gestapeltes Layout zu verkleinern.
+  // Mitarbeiter/Leadquellen/Kontrolle/Übersicht/PLZ leben jetzt im separaten Statistik-
+  // Hauptbereich (StatistikAnsicht.tsx, app/admin/statistik/page.tsx) statt in einem Panel neben
+  // der Karte — ein Klick auf eine PLZ-Fläche navigiert dorthin (siehe KartenAnsicht.tsx).
   //
   // Logo sitzt im linken Chip statt in der Admin-Nav — Chat-Vorgabe: "Das Logo muss auch
   // umplatziert werden".

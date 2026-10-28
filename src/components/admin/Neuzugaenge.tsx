@@ -1,99 +1,161 @@
-import { Card } from "@/components/layout/SectionShell";
 import { NeuzugaengeWoche } from "@/types";
 
 // Deutsches Tausendertrennzeichen, analog zu Leadquellen.tsx/Kontrolle.tsx.
 const zahlenformat = new Intl.NumberFormat("de-DE");
 
-// Eine Wochenzeile im Neuzugänge-Verlauf — zwei Balken (Objekte/Kunden) je Woche, JEWEILS auf
-// die eigene Spitze skaliert (maxObjekte/maxKunden statt eines gemeinsamen Maximums), damit der
-// Wochen-zu-Woche-TREND innerhalb jeder Kennzahl erkennbar bleibt (Chat-Vorgabe: "wieviele ... in
-// einer Woche angelegt worden sind") — ein gemeinsames Maximum würde die regelmäßig deutlich
-// kleineren Objekte-Balken neben den Kunden-Balken fast unsichtbar machen. Gleiches
-// Balken-Muster wie HerkunftZeile in Leadquellen.tsx. Walnuss (Objekte) + Asche (Kunden) statt
-// Messing für die zweite Farbe — Messing darf laut CI höchstens 1× pro Sichtbereich auftauchen
-// und ist in der Objektkarte/PLZ-Legende bereits vergeben (siehe KATEGORIE_FARBE in
-// PlzObjekte.tsx).
-function WochenZeile({
-  woche,
-  maxObjekte,
-  maxKunden,
+const CHART_BREITE = 400;
+const CHART_HOEHE = 180;
+const OBEN_PADDING = 20; // Platz für den Wert-Label über dem höchsten Balken
+const UNTEN_PADDING = 22; // Platz für die Datums-Beschriftung je Balken
+const PLOT_HOEHE = CHART_HOEHE - OBEN_PADDING - UNTEN_PADDING;
+
+// Ein einzelnes Balkendiagramm (Objekte ODER Kunden, siehe Uebersicht.tsx, das beide
+// nebeneinander einbindet) — bewusst ZWEI getrennte Ein-Serien-Diagramme statt EINES
+// gruppierten Zwei-Serien-Diagramms mit gemeinsamer Skala: Kunden-Zahlen liegen pro Woche
+// typischerweise 3-5× über den Objekte-Zahlen (live beobachtet), eine gemeinsame Achse würde die
+// Objekte-Balken fast unsichtbar neben den Kunden-Balken flachdrücken UND wäre im Kern eine
+// Dual-Achsen-Darstellung mit nur einer sichtbaren Skala — genau das Muster, von dem die
+// dataviz-Referenz ausdrücklich abrät ("zwei Diagramme ... statt einer Doppelachse"). Jede der
+// beiden Karten bekommt stattdessen ihre EIGENE, ehrliche Skala.
+//
+// Referenzlinie (Oktober 2026 Chat-Vorgabe: "mehr in Referenzen"): eine gestrichelte
+// Durchschnittslinie über die abgeschlossenen Wochen (OHNE die noch laufende aktuelle Woche, die
+// sonst den Schnitt künstlich drücken würde) — zeigt auf einen Blick, ob die aktuelle/letzte Woche
+// über oder unter dem jüngeren Normalniveau liegt, ohne eine irreführende Wochenvergleich-Prozent-
+// angabe gegen eine noch unvollständige Woche zu bilden.
+function Balkendiagramm({
+  titel,
+  einheit,
+  wochen,
+  wert,
+  farbKlasse,
 }: {
-  woche: NeuzugaengeWoche;
-  maxObjekte: number;
-  maxKunden: number;
+  titel: string;
+  einheit: string;
+  wochen: NeuzugaengeWoche[];
+  wert: (woche: NeuzugaengeWoche) => number | null;
+  farbKlasse: string;
 }) {
-  const breite = (wert: number | null, max: number) =>
-    wert === null || max === 0 ? 0 : Math.max(4, Math.round((wert / max) * 100));
+  // Chronologisch (älteste zuerst) für die Lesrichtung links→rechts — ladeNeuzugaengeVerlauf
+  // liefert bewusst neueste zuerst (siehe mitarbeiterstatistik.ts), hier fürs Diagramm umgedreht.
+  const chronologisch = [...wochen].reverse();
+  const werte = chronologisch.map((w) => wert(w) ?? 0);
+  const maxWert = Math.max(1, ...werte);
+
+  const abgeschlosseneWerte = chronologisch
+    .filter((w) => !w.label.includes("(laufend)"))
+    .map((w) => wert(w))
+    .filter((w): w is number => w !== null);
+  const durchschnitt =
+    abgeschlosseneWerte.length === 0
+      ? null
+      : abgeschlosseneWerte.reduce((summe, w) => summe + w, 0) / abgeschlosseneWerte.length;
+
+  const gruppenbreite = CHART_BREITE / chronologisch.length;
+  const balkenbreite = gruppenbreite * 0.55;
 
   return (
-    <div className="border-b border-anthrazit/5 py-xs last:border-b-0">
-      <p className="mb-[4px] text-small font-medium text-anthrazit">{woche.label}</p>
-      <div className="flex items-center gap-xs py-[1px]">
-        <span className="w-[50px] shrink-0 text-small text-anthrazit/60">Objekte</span>
-        <div className="h-[8px] flex-1 overflow-hidden rounded-sm bg-stein">
-          <div
-            className="h-full rounded-sm bg-walnuss"
-            style={{ width: `${breite(woche.neueObjekte, maxObjekte)}%` }}
-          />
-        </div>
-        <span className="w-7 shrink-0 text-right font-mono text-small text-anthrazit/70">
-          {woche.neueObjekte === null ? "–" : zahlenformat.format(woche.neueObjekte)}
-        </span>
-      </div>
-      <div className="flex items-center gap-xs py-[1px]">
-        <span className="w-[50px] shrink-0 text-small text-anthrazit/60">Kunden</span>
-        <div className="h-[8px] flex-1 overflow-hidden rounded-sm bg-stein">
-          <div
-            className="h-full rounded-sm bg-asche"
-            style={{ width: `${breite(woche.neueKunden, maxKunden)}%` }}
-          />
-        </div>
-        <span className="w-7 shrink-0 text-right font-mono text-small text-anthrazit/70">
-          {woche.neueKunden === null ? "–" : zahlenformat.format(woche.neueKunden)}
-        </span>
-      </div>
+    <div>
+      <p className="mb-xs font-slab text-lg font-bold text-anthrazit">{titel}</p>
+      <svg viewBox={`0 0 ${CHART_BREITE} ${CHART_HOEHE}`} className="h-auto w-full" role="img" aria-label={titel}>
+        {durchschnitt !== null && (
+          <>
+            <line
+              x1={0}
+              x2={CHART_BREITE}
+              y1={OBEN_PADDING + (PLOT_HOEHE - (durchschnitt / maxWert) * PLOT_HOEHE)}
+              y2={OBEN_PADDING + (PLOT_HOEHE - (durchschnitt / maxWert) * PLOT_HOEHE)}
+              stroke="#A9A29A"
+              strokeWidth={1}
+              strokeDasharray="4 3"
+            />
+            <text
+              x={CHART_BREITE}
+              y={OBEN_PADDING + (PLOT_HOEHE - (durchschnitt / maxWert) * PLOT_HOEHE) - 4}
+              textAnchor="end"
+              className="fill-anthrazit/50 font-mono text-[9px]"
+            >
+              Ø {zahlenformat.format(Math.round(durchschnitt))}
+            </text>
+          </>
+        )}
+        {chronologisch.map((woche, i) => {
+          const w = wert(woche) ?? 0;
+          const laeuft = woche.label.includes("(laufend)");
+          const balkenhoehe = maxWert === 0 ? 0 : (w / maxWert) * PLOT_HOEHE;
+          const x = i * gruppenbreite + (gruppenbreite - balkenbreite) / 2;
+          const y = OBEN_PADDING + (PLOT_HOEHE - balkenhoehe);
+          // Kurzform des Datums für die Achsenbeschriftung — woche.label trägt zusätzlich das
+          // Enddatum und ggf. "(laufend)" (siehe NeuzugaengeWoche in types/index.ts), hier reicht
+          // das Startdatum; "laufend" wird stattdessen über reduzierte Deckkraft + "*" codiert.
+          const kurzDatum = woche.label.split("–")[0];
+          return (
+            <g key={woche.von}>
+              <rect
+                x={x}
+                y={y}
+                width={balkenbreite}
+                height={balkenhoehe}
+                rx={3}
+                className={farbKlasse}
+                fillOpacity={laeuft ? 0.45 : 1}
+              />
+              <text
+                x={x + balkenbreite / 2}
+                y={y - 4}
+                textAnchor="middle"
+                className="fill-anthrazit font-mono text-[10px] font-medium"
+              >
+                {zahlenformat.format(w)}
+              </text>
+              <text
+                x={x + balkenbreite / 2}
+                y={CHART_HOEHE - 6}
+                textAnchor="middle"
+                className="fill-anthrazit/50 font-mono text-[9px]"
+              >
+                {kurzDatum}
+                {laeuft ? "*" : ""}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <p className="mt-[2px] text-small text-anthrazit/40">
+        {einheit} je Kalenderwoche · * aktuelle Woche, noch nicht abgeschlossen
+      </p>
     </div>
   );
 }
 
-// "Neuzugänge"-Seite im Admin-Bereich: wie viele Objekte und Kunden je Kalenderwoche neu in
-// OnOffice angelegt wurden (siehe ladeNeuzugaengeVerlauf in onoffice/mitarbeiterstatistik.ts) —
-// Oktober 2026 Chat-Vorgabe: ursprünglich zwei Kacheln auf "Auf einen Blick" (rollierende 7
-// Tage), auf Nutzerwunsch durch einen "eigenen Reiter mit mehr Verlauf (z.B. Wochen-Trend,
-// letzte 4-8 Wochen)" ersetzt. undefined (statt eines leeren Arrays) bedeutet "Live-Abruf
-// fehlgeschlagen" (siehe app/admin/page.tsx), analog zum Muster bei Kontrolle/Leadquellen.
+// "Neuzugänge"-Baustein der Übersicht (siehe Uebersicht.tsx) — zwei Balkendiagramme (Objekte/
+// Kunden) nebeneinander, je Kalenderwoche der letzten `verlauf.length` Wochen. Ersetzt die
+// frühere eigene "Neuzugänge"-Navi-Seite mit Text-Balken (siehe adminNav.ts) — Oktober 2026
+// Chat-Vorgabe wollte die Statistik-Seite als EINEN auf-einen-Blick-lesbaren TV-Dashboard-
+// Landingscreen mit echten Diagrammen statt eines weiteren Klickschritts.
 export function Neuzugaenge({ verlauf }: { verlauf?: NeuzugaengeWoche[] }) {
   if (verlauf === undefined) {
     return (
-      <Card compact className="text-center">
-        <p className="text-small text-anthrazit/50">
-          Neuzugänge konnten nicht geladen werden.
-        </p>
-      </Card>
+      <p className="text-small text-anthrazit/50">Neuzugänge konnten nicht geladen werden.</p>
     );
   }
 
-  const maxObjekte = Math.max(0, ...verlauf.map((w) => w.neueObjekte ?? 0));
-  const maxKunden = Math.max(0, ...verlauf.map((w) => w.neueKunden ?? 0));
-
   return (
-    <>
-      <p className="mb-xs max-w-[65ch] text-small text-anthrazit/60">
-        Neu in OnOffice angelegte Objekte und Kunden je Kalenderwoche, die letzten{" "}
-        {verlauf.length} Wochen.
-      </p>
-      <Card compact>
-        <div className="flex flex-col">
-          {verlauf.map((woche) => (
-            <WochenZeile
-              key={woche.von}
-              woche={woche}
-              maxObjekte={maxObjekte}
-              maxKunden={maxKunden}
-            />
-          ))}
-        </div>
-      </Card>
-    </>
+    <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
+      <Balkendiagramm
+        titel="Neue Objekte"
+        einheit="Objekte"
+        wochen={verlauf}
+        wert={(w) => w.neueObjekte}
+        farbKlasse="fill-chart-1"
+      />
+      <Balkendiagramm
+        titel="Neue Kunden"
+        einheit="Kunden"
+        wochen={verlauf}
+        wert={(w) => w.neueKunden}
+        farbKlasse="fill-chart-2"
+      />
+    </div>
   );
 }

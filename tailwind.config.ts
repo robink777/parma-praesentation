@@ -18,6 +18,39 @@ const config: Config = {
         asche: "#A9A29A",
         sand: "#E1D6C1",
         tinte: "#1B1413",
+        // Diagramm-Akzentfarben für die TV-Dashboard-Statistikseite im Admin-Bereich (Oktober
+        // 2026 Chat-Vorgabe: "mehr Akzentfarben an den Datenpunkten ... jetzt ist es mir viel zu
+        // viel Ton in Ton") — eine zweite, enger umrissene CI-Abweichung ZUSÄTZLICH zur bereits
+        // dokumentierten Dichte-Ausnahme (siehe Memory feedback_admin_panel_ci_dichte.md): nur für
+        // Datenpunkte (KPI-Icons, Diagrammbalken, Status-Hinweise), nicht für Fließtext/Flächen —
+        // dort bleibt die CI-Regel "Walnuss nur Text, Messing max. 1× pro Sichtbereich" unverändert
+        // bestehen. Acht fest geordnete, NIE rotierende Kategorialfarben nach der dataviz-Skill-
+        // Methode (plugin:anthropic-skills im Projektwissen) — Messing bleibt als Marken-Anker
+        // Slot 1, die übrigen sieben wurden iterativ mit deren scripts/validate_palette.js geprüft
+        // (Lightness-Band, Chroma-Floor ≥0.1, CVD-Abstand, Kontrast), bis alle sechs Prüfungen für
+        // Light-Mode bestehen (worst-case ΔE 8.0 deutan / 18.8 normal-vision, beides über der
+        // jeweiligen Mindestschwelle). Kein Dark-Mode-Pendant: Die App hat aktuell nirgendwo einen
+        // Dark Mode (auch die Basis-CI-Palette oben hat keine Dark-Varianten), ein ungenutzter
+        // zweiter Satz wäre totes Gewicht.
+        chart: {
+          1: "#CB8E49", // Messing (Marken-Anker)
+          2: "#1D6FA3", // Stahlblau
+          3: "#B6512E", // Terrakotta
+          4: "#6A3FA0", // Violett
+          5: "#3C7A3E", // Salbeigrün
+          6: "#4A5FA0", // Flieder
+          7: "#9C2F57", // Beere
+          8: "#00897B", // Petrol
+        },
+        // Reservierte, feste Status-Skala (siehe dataviz-Skill: "Status never follows the theme")
+        // für Kontrolle.tsx — NIE als Kategorialfarbe wiederverwendet, immer mit Icon + Text
+        // kombiniert. Kontrastwerte gegen reinweiss per validate_palette.js contrast()-Export
+        // geprüft: gut 4.91:1, warnung 5.03:1, kritisch 6.37:1 (alle ≥4.5:1 für Fließtext).
+        status: {
+          gut: "#2F7D4F",
+          warnung: "#8C6712",
+          kritisch: "#B3261E",
+        },
       },
       fontFamily: {
         slab: ["var(--font-roboto-slab)", "serif"],
