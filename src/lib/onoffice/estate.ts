@@ -2243,6 +2243,43 @@ export async function zaehleBesichtigungen(
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
+// Zählt Telefonat-Aktivitäten eines Mitarbeiters im Zeitraum [von, bis] — Grundlage für
+// "Telefonate pro Tag" im Vertriebs-Überblick (Oktober 2026 Chat-Vorgabe). ANDERES resourcetype
+// als Termine/Besichtigungen oben: Telefonate sind kein Kalendereintrag, sondern ein
+// "Maklerbuch"-/Aktivitäten-Eintrag (apidoc.onoffice.de, Modul "Agents log / Activities") —
+// resourcetype "agentslog", gefiltert über den normalen "filter"-Parameter (nicht die
+// Kalender-eigenen datestart/dateend/users-Parameter). Live geprüft (Oktober 2026): Das ID-Feld
+// heißt hier "Nr", NICHT "Id" wie bei estate — ein Testaufruf mit data:["Id"] lieferte den Fehler
+// "Unknown field: ''" (Code 75). "Benutzer_nr" IST hier filterbar (anders als "Benutzer" selbst,
+// laut Doku ausdrücklich ausgeschlossen) und meint dieselbe Nutzer-Nr wie bei zaehleTermine oben.
+//
+// WICHTIG zur Dateninterpretation: Das Team trägt Telefonate erst seit Kurzem konsequent in
+// OnOffice ein (Nutzer-Rückmeldung Oktober 2026, nachdem eine erste Stichprobe stark schwankende
+// 30-Tage-Werte zeigte — 0 bis 52 — was zunächst wie inkonsistente Erfassung aussah). Die Zahl
+// wird dadurch mit wachsendem Zeitabstand zum Start der Erfassung automatisch aussagekräftiger,
+// ohne dass diese Funktion dafür angepasst werden müsste.
+export async function zaehleTelefonate(nutzerNr: string, von: string, bis: string): Promise<number> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "agentslog",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Nr"],
+        filter: {
+          Aktionsart: [{ op: "=", val: "Telefonat" }],
+          Benutzer_nr: [{ op: "=", val: nutzerNr }],
+          Datum: [{ op: ">=", val: von }, { op: "<=", val: bis }],
+        },
+        listlimit: 1,
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
 // Bildet die drei vom Nutzer gewünschten Akquise-Kennzahlen ("Anzahl Akquise - Ersttermin/
 // -Zweittermin/-Vertragstermin", August 2026 Chat-Vorgabe) auf OnOffice-Kalender-Terminarten ab.
 // Ursprünglich (erster Live-Check, August 2026) gab es diese drei Terminarten noch nicht im

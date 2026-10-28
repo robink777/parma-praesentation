@@ -18,6 +18,7 @@ import {
   zaehleNeueKunden,
   zaehleNeueObjekte,
   zaehleObjekteInAufarbeitung,
+  zaehleTelefonate,
   zaehleTermine,
   zaehleTermineNachArt,
   zaehleVerkaufteObjekteFuerMitarbeiter,
@@ -189,6 +190,7 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         akquiseZweittermineJahr,
         akquiseVertragstermin30Tage,
         akquiseVertragstermineJahr,
+        telefonate30Tage,
       ] = await Promise.all([
         nutzerNr ? zaehleAktiveObjekte(nutzerNr).catch(() => null) : Promise.resolve(null),
         nutzerNr
@@ -247,6 +249,7 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
               () => null
             )
           : Promise.resolve(null),
+        nutzerNr ? zaehleTelefonate(nutzerNr, von30Tage, bis30Tage).catch(() => null) : Promise.resolve(null),
       ]);
 
       const kennzahlen: MitarbeiterKennzahlen = {
@@ -264,6 +267,7 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         akquiseZweittermineJahr,
         akquiseVertragstermin30Tage,
         akquiseVertragstermineJahr,
+        telefonate30Tage,
       };
 
       return [mitglied.name, kennzahlen] as const;

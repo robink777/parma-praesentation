@@ -332,7 +332,21 @@ const LEERE_KENNZAHLEN: MitarbeiterKennzahlen = {
   akquiseZweittermineJahr: null,
   akquiseVertragstermin30Tage: null,
   akquiseVertragstermineJahr: null,
+  telefonate30Tage: null,
 };
+
+// Rundet einen 30-Tage-Gesamtwert auf eine Pro-Tag-Rate herunter (Oktober 2026 Chat-Vorgabe:
+// "wie viele Telefonate pro Tag, wie viele Termine pro Tag") — eine Nachkommastelle, damit auch
+// Mitarbeiter mit wenigen Vorgängen pro Monat (z.B. 4 Telefonate/30 Tage = 0,1/Tag) nicht
+// fälschlich als "0" erscheinen.
+const proTagFormat = new Intl.NumberFormat("de-DE", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
+function formatProTag(n: number | null): string {
+  return n === null ? "–" : proTagFormat.format(n / 30);
+}
 
 function KennzahlenZeile({
   mitglied,
@@ -422,6 +436,129 @@ function MitarbeiterTabelle({
   );
 }
 
+// Eine Zeile der Vertriebs-Vergleichstabelle (siehe VertriebTabelle unten) — gleiches
+// Aufklapp-Prinzip wie KennzahlenZeile oben (Klick auf den Namen lädt/zeigt die Objektliste),
+// aber als echte <tr>/<td>-Struktur statt gestapelter Metrik-Chips, damit alle Mitarbeiter
+// untereinander direkt vergleichbar sind (Oktober 2026 Chat-Vorgabe: "ich hätte gerne alle
+// Mitarbeiter auf einen Blick zu sehen"). Die aufgeklappte Objektliste braucht dafür eine ZWEITE
+// <tr> mit vollem colSpan, eine <tr> kann selbst kein Block-Element mit eigenem Innenleben sein.
+function VertriebZeile({
+  mitglied,
+  kennzahlen,
+}: {
+  mitglied: TeamMitglied;
+  kennzahlen?: MitarbeiterKennzahlen;
+}) {
+  const [offen, setOffen] = useState(false);
+  const [wurdeGeoeffnet, setWurdeGeoeffnet] = useState(false);
+  const k = kennzahlen ?? LEERE_KENNZAHLEN;
+
+  function umschalten() {
+    setOffen((bisher) => !bisher);
+    setWurdeGeoeffnet(true);
+  }
+
+  return (
+    <>
+      <tr className="border-b border-anthrazit/10">
+        <td className="py-sm pr-md">
+          <button
+            type="button"
+            onClick={umschalten}
+            aria-expanded={offen}
+            aria-label={`Objektliste von ${mitglied.name} ${offen ? "einklappen" : "ausklappen"}`}
+            className="flex items-center gap-xs text-left"
+          >
+            <Icon
+              name="chevronRight"
+              size={16}
+              className={`shrink-0 text-anthrazit/40 transition-transform ${offen ? "rotate-90" : ""}`}
+            />
+            <span className="truncate text-lg font-medium text-anthrazit">{mitglied.name}</span>
+          </button>
+        </td>
+        <td className="px-md py-sm text-right font-mono text-body text-anthrazit">
+          {formatProTag(k.telefonate30Tage)}
+        </td>
+        <td className="px-md py-sm text-right font-mono text-body text-anthrazit">
+          {formatProTag(k.termine30Tage)}
+        </td>
+        <td className="px-md py-sm text-right font-mono text-body text-anthrazit">
+          {formatWert(k.objekteInAufarbeitung)}
+        </td>
+        <td className="px-md py-sm text-right font-mono text-body text-anthrazit">
+          {formatWert(k.aktiveObjekte)}
+        </td>
+        <td className="py-sm pl-md text-right font-mono text-body text-anthrazit">
+          {formatWert(k.verkaufteObjekteJahr)}
+        </td>
+      </tr>
+      {wurdeGeoeffnet && (
+        <tr className={offen ? "" : "hidden"}>
+          <td colSpan={6} className="border-b border-anthrazit/10 pb-sm pl-md">
+            <MitarbeiterObjekte name={mitglied.name} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// Vertrieb als echte Vergleichstabelle statt der gestapelten Metrik-Zeilen der übrigen drei
+// Reiter (siehe MitarbeiterTabelle oben) — Oktober 2026 Chat-Vorgabe, bewusst nur für Vertrieb:
+// "ich hätte gerne alle Mitarbeiter auf einen Blick zu sehen, zumindest die
+// Vertriebsmitarbeiter". Fünf feste Spalten statt des 30-Tage-/Jahr-Umschalters der übrigen
+// Reiter — jede Spalte hat hier ihre eigene, bewusst gewählte feste Bezugsgröße (Telefonate/
+// Termine als Pro-Tag-Rate über die letzten 30 Tage, Aufarbeitung/Aktive Immobilien als
+// Snapshot, Verkäufe fürs laufende Kalenderjahr), ein zusätzlicher Umschalter wäre hier nur
+// verwirrend.
+function VertriebTabelle({
+  mitglieder,
+  kennzahlen,
+}: {
+  mitglieder: TeamMitglied[];
+  kennzahlen?: Record<string, MitarbeiterKennzahlen>;
+}) {
+  return (
+    <Card>
+      <h3 className="mb-sm font-slab text-2xl font-bold text-anthrazit">Vertrieb</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] border-collapse">
+          <thead>
+            <tr className="border-b-2 border-anthrazit/15 text-left">
+              <th className="label pb-xs pr-md font-normal text-anthrazit/50">Mitarbeiter</th>
+              <th className="label pb-xs px-md text-right font-normal text-anthrazit/50">
+                Telefonate/Tag
+              </th>
+              <th className="label pb-xs px-md text-right font-normal text-anthrazit/50">
+                Termine/Tag
+              </th>
+              <th className="label pb-xs px-md text-right font-normal text-anthrazit/50">
+                Aufarbeitung
+              </th>
+              <th className="label pb-xs px-md text-right font-normal text-anthrazit/50">
+                Aktive Immobilien
+              </th>
+              <th className="label pb-xs pl-md text-right font-normal text-anthrazit/50">
+                Verkäufe
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {mitglieder.map((mitglied) => (
+              <VertriebZeile
+                key={mitglied.name}
+                mitglied={mitglied}
+                kennzahlen={kennzahlen?.[mitglied.name]}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
 // Die vier Reiter innerhalb des "Mitarbeiter"-Bereichs (August 2026 Chat-Vorgabe: "ich brauche
 // bei Mitarbeiter neben Vertrieb noch zwei weitere Reiter ... Akquise ... und Setting ... Alle
 // anderen Mitarbeiter können als 'weitere Mitarbeiter' gelistet bleiben").
@@ -495,9 +632,10 @@ function ZeitraumSchalter({
 }
 
 // Zeigt die bestehende TEAM-Liste (data/unternehmen.ts, NICHT alle Live-OnOffice-Nutzer — auf
-// ausdrücklichen Nutzerwunsch), aufgeteilt in vier Reiter. Vertrieb/Setting/Weitere Mitarbeiter
-// zeigen dieselben fünf Auslastungs-Kennzahlen, Akquise zeigt stattdessen die drei
-// Akquise-Terminarten (siehe baueMetriken/KennzahlenZeile, modus="akquise").
+// ausdrücklichen Nutzerwunsch), aufgeteilt in vier Reiter. Vertrieb zeigt die neue
+// Vergleichstabelle (siehe VertriebTabelle oben), Setting/Weitere Mitarbeiter weiterhin dieselben
+// gestapelten Auslastungs-Kennzahlen, Akquise die drei Akquise-Terminarten (siehe
+// baueMetriken/KennzahlenZeile, modus="akquise").
 export function MitarbeiterBereich({
   kennzahlen,
 }: {
@@ -514,11 +652,11 @@ export function MitarbeiterBereich({
         übernimmt.
       </p>
       <MitarbeiterReiterleiste aktiv={mitarbeiterReiter} onSelect={setMitarbeiterReiter} />
-      {mitarbeiterReiter !== "weitere" && (
+      {mitarbeiterReiter === "akquise" || mitarbeiterReiter === "setting" ? (
         <ZeitraumSchalter aktiv={zeitraum} onSelect={setZeitraum} />
-      )}
+      ) : null}
       {mitarbeiterReiter === "vertrieb" && (
-        <MitarbeiterTabelle titel="Vertrieb" mitglieder={vertrieb} kennzahlen={kennzahlen} zeitraum={zeitraum} />
+        <VertriebTabelle mitglieder={vertrieb} kennzahlen={kennzahlen} />
       )}
       {mitarbeiterReiter === "akquise" && (
         <MitarbeiterTabelle

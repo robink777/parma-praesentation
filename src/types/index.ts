@@ -317,6 +317,12 @@ export interface MitarbeiterKennzahlen {
   akquiseZweittermineJahr: number | null;
   akquiseVertragstermin30Tage: number | null;
   akquiseVertragstermineJahr: number | null;
+  // Telefonat-Aktivitäten der letzten 30 Tage (Modul "agentslog"/Maklerbuch, siehe
+  // zaehleTelefonate in onoffice/estate.ts) — Grundlage für "Telefonate pro Tag" im
+  // Vertriebs-Überblick (Oktober 2026 Chat-Vorgabe). Nur ein 30-Tage-Wert, kein Jahres-Pendant
+  // (anders als termine/besichtigungen oben): Das Team trägt Telefonate erst seit Kurzem
+  // konsequent ein, ein Jahreswert wäre dadurch noch unbrauchbar verzerrt.
+  telefonate30Tage: number | null;
 }
 
 // Einzelnes Objekt in der aufklappbaren Objektliste je Mitarbeiter (Admin-Bereich, siehe
