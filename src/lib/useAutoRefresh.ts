@@ -10,9 +10,13 @@ import { useRouter } from "next/navigation";
 // ersetzt nur deren Props, OHNE den Suspense-/loading.tsx-Fallback erneut zu zeigen (der greift
 // nur bei einer echten Navigation auf das Segment, nicht beim Refresh einer bereits gemounteten
 // Seite) — die bestehende Tab-/Scroll-Auswahl im Client-State bleibt dabei unberührt.
-// Nutzer-Entscheidung Oktober 2026: alle 5 Minuten, als Kompromiss zwischen Aktualität und
-// Anfragelast gegen die OnOffice-API im Dauerbetrieb.
-export const ADMIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+// Nutzer-Entscheidung Oktober 2026: jede Minute, bewusst auf Kosten höherer Anfragelast gegen
+// OnOffice (ein einzelner Refresh löst ~150-170 Einzelabfragen aus, siehe ladeMitarbeiterKennzahlen/
+// ladeNeuzugaengeVerlauf in onoffice/mitarbeiterstatistik.ts — vorher 5 Minuten, exakt wegen dieser
+// Last). Ausdrücklich NICHT in Stein gemeißelt: "halte im Kopf, dass wir das auch wieder
+// zurückändern können, wenn es irgendwann zu einem Problem führt" — bei spürbaren
+// OnOffice-Fehlern/Drosselung im Dauerbetrieb diesen Wert als Ersten Verdächtigen prüfen.
+export const ADMIN_REFRESH_INTERVAL_MS = 60 * 1000;
 
 export function useAutoRefresh(intervalMs: number) {
   const router = useRouter();
