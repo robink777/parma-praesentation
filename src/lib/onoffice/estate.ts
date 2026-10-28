@@ -2323,16 +2323,40 @@ export async function zaehleAktiveKunden(benutzername: string): Promise<number> 
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
+// status2-Werte, die KEIN eigenes Parma-Immobilien-Objekt sind, auch wenn sie als ganz normaler
+// "estate"-Datensatz mit erstellt_am in OnOffice angelegt werden — Nutzer-Hinweis Oktober 2026:
+// "es ist im Grunde unmöglich dass wir teilweise 37 Objekte in einer Woche anlegen", live gegen
+// den Account geprüft (search_estates, Woche 05.–11.10.): von 37 in dieser Woche angelegten
+// Datensätzen trugen 19 den Status2 "Marktbeobachtung"/"Marktbeobachtung - Bearbeitet" (notierte
+// FREMDE Inserate zur eigenen Marktbeobachtung, kein Parma-Objekt) — zaehleNeueObjekte zählte sie
+// bisher mit, weil der reine cntabsolute-Zähl-Trick (siehe zaehleVerkaufteObjekte oben) keine
+// Möglichkeit bot, nach status2 auszuschließen. Dieselben drei Werte schließt bereits
+// ladeObjektkarteDaten weiter oben implizit aus (AKQUISE_STATUS erkennt sie nicht, die Fläche
+// fällt durch auf "kategorie === null" → wird übersprungen) — hier jetzt explizit, da ein reiner
+// Zähl-Abruf ohne Status2-Daten keine Filterung nach dem Laden erlaubt.
+const KEIN_EIGENES_OBJEKT_STATUS2 = new Set([
+  "marktbeobachtung", // "Marktbeobachtung"
+  "ind_Schl_5775", // "Marktbeobachtung - Bearbeitet"
+  "ind_Schl_5767", // "Fremdobjekt - Parma Finanz GmbH"
+]);
+
+// Oberste sinnvolle Obergrenze für eine einzelne Kalenderwoche — selbst mit den vielen
+// Marktbeobachtungs-Datensätzen lag die beobachtete Spitzenwoche bei 37 (siehe oben), 500 lässt
+// großzügig Luft, ohne eine echte Seitenweise-Abfrage (offset-Schleife) zu brauchen.
+const NEUE_OBJEKTE_LISTLIMIT = 500;
+
 // Zählt Objekte, die in einem Datumsfenster in OnOffice ANGELEGT wurden (Feld "erstellt_am",
 // System-Zeitstempel bei Objekterstellung, live per get_field_definitions/search_estates
 // bestätigt — Oktober 2026) — Grundlage für den "Neuzugänge"-Navi-Punkt im Admin-Bereich (siehe
 // ladeNeuzugaengeVerlauf in mitarbeiterstatistik.ts, Chat-Vorgabe: "wieviele Objekte und wieviele
 // Kunden in einer Woche angelegt worden sind"). bis optional — ohne bis "seit von bis heute"
 // (offenes Fenster), mit bis ein abgeschlossenes Wochenfenster (siehe Datumsfilter-Muster bei
-// zaehleVerkaufteObjekteFuerMitarbeiter oben). Gleiches listlimit:1 + meta.cntabsolute-Muster wie
-// zaehleVerkaufteObjekte oben.
+// zaehleVerkaufteObjekteFuerMitarbeiter oben). Lädt (anders als die übrigen zaehle*-Funktionen)
+// echte Datensätze statt nur meta.cntabsolute zu lesen, weil status2 erst NACH dem Laden gegen
+// KEIN_EIGENES_OBJEKT_STATUS2 geprüft werden kann — die onOffice-Filtersyntax bietet keinen
+// "status2 nicht in [...]"-Operator, den man stattdessen serverseitig anwenden könnte.
 export async function zaehleNeueObjekte(von: string, bis?: string): Promise<number> {
-  const result = await callOnOfficeApi([
+  const result = await callOnOfficeApi<RawEstateRecord>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
       resourcetype: "estate",
@@ -2340,17 +2364,18 @@ export async function zaehleNeueObjekte(von: string, bis?: string): Promise<numb
       identifier: "",
       cacheable: false,
       parameters: {
-        data: ["Id"],
+        data: ["Id", "status2"],
         filter: {
           erstellt_am: bis
             ? [{ op: ">=", val: von }, { op: "<=", val: bis }]
             : [{ op: ">=", val: von }],
         },
-        listlimit: 1,
+        listlimit: NEUE_OBJEKTE_LISTLIMIT,
       },
     },
   ]);
-  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+  const records = result?.response?.results?.[0]?.data?.records ?? [];
+  return records.filter((r) => !KEIN_EIGENES_OBJEKT_STATUS2.has(r.elements.status2 ?? "")).length;
 }
 
 // Zählt Adressen (Kunden/Kontakte jeder Art), die in einem Datumsfenster in OnOffice angelegt
