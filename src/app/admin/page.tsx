@@ -5,8 +5,14 @@ import {
   ladeNeuzugaengeVerlauf,
   ladeObjektGesamtKennzahlen,
 } from "@/lib/onoffice/mitarbeiterstatistik";
-import { ladeKontrollObjekte, ladeLeadquellenKennzahlen, ladeObjektkarteDaten } from "@/lib/onoffice/estate";
 import {
+  ladeAlleMitarbeiter,
+  ladeKontrollObjekte,
+  ladeLeadquellenKennzahlen,
+  ladeObjektkarteDaten,
+} from "@/lib/onoffice/estate";
+import {
+  Betreuer,
   KontrollObjekt,
   LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
@@ -28,9 +34,10 @@ export default async function AdminPage() {
   let leadquellenKennzahlen: LeadquellenKennzahlen | undefined;
   let objektkarteDaten: ObjektkarteDaten | undefined;
   let neuzugaengeVerlauf: NeuzugaengeWoche[] | undefined;
+  let alleMitarbeiter: Betreuer[] | undefined;
 
   if (ONOFFICE_MODE === "live") {
-    // Sechs Abrufe gleichzeitig (Promise.all), jeder einzeln per .catch() abgesichert — ein
+    // Sieben Abrufe gleichzeitig (Promise.all), jeder einzeln per .catch() abgesichert — ein
     // einzelner fehlgeschlagener Abruf (z.B. transienter OnOffice-Verbindungsfehler trotz Retry,
     // siehe onoffice/client.ts) soll nicht die ganze Seite abstürzen lassen, sondern nur den
     // betroffenen Abschnitt in seinen eigenen "nicht geladen"-Zustand versetzen.
@@ -41,6 +48,7 @@ export default async function AdminPage() {
       leadquellenErgebnis,
       objektkarteErgebnis,
       neuzugaengeVerlaufErgebnis,
+      alleMitarbeiterErgebnis,
     ] = await Promise.all([
       ladeMitarbeiterKennzahlen().catch((error) => {
         console.error("Live-Abruf der Mitarbeiterstatistik aus OnOffice fehlgeschlagen:", error);
@@ -69,6 +77,10 @@ export default async function AdminPage() {
         console.error("Live-Abruf des Neuzugänge-Verlaufs aus OnOffice fehlgeschlagen:", error);
         return undefined;
       }),
+      ladeAlleMitarbeiter().catch((error) => {
+        console.error("Live-Abruf der Mitarbeiterfotos aus OnOffice fehlgeschlagen:", error);
+        return undefined;
+      }),
     ]);
     kennzahlen = kennzahlenErgebnis;
     gesamtKennzahlen = gesamtKennzahlenErgebnis;
@@ -76,6 +88,7 @@ export default async function AdminPage() {
     leadquellenKennzahlen = leadquellenErgebnis;
     objektkarteDaten = objektkarteErgebnis;
     neuzugaengeVerlauf = neuzugaengeVerlaufErgebnis;
+    alleMitarbeiter = alleMitarbeiterErgebnis;
   }
 
   return (
@@ -86,6 +99,7 @@ export default async function AdminPage() {
       leadquellenKennzahlen={leadquellenKennzahlen}
       objektkarteDaten={objektkarteDaten}
       neuzugaengeVerlauf={neuzugaengeVerlauf}
+      alleMitarbeiter={alleMitarbeiter}
     />
   );
 }

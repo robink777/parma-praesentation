@@ -11,6 +11,7 @@ import { Leadquellen } from "./Leadquellen";
 import { Kontrolle } from "./Kontrolle";
 import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
 import {
+  Betreuer,
   KontrollObjekt,
   LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
@@ -33,6 +34,7 @@ export function AdminDashboard({
   leadquellenKennzahlen,
   objektkarteDaten,
   neuzugaengeVerlauf,
+  alleMitarbeiter,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
@@ -40,17 +42,19 @@ export function AdminDashboard({
   leadquellenKennzahlen?: LeadquellenKennzahlen;
   objektkarteDaten?: ObjektkarteDaten;
   neuzugaengeVerlauf?: NeuzugaengeWoche[];
+  alleMitarbeiter?: Betreuer[];
 }) {
   const [abschnitt, setAbschnitt] = useState("uebersicht");
   const [gewaehltePlz, setGewaehltePlz] = useState<{ plz: string; ort: string } | null>(null);
   useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS);
 
-  // "Übersicht" und "Karte" sind die beiden TV-Dashboard-Landing-Screens (Oktober 2026
-  // Chat-Vorgabe: "alle Infos die nicht auf eine Seite passen fliegen raus") — beide bekommen
-  // eine FESTE Höhe ohne Scroll und keinen eigenen Seitentitel, der nur Platz kostet. Mitarbeiter/
-  // Leadquellen/Kontrolle sind der Natur ihrer Daten nach unbegrenzt lang (Mitarbeiterzahl,
-  // Objektliste …) — dort bleibt normales Scrollen nötig und sinnvoll.
-  const istVollflaechig = abschnitt === "uebersicht" || abschnitt === "karte";
+  // "Übersicht", "Karte" und "Mitarbeiter" sind die drei TV-Dashboard-Landing-Screens (Oktober
+  // 2026 Chat-Vorgabe: "Ich will dass sie den ersten beiden Seiten gleicht ... auch in dem Navi
+  // Punkt will ich nicht scrollen müssen") — alle drei bekommen eine FESTE Höhe ohne Scroll und
+  // keinen eigenen Seitentitel, der nur Platz kostet. Leadquellen/Kontrolle sind der Natur ihrer
+  // Daten nach unbegrenzt lang (Objektliste …) — dort bleibt normales Scrollen nötig und sinnvoll.
+  const istVollflaechig =
+    abschnitt === "uebersicht" || abschnitt === "karte" || abschnitt === "mitarbeiter";
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-stein">
@@ -75,13 +79,15 @@ export function AdminDashboard({
             onPlzKlick={(plz, ort) => setGewaehltePlz({ plz, ort })}
           />
         )}
+        {abschnitt === "mitarbeiter" && (
+          <MitarbeiterBereich kennzahlen={kennzahlen} alleMitarbeiter={alleMitarbeiter} />
+        )}
         {!istVollflaechig && (
           <>
             <p className="label mb-xs">Admin-Bereich</p>
             <h1 className="mb-lg font-slab text-[40px] font-bold leading-[1.2] text-anthrazit md:text-[48px]">
               {ADMIN_NAV_ITEMS.find((item) => item.id === abschnitt)?.label}
             </h1>
-            {abschnitt === "mitarbeiter" && <MitarbeiterBereich kennzahlen={kennzahlen} />}
             {abschnitt === "leadquellen" && <Leadquellen kennzahlen={leadquellenKennzahlen} />}
             {abschnitt === "kontrolle" && <Kontrolle objekte={kontrollObjekte} />}
           </>

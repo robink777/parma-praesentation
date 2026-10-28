@@ -2,6 +2,7 @@ import Image from "next/image";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon, IconName } from "@/components/icons/Icon";
 import { GOOGLE_BEWERTUNG, KENNZAHLEN, PORTALANFRAGEN_JAHR, STANDORTE, TEAM } from "@/data/unternehmen";
+import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import { Betreuer, Kennzahl } from "@/types";
 
 // Deutsches Tausendertrennzeichen (Punkt) für die live abgerufenen/gepflegten Kennzahlen unten —
@@ -47,30 +48,10 @@ function liveKennzahlen(
   ];
 }
 
-function initialen(name: string) {
-  const teile = name.trim().split(/\s+/);
-  const erster = teile[0]?.charAt(0) || "";
-  const letzter = teile.length > 1 ? teile[teile.length - 1].charAt(0) : "";
-  return `${erster}${letzter}`.toUpperCase() || "?";
-}
-
 // Team-Bereich zeigt die echten Profilfotos aus OnOffice (siehe ladeAlleMitarbeiter in
 // onoffice/estate.ts, Praesentation.alleMitarbeiter), statt wie bisher für jede Person
-// dasselbe generische Icon. Die Team-Stammdaten (Name/Rolle/Standort) bleiben die statische
-// TEAM-Liste aus data/unternehmen.ts — dort existiert kein Profilfoto-Feld und keine
-// OnOffice-Adress-ID, daher erfolgt die Zuordnung über einen Abgleich des vollen Namens
-// ("Vorname Nachname") mit Betreuer.vorname + " " + Betreuer.nachname. Findet sich kein
-// Treffer (oder ist im Mock-Modus kein Foto hinterlegt), erscheint wie bei Kontaktperson.tsx
-// ein Initialen-Avatar statt eines Platzhalterfotos.
-function fotoLookup(alleMitarbeiter: Betreuer[]): Record<string, string> {
-  const lookup: Record<string, string> = {};
-  for (const m of alleMitarbeiter) {
-    const voller = [m.vorname, m.nachname].filter(Boolean).join(" ");
-    if (voller && m.profilbildUrl) lookup[voller] = m.profilbildUrl;
-  }
-  return lookup;
-}
-
+// dasselbe generische Icon — fotoLookup/initialen jetzt in lib/mitarbeiterFotos.ts (Oktober
+// 2026 auch vom Admin-Mitarbeiterbereich genutzt, siehe MitarbeiterBereich.tsx).
 export function Unternehmen({
   alleMitarbeiter,
   kennzahlen,
