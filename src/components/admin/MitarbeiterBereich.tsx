@@ -26,9 +26,11 @@ function formatWert(n: number | null): string {
 }
 
 // Rundet einen 30-Tage-Gesamtwert auf eine Pro-Tag-Rate herunter (Oktober 2026 Chat-Vorgabe:
-// "wie viele Telefonate pro Tag, wie viele Termine pro Tag") — eine Nachkommastelle, damit auch
-// Mitarbeiter mit wenigen Vorgängen pro Monat (z.B. 4 Telefonate/30 Tage = 0,1/Tag) nicht
-// fälschlich als "0" erscheinen.
+// "wie viele Termine pro Tag") — eine Nachkommastelle, damit auch Mitarbeiter mit wenigen
+// Terminen nicht fälschlich als "0" erscheinen. NICHT mehr für Telefonate verwendet (siehe
+// telefonateHeute/telefonateMonat in types/index.ts) — dieselbe Pro-Tag-Rate ergab dort bei
+// wenigen Anrufen eine Kommazahl, die der Nutzer ausdrücklich als "keinen Sinn" ergebend
+// zurückwies ("ich will Anrufe pro Tag und pro Monat! Keine Durchschnittswert").
 const proTagFormat = new Intl.NumberFormat("de-DE", {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
@@ -94,15 +96,18 @@ const LEERE_KENNZAHLEN: MitarbeiterKennzahlen = {
   akquiseZweittermineJahr: null,
   akquiseVertragstermin30Tage: null,
   akquiseVertragstermineJahr: null,
-  telefonate30Tage: null,
+  telefonateHeute: null,
+  telefonateMonat: null,
 };
 
 // Baut die Liste der auf einer Kachel anzuzeigenden Kennzahlen (Label + formatierter Wert) in
 // der passenden Reihenfolge — EIN Builder für alle vier Reiter, je nach modus/zeitraum.
-// "vertrieb": die fünf Oktober-2026-Kennzahlen ("Telefonate pro Tag, Termine pro Tag, Objekte in
-// der Aufarbeitung, aktive Immobilien, Verkäufe"), fest auf die letzten 30 Tage bzw. das laufende
-// Jahr bezogen, kein Umschalter nötig. "akquise"/"standard" unverändert aus der vorherigen
-// Tabellen-Darstellung übernommen (siehe Git-Historie baueMetriken).
+// "vertrieb": die Oktober-2026-Kennzahlen ("Anrufe heute, Anrufe Monat, Termine pro Tag, Objekte
+// in der Aufarbeitung, aktive Immobilien, Verkäufe") — Anrufe als ECHTE Zählwerte statt einer
+// Pro-Tag-Durchschnittsrate (Nutzer-Korrektur: "ich will Anrufe pro Tag und pro Monat! Keine
+// Durchschnittswert"), Termine bewusst weiterhin als Pro-Tag-Rate (dazu keine Rückmeldung).
+// "akquise"/"standard" unverändert aus der vorherigen Tabellen-Darstellung übernommen (siehe
+// Git-Historie baueMetriken).
 function baueMetriken(
   k: MitarbeiterKennzahlen,
   modus: KennzahlenModus,
@@ -110,7 +115,8 @@ function baueMetriken(
 ): { label: string; wert: string }[] {
   if (modus === "vertrieb") {
     return [
-      { label: "Telefonate/Tag", wert: formatProTag(k.telefonate30Tage) },
+      { label: "Anrufe heute", wert: formatWert(k.telefonateHeute) },
+      { label: "Anrufe Monat", wert: formatWert(k.telefonateMonat) },
       { label: "Termine/Tag", wert: formatProTag(k.termine30Tage) },
       { label: "Aufarbeitung", wert: formatWert(k.objekteInAufarbeitung) },
       { label: "Aktive Immobilien", wert: formatWert(k.aktiveObjekte) },

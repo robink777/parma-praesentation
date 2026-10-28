@@ -57,6 +57,27 @@ function ermittleZeitraeume() {
   };
 }
 
+// Zeitfenster für die Telefonate-Kennzahl im Vertrieb-Überblick (Oktober 2026 Chat-Vorgabe: "ich
+// will Anrufe pro Tag und pro Monat! Keine Durchschnittswert" — als Korrektur zu einer zunächst
+// gebauten 30-Tage-Durchschnittsrate, die als Kommazahl "keinen Sinn" ergab). "Heute" = Mitternacht
+// bis Tagesende, "Monat" = 1. des laufenden Kalendermonats bis Monatsende (wie bei
+// ermittleJahresDatumsfenster unten: Datensätze aus der Zukunft gibt es ohnehin nicht, das feste
+// Monatsende spart eine zweite "bis heute"-Berechnung).
+function ermittleTelefonateZeitraeume() {
+  const heute = new Date();
+  const jahr = heute.getFullYear();
+  const monat = heute.getMonth();
+  const monatsanfang = new Date(jahr, monat, 1);
+  const monatsende = new Date(jahr, monat + 1, 0);
+
+  return {
+    vonHeute: formatiereDatumZeit(heute, "00:00:00"),
+    bisHeute: formatiereDatumZeit(heute, "23:59:59"),
+    vonMonat: formatiereDatumZeit(monatsanfang, "00:00:00"),
+    bisMonat: formatiereDatumZeit(monatsende, "23:59:59"),
+  };
+}
+
 // Datumsfenster (ohne Uhrzeitanteil) für das aktuelle Kalenderjahr, für die neue Kennzahl
 // "Verkaufte Objekte" je Mitarbeiter (siehe zaehleVerkaufteObjekteFuerMitarbeiter in estate.ts,
 // Juli 2026 Chat-Vorgabe: "die Zahl der verkauften Objekte pro Mitarbeiter in diesem Jahr ...
@@ -165,6 +186,7 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
 > {
   const { von30Tage, bis30Tage, vonJahr, bisJahr } = ermittleZeitraeume();
   const { vonJahr: vonJahrVerkauft, bisJahr: bisJahrVerkauft } = ermittleJahresDatumsfenster();
+  const { vonHeute, bisHeute, vonMonat, bisMonat } = ermittleTelefonateZeitraeume();
 
   const eintraege = await Promise.all(
     TEAM.map(async (mitglied) => {
@@ -190,7 +212,8 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         akquiseZweittermineJahr,
         akquiseVertragstermin30Tage,
         akquiseVertragstermineJahr,
-        telefonate30Tage,
+        telefonateHeute,
+        telefonateMonat,
       ] = await Promise.all([
         nutzerNr ? zaehleAktiveObjekte(nutzerNr).catch(() => null) : Promise.resolve(null),
         nutzerNr
@@ -249,7 +272,8 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
               () => null
             )
           : Promise.resolve(null),
-        nutzerNr ? zaehleTelefonate(nutzerNr, von30Tage, bis30Tage).catch(() => null) : Promise.resolve(null),
+        nutzerNr ? zaehleTelefonate(nutzerNr, vonHeute, bisHeute).catch(() => null) : Promise.resolve(null),
+        nutzerNr ? zaehleTelefonate(nutzerNr, vonMonat, bisMonat).catch(() => null) : Promise.resolve(null),
       ]);
 
       const kennzahlen: MitarbeiterKennzahlen = {
@@ -267,7 +291,8 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         akquiseZweittermineJahr,
         akquiseVertragstermin30Tage,
         akquiseVertragstermineJahr,
-        telefonate30Tage,
+        telefonateHeute,
+        telefonateMonat,
       };
 
       return [mitglied.name, kennzahlen] as const;
