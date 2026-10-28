@@ -318,12 +318,19 @@ export interface MitarbeiterKennzahlen {
   akquiseVertragstermin30Tage: number | null;
   akquiseVertragstermineJahr: number | null;
   // Telefonat-Aktivitäten (Modul "agentslog"/Maklerbuch, siehe zaehleTelefonate in
-  // onoffice/estate.ts) — Grundlage für den Vertriebs-Überblick. Bewusst ECHTE Zählwerte (heute/
-  // Monat) statt einer 30-Tage-Pro-Tag-Durchschnittsrate (Oktober 2026 Chat-Vorgabe-Korrektur:
-  // "ich will Anrufe pro Tag und pro Monat! Keine Durchschnittswert" — eine Kommazahl wie "0,3"
-  // wirkte bei wenigen Anrufen sinnlos).
+  // onoffice/estate.ts) und Termine (siehe zaehleTermine), jeweils "heute" und "diese Woche" —
+  // Grundlage für den Vertriebs-Überblick. Bewusst ECHTE Zählwerte statt einer
+  // Durchschnittsrate (Oktober 2026 Chat-Vorgabe-Korrektur: "ich will Anrufe pro Tag und pro
+  // Monat! Keine Durchschnittswert" — eine Kommazahl wie "0,3" wirkte bei wenigen Anrufen
+  // sinnlos). "Woche" zunächst als Monat gebaut, auf direkte Folge-Vorgabe ("Anrufe heute,
+  // Anrufe Woche ... Termine pro Tag und Termine pro Woche") auf die laufende Kalenderwoche
+  // umgestellt, damit Anrufe UND Termine dasselbe Zeitfenster teilen. termineHeute/termineWoche
+  // sind NEU und unabhängig von termine30Tage/termineJahr oben (die bleiben für Akquise/Setting/
+  // Weitere Mitarbeiter unverändert in Gebrauch).
   telefonateHeute: number | null;
-  telefonateMonat: number | null;
+  telefonateWoche: number | null;
+  termineHeute: number | null;
+  termineWoche: number | null;
 }
 
 // Einzelnes Objekt in der aufklappbaren Objektliste je Mitarbeiter (Admin-Bereich, siehe

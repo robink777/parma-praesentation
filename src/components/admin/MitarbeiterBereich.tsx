@@ -25,21 +25,6 @@ function formatWert(n: number | null): string {
   return n === null ? "–" : zahlenformat.format(n);
 }
 
-// Rundet einen 30-Tage-Gesamtwert auf eine Pro-Tag-Rate herunter (Oktober 2026 Chat-Vorgabe:
-// "wie viele Termine pro Tag") — eine Nachkommastelle, damit auch Mitarbeiter mit wenigen
-// Terminen nicht fälschlich als "0" erscheinen. NICHT mehr für Telefonate verwendet (siehe
-// telefonateHeute/telefonateMonat in types/index.ts) — dieselbe Pro-Tag-Rate ergab dort bei
-// wenigen Anrufen eine Kommazahl, die der Nutzer ausdrücklich als "keinen Sinn" ergebend
-// zurückwies ("ich will Anrufe pro Tag und pro Monat! Keine Durchschnittswert").
-const proTagFormat = new Intl.NumberFormat("de-DE", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-
-function formatProTag(n: number | null): string {
-  return n === null ? "–" : proTagFormat.format(n / 30);
-}
-
 // Quote 1. → 2. Termin, immer auf Basis der Jahreszahlen (Chat-Vorgabe: "bitte jeweils fürs Jahr
 // angeben") — unabhängig vom 30-Tage/Jahr-Umschalter, damit die Quote nicht durch die kleinen,
 // schwankungsanfälligen 30-Tage-Zahlen verzerrt wird. null, wenn im laufenden Jahr noch kein
@@ -97,17 +82,20 @@ const LEERE_KENNZAHLEN: MitarbeiterKennzahlen = {
   akquiseVertragstermin30Tage: null,
   akquiseVertragstermineJahr: null,
   telefonateHeute: null,
-  telefonateMonat: null,
+  telefonateWoche: null,
+  termineHeute: null,
+  termineWoche: null,
 };
 
 // Baut die Liste der auf einer Kachel anzuzeigenden Kennzahlen (Label + formatierter Wert) in
 // der passenden Reihenfolge — EIN Builder für alle vier Reiter, je nach modus/zeitraum.
-// "vertrieb": die Oktober-2026-Kennzahlen ("Anrufe heute, Anrufe Monat, Termine pro Tag, Objekte
-// in der Aufarbeitung, aktive Immobilien, Verkäufe") — Anrufe als ECHTE Zählwerte statt einer
-// Pro-Tag-Durchschnittsrate (Nutzer-Korrektur: "ich will Anrufe pro Tag und pro Monat! Keine
-// Durchschnittswert"), Termine bewusst weiterhin als Pro-Tag-Rate (dazu keine Rückmeldung).
-// "akquise"/"standard" unverändert aus der vorherigen Tabellen-Darstellung übernommen (siehe
-// Git-Historie baueMetriken).
+// "vertrieb": Anrufe und Termine je "heute" und "diese Woche" — ALLES echte Zählwerte, bewusst
+// KEINE Durchschnittsrate (Nutzer-Korrektur: erst "ich will Anrufe pro Tag und pro Monat! Keine
+// Durchschnittswert", direkt darauf präzisiert auf "Termine pro Tag und Termine pro Woche" mit
+// demselben Prinzip). Aufarbeitung/Aktive Immobilien/Verkäufe sind hier NICHT mehr dabei — die
+// zeigt stattdessen ObjektBalken unterhalb der Kachel (Chat-Vorgabe: "Die Objektstatistik hätte
+// ich gerne darunter als Balkendiagramm"). "akquise"/"standard" unverändert aus der vorherigen
+// Tabellen-Darstellung übernommen (siehe Git-Historie baueMetriken).
 function baueMetriken(
   k: MitarbeiterKennzahlen,
   modus: KennzahlenModus,
@@ -116,11 +104,9 @@ function baueMetriken(
   if (modus === "vertrieb") {
     return [
       { label: "Anrufe heute", wert: formatWert(k.telefonateHeute) },
-      { label: "Anrufe Monat", wert: formatWert(k.telefonateMonat) },
-      { label: "Termine/Tag", wert: formatProTag(k.termine30Tage) },
-      { label: "Aufarbeitung", wert: formatWert(k.objekteInAufarbeitung) },
-      { label: "Aktive Immobilien", wert: formatWert(k.aktiveObjekte) },
-      { label: "Verkäufe", wert: formatWert(k.verkaufteObjekteJahr) },
+      { label: "Anrufe Woche", wert: formatWert(k.telefonateWoche) },
+      { label: "Termine heute", wert: formatWert(k.termineHeute) },
+      { label: "Termine Woche", wert: formatWert(k.termineWoche) },
     ];
   }
 
@@ -178,19 +164,84 @@ function baueMetriken(
   ];
 }
 
+// Die drei Objekt-Kennzahlen als EIN gemeinsamer Balken statt eigener Kacheln-Felder (Chat-
+// Vorgabe: "Die Objektstatistik hätte ich gerne darunter als Balkendiagramm. Einen Balken mit
+// den Werten darin"). Farben bewusst dieselben wie an anderer Stelle im Dashboard für dieselbe
+// Bedeutung (siehe Uebersicht.tsx: "Verkaufte Objekte" = chart-1, "Aktive Vermarktung" = chart-2,
+// "In Aufarbeitung" = chart-6) — wiedererkennbare Farbcodierung statt neu erfundener Töne.
+const OBJEKT_BALKEN_SEGMENTE: {
+  label: string;
+  farbKlasse: string;
+  wert: (k: MitarbeiterKennzahlen) => number | null;
+}[] = [
+  { label: "Aufarbeitung", farbKlasse: "bg-chart-6", wert: (k) => k.objekteInAufarbeitung },
+  { label: "Aktive Immobilien", farbKlasse: "bg-chart-2", wert: (k) => k.aktiveObjekte },
+  { label: "Verkäufe", farbKlasse: "bg-chart-1", wert: (k) => k.verkaufteObjekteJahr },
+];
+
+// Kleine Legende über dem Vertrieb-Raster (siehe MitarbeiterBereich unten) — EINMAL für alle
+// Kacheln statt pro Kachel wiederholt, da Reihenfolge/Farben für jede Person gleich bleiben
+// (dataviz-Regel: Farbe allein genügt nie, Legende macht die drei Segmente eindeutig).
+function ObjektBalkenLegende() {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-md text-small text-anthrazit/60">
+      {OBJEKT_BALKEN_SEGMENTE.map((segment) => (
+        <span key={segment.label} className="flex items-center gap-xs">
+          <span className={`inline-block h-[10px] w-[10px] rounded-full ${segment.farbKlasse}`} />
+          {segment.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// EIN Balken, in drei proportionale Abschnitte geteilt (Aufarbeitung/Aktive Immobilien/
+// Verkäufe), Wert als Zahl direkt im jeweiligen Abschnitt. Mindestbreite 10 % je Abschnitt (dann
+// auf 100 % renormiert) — ohne sie würde ein Abschnitt mit Wert 0 auf 0 Breite kollabieren und
+// die "0" wäre nirgends mehr lesbar.
+function ObjektBalken({ k }: { k: MitarbeiterKennzahlen }) {
+  const werte = OBJEKT_BALKEN_SEGMENTE.map((segment) => segment.wert(k) ?? 0);
+  const summe = werte.reduce((a, b) => a + b, 0) || 1;
+  const roh = werte.map((w) => Math.max(0.1, w / summe));
+  const rohSumme = roh.reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="mt-sm flex h-[clamp(22px,4vh,32px)] shrink-0 gap-[2px] overflow-hidden rounded-sm">
+      {OBJEKT_BALKEN_SEGMENTE.map((segment, i) => (
+        <div
+          key={segment.label}
+          className={`flex items-center justify-center ${segment.farbKlasse}`}
+          style={{ width: `${(roh[i] / rohSumme) * 100}%` }}
+          title={`${segment.label}: ${zahlenformat.format(werte[i])}`}
+        >
+          <span className="font-slab text-[clamp(11px,1.8vh,14px)] font-bold text-reinweiss [text-shadow:0_1px_2px_rgba(27,20,19,0.45)]">
+            {zahlenformat.format(werte[i])}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Eine Mitarbeiter-Kachel — Reinweiß auf Stein, rounded-lg + dezenter Schatten, exakt im selben
 // Karten-Look wie KpiKachel in Uebersicht.tsx. Titelbild aus OnOffice (siehe fotoLookup,
 // ladeAlleMitarbeiter in onoffice/estate.ts) statt eines generischen Icons, mit
 // Initialen-Avatar-Fallback (analog zu Unternehmen.tsx) für Mitarbeiter ohne hinterlegtes Foto.
+// Balken (ObjektBalken) nur im Vertrieb-Reiter, direkt unter dem Kennzahlen-Raster.
 function MitarbeiterKachel({
   mitglied,
   fotoUrl,
-  metriken,
+  kennzahlen,
+  modus,
+  zeitraum,
 }: {
   mitglied: TeamMitglied;
   fotoUrl?: string;
-  metriken: { label: string; wert: string }[];
+  kennzahlen: MitarbeiterKennzahlen;
+  modus: KennzahlenModus;
+  zeitraum?: Zeitraum;
 }) {
+  const metriken = baueMetriken(kennzahlen, modus, zeitraum);
   return (
     <div className="flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
       <div className="mb-sm flex shrink-0 items-center gap-sm">
@@ -217,6 +268,7 @@ function MitarbeiterKachel({
           </div>
         ))}
       </div>
+      {modus === "vertrieb" && <ObjektBalken k={kennzahlen} />}
     </div>
   );
 }
@@ -245,7 +297,9 @@ function MitarbeiterRaster({
           key={mitglied.name}
           mitglied={mitglied}
           fotoUrl={fotos[mitglied.name]}
-          metriken={baueMetriken(kennzahlen?.[mitglied.name] ?? LEERE_KENNZAHLEN, modus, zeitraum)}
+          kennzahlen={kennzahlen?.[mitglied.name] ?? LEERE_KENNZAHLEN}
+          modus={modus}
+          zeitraum={zeitraum}
         />
       ))}
     </div>
@@ -348,6 +402,7 @@ export function MitarbeiterBereich({
         {(mitarbeiterReiter === "akquise" || mitarbeiterReiter === "setting") && (
           <ZeitraumSchalter aktiv={zeitraum} onSelect={setZeitraum} />
         )}
+        {mitarbeiterReiter === "vertrieb" && <ObjektBalkenLegende />}
       </div>
       <div className="min-h-0 flex-1">
         {mitarbeiterReiter === "vertrieb" && (

@@ -57,24 +57,25 @@ function ermittleZeitraeume() {
   };
 }
 
-// Zeitfenster für die Telefonate-Kennzahl im Vertrieb-Überblick (Oktober 2026 Chat-Vorgabe: "ich
+// Zeitfenster für Telefonate UND Termine im Vertrieb-Überblick (Oktober 2026 Chat-Vorgabe: "ich
 // will Anrufe pro Tag und pro Monat! Keine Durchschnittswert" — als Korrektur zu einer zunächst
-// gebauten 30-Tage-Durchschnittsrate, die als Kommazahl "keinen Sinn" ergab). "Heute" = Mitternacht
-// bis Tagesende, "Monat" = 1. des laufenden Kalendermonats bis Monatsende (wie bei
-// ermittleJahresDatumsfenster unten: Datensätze aus der Zukunft gibt es ohnehin nicht, das feste
-// Monatsende spart eine zweite "bis heute"-Berechnung).
-function ermittleTelefonateZeitraeume() {
+// gebauten 30-Tage-Durchschnittsrate, die als Kommazahl "keinen Sinn" ergab —, direkt darauf
+// präzisiert auf "Anrufe heute, Anrufe Woche ... Termine pro Tag und Termine pro Woche", daher
+// "Woche" statt des zunächst gebauten Monats). "Heute" = Mitternacht bis Tagesende, "Woche" = die
+// laufende Kalenderwoche (Montag-Sonntag, montagDerWoche weiter unten — dieselbe Mo-So-Woche wie
+// im Neuzugänge-Verlauf) von Montag 00:00 bis Sonntag 23:59 (Datensätze aus der Zukunft gibt es
+// ohnehin nicht, das feste Wochenende spart eine zweite "bis heute"-Berechnung).
+function ermittleHeuteWocheZeitraeume() {
   const heute = new Date();
-  const jahr = heute.getFullYear();
-  const monat = heute.getMonth();
-  const monatsanfang = new Date(jahr, monat, 1);
-  const monatsende = new Date(jahr, monat + 1, 0);
+  const montag = montagDerWoche(heute);
+  const sonntag = new Date(montag);
+  sonntag.setDate(sonntag.getDate() + 6);
 
   return {
     vonHeute: formatiereDatumZeit(heute, "00:00:00"),
     bisHeute: formatiereDatumZeit(heute, "23:59:59"),
-    vonMonat: formatiereDatumZeit(monatsanfang, "00:00:00"),
-    bisMonat: formatiereDatumZeit(monatsende, "23:59:59"),
+    vonWoche: formatiereDatumZeit(montag, "00:00:00"),
+    bisWoche: formatiereDatumZeit(sonntag, "23:59:59"),
   };
 }
 
@@ -186,7 +187,7 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
 > {
   const { von30Tage, bis30Tage, vonJahr, bisJahr } = ermittleZeitraeume();
   const { vonJahr: vonJahrVerkauft, bisJahr: bisJahrVerkauft } = ermittleJahresDatumsfenster();
-  const { vonHeute, bisHeute, vonMonat, bisMonat } = ermittleTelefonateZeitraeume();
+  const { vonHeute, bisHeute, vonWoche, bisWoche } = ermittleHeuteWocheZeitraeume();
 
   const eintraege = await Promise.all(
     TEAM.map(async (mitglied) => {
@@ -213,7 +214,9 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         akquiseVertragstermin30Tage,
         akquiseVertragstermineJahr,
         telefonateHeute,
-        telefonateMonat,
+        telefonateWoche,
+        termineHeute,
+        termineWoche,
       ] = await Promise.all([
         nutzerNr ? zaehleAktiveObjekte(nutzerNr).catch(() => null) : Promise.resolve(null),
         nutzerNr
@@ -273,7 +276,9 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
             )
           : Promise.resolve(null),
         nutzerNr ? zaehleTelefonate(nutzerNr, vonHeute, bisHeute).catch(() => null) : Promise.resolve(null),
-        nutzerNr ? zaehleTelefonate(nutzerNr, vonMonat, bisMonat).catch(() => null) : Promise.resolve(null),
+        nutzerNr ? zaehleTelefonate(nutzerNr, vonWoche, bisWoche).catch(() => null) : Promise.resolve(null),
+        nutzerNr ? zaehleTermine(nutzerNr, vonHeute, bisHeute).catch(() => null) : Promise.resolve(null),
+        nutzerNr ? zaehleTermine(nutzerNr, vonWoche, bisWoche).catch(() => null) : Promise.resolve(null),
       ]);
 
       const kennzahlen: MitarbeiterKennzahlen = {
@@ -292,7 +297,9 @@ export async function ladeMitarbeiterKennzahlen(): Promise<
         akquiseVertragstermin30Tage,
         akquiseVertragstermineJahr,
         telefonateHeute,
-        telefonateMonat,
+        telefonateWoche,
+        termineHeute,
+        termineWoche,
       };
 
       return [mitglied.name, kennzahlen] as const;
