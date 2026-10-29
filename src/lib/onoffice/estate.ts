@@ -2414,40 +2414,30 @@ export async function zaehleAktiveKunden(benutzername: string): Promise<number> 
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
-// status2-Werte, die KEIN eigenes Parma-Immobilien-Objekt sind, auch wenn sie als ganz normaler
-// "estate"-Datensatz mit erstellt_am in OnOffice angelegt werden — Nutzer-Hinweis Oktober 2026:
-// "es ist im Grunde unmöglich dass wir teilweise 37 Objekte in einer Woche anlegen", live gegen
-// den Account geprüft (search_estates, Woche 05.–11.10.): von 37 in dieser Woche angelegten
-// Datensätzen trugen 19 den Status2 "Marktbeobachtung"/"Marktbeobachtung - Bearbeitet" (notierte
-// FREMDE Inserate zur eigenen Marktbeobachtung, kein Parma-Objekt) — zaehleNeueObjekte zählte sie
-// bisher mit, weil der reine cntabsolute-Zähl-Trick (siehe zaehleVerkaufteObjekte oben) keine
-// Möglichkeit bot, nach status2 auszuschließen. Dieselben drei Werte schließt bereits
-// ladeObjektkarteDaten weiter oben implizit aus (AKQUISE_STATUS erkennt sie nicht, die Fläche
-// fällt durch auf "kategorie === null" → wird übersprungen) — hier jetzt explizit, da ein reiner
-// Zähl-Abruf ohne Status2-Daten keine Filterung nach dem Laden erlaubt.
-const KEIN_EIGENES_OBJEKT_STATUS2 = new Set([
-  "marktbeobachtung", // "Marktbeobachtung"
-  "ind_Schl_5775", // "Marktbeobachtung - Bearbeitet"
-  "ind_Schl_5767", // "Fremdobjekt - Parma Finanz GmbH"
-]);
-
-// Oberste sinnvolle Obergrenze für eine einzelne Kalenderwoche — selbst mit den vielen
-// Marktbeobachtungs-Datensätzen lag die beobachtete Spitzenwoche bei 37 (siehe oben), 500 lässt
-// großzügig Luft, ohne eine echte Seitenweise-Abfrage (offset-Schleife) zu brauchen.
+// Oberste sinnvolle Obergrenze für eine einzelne Kalenderwoche — selbst mit vielen
+// Marktbeobachtungs-Datensätzen lag die beobachtete Spitzenwoche bei 37, 500 lässt großzügig
+// Luft, ohne eine echte Seitenweise-Abfrage (offset-Schleife) zu brauchen.
 const NEUE_OBJEKTE_LISTLIMIT = 500;
 
 // Klartext-Zuordnung für "Status 2" (Objekt-Feld, live per get_field_definitions geprüft —
 // Oktober 2026) — für die Status2-Aufschlüsselung der "Neue Objekte"-Säulen auf der Übersicht
-// (Nutzer-Vorgabe: "Neue Objekte = Status 2 anzeigen ... mit Legende", siehe
-// Neuzugaenge.tsx). Enthält bewusst auch die drei Werte aus KEIN_EIGENES_OBJEKT_STATUS2 nicht
-// extra, weil zaehleNeueObjekte unten diese Datensätze schon VOR der Aufschlüsselung
-// herausfiltert (kein Parma-Objekt) — sie tauchen hier also nie auf. "" (leeres Status2) ist ein
-// validierter Bestandsfall (siehe Korrektur 2 bei ladeObjektkarteDaten oben), deshalb mit
-// eigenem Label statt als "Unbekannt" zu erscheinen.
+// (Nutzer-Vorgabe: "Neue Objekte = Status 2 anzeigen ... mit Legende", siehe Neuzugaenge.tsx).
+// Deckt ALLE 19 permitted_values ab, inklusive Marktbeobachtung/Marktbeobachtung - Bearbeitet/
+// Fremdobjekt - Parma Finanz GmbH — zaehleNeueObjekte unten zählte diese drei Werte früher
+// bewusst NICHT mit ("es ist im Grunde unmöglich dass wir teilweise 37 Objekte in einer Woche
+// anlegen"), bis der Nutzer nach Kontrolle der Einzelliste klarstellte: "ich will immer ALLE
+// Objekte sehen! Auch Marktbeobachtung ist extrem wichtig, darüber werden wir die Kaltakquise
+// steuern" — die Status2-Aufschlüsselung macht die hohe Zahl jetzt selbsterklärend, ein
+// Herausfiltern ist dafür nicht mehr nötig. "" (leeres Status2) ist ein validierter Bestandsfall
+// (siehe Korrektur 2 bei ladeObjektkarteDaten oben), deshalb mit eigenem Label statt als
+// "Unbekannt" zu erscheinen.
 const STATUS2_LABELS: Record<string, string> = {
   "": "Ohne Status 2",
   status2obj_inaktiv: "Inaktiv",
   status2obj_aktiv: "Aktiv",
+  marktbeobachtung: "Marktbeobachtung",
+  ind_Schl_5775: "Marktbeobachtung - Bearbeitet",
+  ind_Schl_5767: "Fremdobjekt - Parma Finanz GmbH",
   ind_Schl_4903: "Akquise - Absage",
   in_akquise: "Akquise - In Akquise",
   vorbereitung: "Vorbereitung",
@@ -2483,10 +2473,11 @@ function baueVerteilung(labels: string[]): NeuzugaengeVerteilungsEintrag[] {
 // Kunden in einer Woche angelegt worden sind", später ergänzt um "Neue Objekte = Status 2
 // anzeigen, jeweils mit Legende" — siehe verteilung unten). bis optional — ohne bis "seit von bis
 // heute" (offenes Fenster), mit bis ein abgeschlossenes Wochenfenster (siehe Datumsfilter-Muster
-// bei zaehleVerkaufteObjekteFuerMitarbeiter oben). Lädt echte Datensätze statt nur
-// meta.cntabsolute zu lesen, weil status2 erst NACH dem Laden gegen KEIN_EIGENES_OBJEKT_STATUS2
-// geprüft werden kann — die onOffice-Filtersyntax bietet keinen "status2 nicht in [...]"-
-// Operator, den man stattdessen serverseitig anwenden könnte.
+// bei zaehleVerkaufteObjekteFuerMitarbeiter oben). Zählt und schlüsselt ALLE angelegten
+// Datensätze auf, OHNE Marktbeobachtung/Fremdobjekte herauszufiltern (siehe STATUS2_LABELS oben
+// — Nutzer-Vorgabe: "ich will immer alle Objekte sehen, auch Marktbeobachtung ist extrem wichtig,
+// darüber werden wir die Kaltakquise steuern"). Lädt echte Datensätze statt nur meta.cntabsolute
+// zu lesen, weil status2 für die Aufschlüsselung ohnehin gebraucht wird.
 export async function zaehleNeueObjekte(
   von: string,
   bis?: string
@@ -2510,10 +2501,9 @@ export async function zaehleNeueObjekte(
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records ?? [];
-  const eigene = records.filter((r) => !KEIN_EIGENES_OBJEKT_STATUS2.has(r.elements.status2 ?? ""));
   return {
-    gesamt: eigene.length,
-    verteilung: baueVerteilung(eigene.map((r) => status2Label(r.elements.status2 ?? ""))),
+    gesamt: records.length,
+    verteilung: baueVerteilung(records.map((r) => status2Label(r.elements.status2 ?? ""))),
   };
 }
 
