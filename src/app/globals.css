@@ -117,3 +117,44 @@
     opacity: 1;
   }
 }
+
+/* ----------------------------------------------------------------------------------------
+ * TV-Folienleiste (components/tv/TvSlideshow.tsx) — der Folien-Indikator oben rechts (vormals
+ * statische Punkte) zeigt jetzt den Zeitpunkt des nächsten Folienwechsels als schrumpfenden
+ * Balken (Nutzer-Vorgabe Oktober 2026: "ein Balken der kleiner wird und wenn er ganz klein ist
+ * wechselt die Seite"). animation-duration wird dynamisch per Inline-Style gesetzt (richtet sich
+ * nach SLIDE_DAUER_MS), deshalb hier nur Name/Timing/Fill-Mode als Klasse statt fester Dauer.
+ * ---------------------------------------------------------------------------------------- */
+.tv-fortschritt-balken {
+  animation-name: tv-fortschritt-schrumpfen;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes tv-fortschritt-schrumpfen {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ----------------------------------------------------------------------------------------
+ * TV-Mitarbeiterkachel (components/tv/MitarbeiterLeaderboard.tsx) — pulsierende Akzentfarbe für
+ * eine einzelne Kennzahl, deren Wert sich seit dem letzten Datenabruf verändert hat (Nutzer-
+ * Vorgabe: "der Wert der sich verändert hat optisch dargestellt ... pulsierend in der
+ * Akzentfarbe"). Läuft "infinite", weil die auslösende React-Markierung ohnehin nach spätestens
+ * einem Ladezyklus (60s, siehe ADMIN_REFRESH_INTERVAL_MS) automatisch wieder entfernt wird.
+ * ---------------------------------------------------------------------------------------- */
+.tv-wert-aktualisiert {
+  animation: tv-wert-pulsieren 1.6s ease-in-out infinite;
+}
+@keyframes tv-wert-pulsieren {
+  0%,
+  100% {
+    color: inherit;
+  }
+  50% {
+    color: #cb8e49;
+  }
+}

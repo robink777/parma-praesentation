@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import type { WettkampfEintrag, WettkampfKategorie } from "@/lib/onoffice/wettkampf";
@@ -40,6 +43,7 @@ function MitarbeiterZahlenKachel({
   kennzahlen,
   telefonateGesamt,
   termineGesamt,
+  geaenderteFelder,
 }: {
   name: string;
   rang: number;
@@ -47,24 +51,33 @@ function MitarbeiterZahlenKachel({
   kennzahlen?: MitarbeiterKennzahlen;
   telefonateGesamt: number;
   termineGesamt: number;
+  geaenderteFelder?: Set<string>;
 }) {
   // Nutzer-Korrektur: "ich brauche bei allen Mitarbeitern ja auch immer die Gesamtzahlen der
   // einzelnen Punkte ... noch etwas safespace ... ergänzen für Anrufe gesamt, Termine gesamt" —
-  // dritte Zeile (Saison-Gesamtzahl) unter heute/Woche, je Zeile ein Zeitraum.
-  const werte = [
-    { label: "Anrufe heute", wert: formatWert(kennzahlen?.telefonateHeute) },
-    { label: "Termine heute", wert: formatWert(kennzahlen?.termineHeute) },
-    { label: "Anrufe Woche", wert: formatWert(kennzahlen?.telefonateWoche) },
-    { label: "Termine Woche", wert: formatWert(kennzahlen?.termineWoche) },
-    { label: "Anrufe gesamt", wert: formatWert(telefonateGesamt) },
-    { label: "Termine gesamt", wert: formatWert(termineGesamt) },
+  // dritte Zeile (Saison-Gesamtzahl) unter heute/Woche, je Zeile ein Zeitraum. `feld` je Zeile
+  // muss exakt den Schlüsseln von Momentaufnahme (siehe MitarbeiterLeaderboard unten)
+  // entsprechen, sonst greift die Änderungs-Markierung nicht.
+  const werte: { label: string; wert: string; feld: string }[] = [
+    { label: "Anrufe heute", wert: formatWert(kennzahlen?.telefonateHeute), feld: "telefonateHeute" },
+    { label: "Termine heute", wert: formatWert(kennzahlen?.termineHeute), feld: "termineHeute" },
+    { label: "Anrufe Woche", wert: formatWert(kennzahlen?.telefonateWoche), feld: "telefonateWoche" },
+    { label: "Termine Woche", wert: formatWert(kennzahlen?.termineWoche), feld: "termineWoche" },
+    { label: "Anrufe gesamt", wert: formatWert(telefonateGesamt), feld: "telefonateGesamt" },
+    { label: "Termine gesamt", wert: formatWert(termineGesamt), feld: "termineGesamt" },
   ];
   const rangFarbe = RANG_FARBEN[rang - 1];
+  // Nutzer-Vorgabe: "ein kleines Leuchten der Mitarbeiterkachel (vielleicht Schlagschatten mit
+  // Akzentfarbe mit 20% Deckkraft)", solange mindestens ein Wert dieser Kachel sich seit dem
+  // letzten Ladezyklus verändert hat.
+  const hatAenderung = (geaenderteFelder?.size ?? 0) > 0;
   return (
     <div
-      className={`relative rounded-md border-t-2 bg-reinweiss px-sm py-xs shadow-[0_1px_4px_rgba(80,63,61,0.08)] ${
-        rangFarbe ?? "border-t-transparent"
-      }`}
+      className={`relative rounded-md border-t-2 bg-reinweiss px-sm py-xs transition-shadow ${
+        hatAenderung
+          ? "shadow-[0_1px_4px_rgba(80,63,61,0.08),0_0_18px_4px_rgba(203,142,73,0.2)]"
+          : "shadow-[0_1px_4px_rgba(80,63,61,0.08)]"
+      } ${rangFarbe ?? "border-t-transparent"}`}
     >
       <span className="absolute right-[6px] top-[4px] font-mono text-[10px] text-anthrazit/25">
         #{rang}
@@ -87,7 +100,11 @@ function MitarbeiterZahlenKachel({
             <p className="truncate font-mono text-[8px] font-medium uppercase leading-tight text-anthrazit/45">
               {w.label}
             </p>
-            <p className="truncate font-slab text-[clamp(13px,2.2vh,18px)] font-bold leading-tight text-anthrazit">
+            <p
+              className={`truncate font-slab text-[clamp(13px,2.2vh,18px)] font-bold leading-tight text-anthrazit ${
+                geaenderteFelder?.has(w.feld) ? "tv-wert-aktualisiert" : ""
+              }`}
+            >
               {w.wert}
             </p>
           </div>
@@ -192,6 +209,18 @@ function AktivitaetenSaeule({ eintrag, maxPunkte }: { eintrag: WettkampfEintrag;
   );
 }
 
+// Eine Momentaufnahme der sechs Kachel-Kennzahlen eines Mitarbeiters, für den Änderungs-
+// Abgleich zwischen zwei Ladezyklen (siehe MitarbeiterLeaderboard unten). Schlüssel müssen exakt
+// den `feld`-Werten in MitarbeiterZahlenKachel entsprechen.
+interface Momentaufnahme {
+  telefonateHeute: number | null;
+  termineHeute: number | null;
+  telefonateWoche: number | null;
+  termineWoche: number | null;
+  telefonateGesamt: number;
+  termineGesamt: number;
+}
+
 export function MitarbeiterLeaderboard({
   kennzahlen,
   rangliste,
@@ -209,6 +238,46 @@ export function MitarbeiterLeaderboard({
   const heute = new Date();
   const resttage = Math.max(0, Math.ceil((saisonBis.getTime() - heute.getTime()) / 86_400_000));
   const spalten = rangliste.length >= 8 ? "grid-cols-5" : rangliste.length >= 4 ? "grid-cols-3" : "grid-cols-2";
+
+  // Optisches Signal bei Datenänderung (Nutzer-Vorgabe Oktober 2026: "wenn ein Mitarbeiter aktiv
+  // ist und eine Aktivität speichert, ein optisches Feedback ... Leuchten der Kachel ... Wert der
+  // sich verändert hat pulsierend ... immer nur einen Ladezyklus bestehen"). Vergleicht bei jedem
+  // Datenabruf (useAutoRefresh löst alle 60s ein router.refresh() aus, siehe TvSlideshow.tsx) die
+  // neuen gegen die zuletzt gesehenen Werte je Mitarbeiter; Treffer werden genau EINEN Zyklus lang
+  // markiert, weil der nächste Abgleich die Markierung automatisch durch einen frischen (meist
+  // leeren) Diff ersetzt — kein eigener Timer nötig.
+  const vorherigeRef = useRef<Record<string, Momentaufnahme> | null>(null);
+  const [veraenderteFelder, setVeraenderteFelder] = useState<Record<string, Set<string>>>({});
+
+  useEffect(() => {
+    const aktuelle: Record<string, Momentaufnahme> = {};
+    for (const eintrag of rangliste) {
+      aktuelle[eintrag.name] = {
+        telefonateHeute: kennzahlen?.[eintrag.name]?.telefonateHeute ?? null,
+        termineHeute: kennzahlen?.[eintrag.name]?.termineHeute ?? null,
+        telefonateWoche: kennzahlen?.[eintrag.name]?.telefonateWoche ?? null,
+        termineWoche: kennzahlen?.[eintrag.name]?.termineWoche ?? null,
+        telefonateGesamt: eintrag.telefonateGesamt,
+        termineGesamt: eintrag.termineGesamt,
+      };
+    }
+
+    const vorherige = vorherigeRef.current;
+    vorherigeRef.current = aktuelle;
+    if (!vorherige) return; // erster Ladevorgang: Startzustand, noch kein Vergleich möglich
+
+    const signale: Record<string, Set<string>> = {};
+    for (const [name, werte] of Object.entries(aktuelle)) {
+      const alt = vorherige[name];
+      if (!alt) continue; // neu zur Rangliste dazugekommen — nichts zum Vergleichen
+      const felder = new Set<string>();
+      (Object.keys(werte) as (keyof Momentaufnahme)[]).forEach((feld) => {
+        if (werte[feld] !== alt[feld]) felder.add(feld);
+      });
+      if (felder.size > 0) signale[name] = felder;
+    }
+    setVeraenderteFelder(signale);
+  }, [rangliste, kennzahlen]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-sm">
@@ -246,6 +315,7 @@ export function MitarbeiterLeaderboard({
               kennzahlen={kennzahlen?.[eintrag.name]}
               telefonateGesamt={eintrag.telefonateGesamt}
               termineGesamt={eintrag.termineGesamt}
+              geaenderteFelder={veraenderteFelder[eintrag.name]}
             />
           ))}
         </div>

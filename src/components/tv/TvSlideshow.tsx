@@ -26,7 +26,10 @@ import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
 // die Karte aus! Also nur 2 Slides") wieder entfernt — objektkarteDaten wird in
 // AdminDashboardDaten trotzdem weiter mitgeladen (siehe adminDashboard.ts), da app/admin/page.tsx
 // das für den Karte-Navi-Punkt dort weiterhin braucht.
-const SLIDE_DAUER_MS = 20_000;
+//
+// Taktgeschwindigkeit auf Nutzerwunsch verdoppelt ("die Slidewechselgeschwindigkeit kann
+// verdoppelt werden") — ursprünglich 20_000ms.
+const SLIDE_DAUER_MS = 10_000;
 
 type SlideId = "uebersicht" | "mitarbeiter";
 const SLIDES: SlideId[] = ["uebersicht", "mitarbeiter"];
@@ -50,16 +53,21 @@ export function TvSlideshow(
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-stein">
       <header className="flex shrink-0 items-center justify-between px-lg py-md">
         <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={132} height={33} priority />
-        {/* Reine Fortschrittsanzeige, NICHT klickbar (Chat-Vorgabe: "da soll nichts klickbar
-            sein") — zeigt nur, welche der drei Folien gerade läuft. */}
+        {/* Fortschrittsanzeige, NICHT klickbar (Chat-Vorgabe: "da soll nichts klickbar sein") —
+            ein Balken-Track pro Folie; der aktive schrumpft über SLIDE_DAUER_MS und zeigt so an,
+            wann die nächste Folie kommt (Nutzer-Vorgabe: "ein Balken der kleiner wird und wenn er
+            ganz klein ist wechselt die Seite ... kann auch dieses Element [die bisherigen Punkte]
+            dafür nutzen"). */}
         <div className="flex items-center gap-xs" aria-hidden="true">
           {SLIDES.map((s) => (
-            <span
-              key={s}
-              className={`h-[8px] w-[8px] rounded-full transition-colors ${
-                s === slide ? "bg-messing" : "bg-anthrazit/15"
-              }`}
-            />
+            <div key={s} className="h-[4px] w-[34px] overflow-hidden rounded-full bg-anthrazit/10">
+              {s === slide && (
+                <div
+                  className="tv-fortschritt-balken h-full origin-left rounded-full bg-messing"
+                  style={{ animationDuration: `${SLIDE_DAUER_MS}ms` }}
+                />
+              )}
+            </div>
           ))}
         </div>
       </header>
