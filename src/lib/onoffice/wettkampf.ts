@@ -68,13 +68,33 @@ const AKQUISITEUR_SCHLUESSEL: Record<string, string> = {
   "Axel Wehmeier": "ind_Schl_4915",
 };
 
+// Kategorien, aus denen sich die Punktzahl zusammensetzt — Grundlage für das gestapelte
+// Balkendiagramm auf der TV-Folie (Chat-Vorgabe Oktober 2026: "Die Balken der jeweiligen
+// Mitarbeiter kannst du aufteilen wie bei der Statistik der Objekte, farblich in den Balken —
+// wie viele Telefonate, wie viele Termine etc., alles halt was Punkte bringt"). Feste
+// Reihenfolge (wie bei den dataviz-Kategorialfarben an anderer Stelle im Dashboard) statt einer
+// zur Laufzeit variablen Anordnung, damit dieselbe Kategorie auf jedem Balken immer dieselbe
+// Position/Farbe hat.
+export type WettkampfKategorie =
+  | "telefonate"
+  | "besichtigungen"
+  | "akquiseTermine"
+  | "finanzierungTermine"
+  | "auftraege"
+  | "verkaeufe";
+
+export interface WettkampfSegment {
+  kategorie: WettkampfKategorie;
+  // Punkte, NICHT die rohe Anzahl — Telefonate (1 Pkt) kommen sehr viel häufiger vor als
+  // Verkäufe (10 Pkt), eine nach roher Anzahl gestapelte Säule würde Verkäufe/Aufträge optisch
+  // komplett verschwinden lassen, obwohl sie den Wettkampf meistens entscheiden.
+  punkte: number;
+}
+
 export interface WettkampfEintrag {
   name: string;
   punkte: number;
-  telefonate: number;
-  besichtigungen: number;
-  termine: number;
-  verkaeufe: number;
+  segmente: WettkampfSegment[];
 }
 
 // Teilnehmerkreis: Vertrieb + Akquise + Parma Finanz (Stefanie Scalone) — alle, für die
@@ -130,24 +150,23 @@ async function berechnePunkte(
       : Promise.resolve(0),
   ]);
 
-  const punkte =
-    telefonate * PUNKTE.telefonat +
-    besichtigungen * PUNKTE.besichtigung +
-    akquiseErst * PUNKTE.akquiseErsttermin +
-    akquiseZweit * PUNKTE.akquiseZweittermin +
-    finanzErst * PUNKTE.finanzierungErsttermin +
-    finanzZweit * PUNKTE.finanzierungZweittermin +
-    auftraege * PUNKTE.auftragAkquiriert +
-    verkaeufe * PUNKTE.verkauf;
+  const segmente: WettkampfSegment[] = [
+    { kategorie: "telefonate", punkte: telefonate * PUNKTE.telefonat },
+    { kategorie: "besichtigungen", punkte: besichtigungen * PUNKTE.besichtigung },
+    {
+      kategorie: "akquiseTermine",
+      punkte: akquiseErst * PUNKTE.akquiseErsttermin + akquiseZweit * PUNKTE.akquiseZweittermin,
+    },
+    {
+      kategorie: "finanzierungTermine",
+      punkte: finanzErst * PUNKTE.finanzierungErsttermin + finanzZweit * PUNKTE.finanzierungZweittermin,
+    },
+    { kategorie: "auftraege", punkte: auftraege * PUNKTE.auftragAkquiriert },
+    { kategorie: "verkaeufe", punkte: verkaeufe * PUNKTE.verkauf },
+  ];
+  const punkte = segmente.reduce((summe, s) => summe + s.punkte, 0);
 
-  return {
-    name: mitgliedName,
-    punkte,
-    telefonate,
-    besichtigungen,
-    termine: akquiseErst + akquiseZweit + finanzErst + finanzZweit,
-    verkaeufe,
-  };
+  return { name: mitgliedName, punkte, segmente };
 }
 
 // Live-Rangliste für den Büro-Wettkampf, absteigend nach Punkten — siehe
@@ -164,14 +183,7 @@ export async function ladeWettkampfRangliste(): Promise<WettkampfEintrag[]> {
   const eintraege = await Promise.all(
     teilnehmerListe().map((mitglied) =>
       berechnePunkte(mitglied.name, vonZeit, bisZeit, vonDatum, bisDatum).catch(
-        (): WettkampfEintrag => ({
-          name: mitglied.name,
-          punkte: 0,
-          telefonate: 0,
-          besichtigungen: 0,
-          termine: 0,
-          verkaeufe: 0,
-        })
+        (): WettkampfEintrag => ({ name: mitglied.name, punkte: 0, segmente: [] })
       )
     )
   );

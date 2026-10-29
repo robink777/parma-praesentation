@@ -1,40 +1,38 @@
 import Image from "next/image";
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
-import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
+import type { WettkampfEintrag, WettkampfKategorie } from "@/lib/onoffice/wettkampf";
 import { Betreuer, MitarbeiterKennzahlen } from "@/types";
 
-// "Mitarbeiter"-Folie der TV-Vorführung — Oktober 2026 Chat-Vorgabe-Korrektur: "Ich hätte gerne,
-// dass du das Board genauso gestaltest wie das Übersichtsboard, und zwar mit diesen Kacheln ...
-// die Mitarbeiter müssen genau sehen, wie viele Anrufe am Tag, wie viel in der Woche ... Das
-// Pferderennen kannst du deutlich kleiner darstellen". Zwei Bereiche statt der vorherigen,
-// bildschirmfüllenden Pferderennbahn:
-//   1. Kachel-Raster (Hauptfläche) — dieselbe Kachel-Optik wie Uebersicht.tsx/der frühere
-//      Admin-Vertrieb-Reiter: Foto, Name, dann Anrufe heute/Woche + Termine heute/Woche als
-//      echte Zahlen. Grundlage: dieselben kennzahlen (MitarbeiterKennzahlen je Person), die auch
-//      der Admin-Bereich zeigt — EXAKT dieselben Live-Zahlen, keine eigene Berechnung.
-//   2. Pferderennen-Streifen (klein, unten) — die Wettkampf-Rangliste (Punkte über die ganze
-//      Saison, siehe wettkampf.ts) bleibt als kompakte Zusatz-Ansicht erhalten, nur sehr viel
-//      kleiner als zuvor.
+// "Mitarbeiter"-Folie der TV-Vorführung — Oktober 2026 Chat-Vorgabe-Korrektur: "Die Kacheln sind
+// super! Den restlichen Platz kannst du für die Darstellung des Gewinnspiels nutzen. Bauen wir
+// es lieber als Diagramm, y-Achse die Aktivitäten, x-Achse die Mitarbeiter. Für die Mitarbeiter
+// reicht das Kürzel, keine Bilder. Die Balken kannst du aufteilen wie bei der Statistik der
+// Objekte (farblich in den Balken — wie viele Telefonate, wie viele Termine etc., alles halt was
+// Punkte bringt)". Ersetzt das vorherige Pferderennen durch ein gestapeltes Säulendiagramm (nach
+// demselben Prinzip wie ObjektBalken im Admin-Vertrieb-Reiter, hier aber EIN Balken pro
+// Mitarbeiter statt EIN Balken pro Kategorie).
+//
+// Zwei Bereiche:
+//   1. Säulendiagramm (oben) — eine Säule je Mitarbeiter, Höhe = Gesamtpunktzahl, innen gestapelt
+//      nach Punkte-Kategorie (siehe wettkampf.ts, WettkampfSegment). X-Achsen-Beschriftung ist
+//      nur das Namenskürzel (initialen()), kein Foto geladen.
+//   2. Kachel-Raster (unten) — unverändert aus der vorherigen Korrektur: Foto, Name, Anrufe
+//      heute/Woche + Termine heute/Woche, nicht gestreckt (siehe MitarbeiterZahlenKachel).
 // Schrift bewusst kleiner als im übrigen Dashboard (Chat-Vorgabe: "die Ausgabe findet überwiegend
-// auf einem Fernseher statt ... kannst auch mit den Schriftgrößen ein bisschen kleiner werden") —
-// ein Fernseher wird aus der Nähe betrachtet (Mitarbeiter, die kurz hinschauen), nicht wie die
-// übrigen Folien primär aus Raumdistanz.
+// auf einem Fernseher statt ... kannst auch mit den Schriftgrößen ein bisschen kleiner werden").
 const zahlenformat = new Intl.NumberFormat("de-DE");
 
 function formatWert(n: number | null | undefined): string {
   return n === null || n === undefined ? "–" : zahlenformat.format(n);
 }
 
-// Dieselben drei Farben wie zuvor für Platz 1-3 (Messing/Asche/Terrakotta) — jetzt als dezenter
-// Rahmen oben an der Kachel statt (wie zuvor) am Avatar in der Bahn.
+// Dieselben drei Farben wie zuvor für Platz 1-3 (Messing/Asche/Terrakotta) — Rahmen oben an der
+// Kachel.
 const RANG_FARBEN = ["border-messing", "border-asche", "border-chart-3"];
 
-// Eine Kachel — bewusst kompakt (kleinere Schrift/Abstände/Avatar, siehe Dateikommentar oben)
-// UND bewusst NICHT auf die volle verfügbare Höhe gestreckt (kein "h-full"/flex-1 mehr auf der
-// Wurzel): Nutzer-Korrektur Oktober 2026: "jetzt haben wir ganz viel weiße Fläche in den
-// einzelnen Kacheln ... die Kacheln kannst du in der Höhe kürzen" — die Kachel ist jetzt nur so
-// hoch wie ihr Inhalt braucht, der frei werdende Platz geht ans (jetzt prominentere)
-// Pferderennen oben.
+// Eine Kachel — bewusst kompakt UND nicht auf die volle verfügbare Höhe gestreckt (kein
+// "h-full"/flex-1 auf der Wurzel): Die Kachel ist nur so hoch wie ihr Inhalt braucht, als Raster
+// vertikal zentriert in der Restfläche (siehe MitarbeiterLeaderboard unten).
 function MitarbeiterZahlenKachel({
   name,
   rang,
@@ -90,32 +88,83 @@ function MitarbeiterZahlenKachel({
   );
 }
 
-// Eine Bahn im jetzt prominenteren Pferderennen oben (Nutzer-Korrektur: "Dafür das Pferderennen
-// etwas prominenter über die Kacheln, so dass es gut erkennbar ist") — nur Position + Foto, der
-// Name/die Punktzahl stehen bereits in der Kachel darunter, hier bewusst keine Wiederholung
-// ("gut erkennbar" löst sich über das größere Foto selbst, nicht über zusätzlichen Text).
-function Bahn({ eintrag, maxPunkte, fotoUrl }: { eintrag: WettkampfEintrag; maxPunkte: number; fotoUrl?: string }) {
-  const prozent = maxPunkte === 0 ? 4 : Math.max(4, (eintrag.punkte / maxPunkte) * 100);
+// Feste Reihenfolge/Farben je Punkte-Kategorie (dataviz-Prinzip: Kategorialfarben nie zur
+// Laufzeit neu zugewiesen) — sechs unterscheidbare Töne aus der bereits validierten chart-Palette
+// (siehe tailwind.config.ts), hier frei von der Bedeutung, die dieselben Töne z.B. in
+// Uebersicht.tsx tragen (dort Objekt-Status, hier Aktivitätsart — zwei verschiedene Dimensionen).
+const SEGMENT_REIHENFOLGE: WettkampfKategorie[] = [
+  "telefonate",
+  "besichtigungen",
+  "akquiseTermine",
+  "finanzierungTermine",
+  "auftraege",
+  "verkaeufe",
+];
+
+const SEGMENT_FARBEN: Record<WettkampfKategorie, string> = {
+  telefonate: "bg-chart-2",
+  besichtigungen: "bg-chart-5",
+  akquiseTermine: "bg-chart-4",
+  finanzierungTermine: "bg-chart-8",
+  auftraege: "bg-chart-7",
+  verkaeufe: "bg-chart-1",
+};
+
+const SEGMENT_LABEL: Record<WettkampfKategorie, string> = {
+  telefonate: "Telefonate",
+  besichtigungen: "Besichtigungen",
+  akquiseTermine: "Akquise-Termine",
+  finanzierungTermine: "Finanzierungs-Termine",
+  auftraege: "Aufträge",
+  verkaeufe: "Verkäufe",
+};
+
+function SegmentLegende() {
   return (
-    <div className="relative h-full min-h-0 flex-1 overflow-hidden rounded-full bg-stein">
-      <div className="absolute inset-y-0 right-[3%] w-[2px] bg-anthrazit/15" />
-      <div
-        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out"
-        style={{ left: `${prozent}%` }}
-      >
-        {/* FESTE Größe statt an die Bahnhöhe gekoppelt ("h-full"/"aspect-square") — Letzteres
-            verzerrte die Fotos bei den jetzt deutlich höheren Bahnen zu hohen Ovalen und ließ
-            benachbarte Bahnen überlappen (Avatar wurde über die Bahnbreite hinaus breit). */}
-        <div className="relative h-[clamp(36px,6vh,56px)] w-[clamp(36px,6vh,56px)] overflow-hidden rounded-full border-2 border-reinweiss bg-reinweiss shadow-[0_1px_4px_rgba(80,63,61,0.35)]">
-          {fotoUrl ? (
-            <Image src={fotoUrl} alt={eintrag.name} fill className="object-cover" sizes="56px" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center font-slab text-[11px] font-bold text-walnuss">
-              {initialen(eintrag.name)}
-            </div>
-          )}
+    <div className="flex flex-wrap items-center gap-x-sm gap-y-[2px]">
+      {SEGMENT_REIHENFOLGE.map((kat) => (
+        <span key={kat} className="flex items-center gap-[3px] text-[9px] text-anthrazit/50">
+          <span className={`inline-block h-[7px] w-[7px] rounded-full ${SEGMENT_FARBEN[kat]}`} />
+          {SEGMENT_LABEL[kat]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Eine Säule — Gesamthöhe proportional zur Punktzahl relativ zum Spitzenreiter, innen gestapelt
+// nach Kategorie (gleiches Prinzip wie ObjektBalken im Admin-Vertrieb-Reiter, hier aber die
+// Säule EINER Person statt eines Balkens mit mehreren Kategorien nebeneinander). Kein Foto
+// (Chat-Vorgabe: "für die Mitarbeiter musst du nicht die Bilder laden, hier reicht einfach das
+// Kürzel") — nur initialen() als X-Achsen-Beschriftung.
+function AktivitaetenSaeule({ eintrag, maxPunkte }: { eintrag: WettkampfEintrag; maxPunkte: number }) {
+  const hoeheProzent = maxPunkte === 0 ? 2 : Math.max(2, (eintrag.punkte / maxPunkte) * 100);
+  const gesamtFuerAnteile = eintrag.punkte || 1;
+  return (
+    <div className="flex h-full min-w-0 flex-1 flex-col items-center">
+      <span className="mb-[2px] shrink-0 font-mono text-[9px] font-semibold text-anthrazit">
+        {zahlenformat.format(eintrag.punkte)}
+      </span>
+      <div className="flex min-h-0 w-full flex-1 items-end">
+        <div
+          className="flex w-full flex-col-reverse overflow-hidden rounded-t-[3px]"
+          style={{ height: `${hoeheProzent}%` }}
+        >
+          {eintrag.segmente
+            .filter((s) => s.punkte > 0)
+            .map((s) => (
+              <div
+                key={s.kategorie}
+                className={SEGMENT_FARBEN[s.kategorie]}
+                style={{ height: `${(s.punkte / gesamtFuerAnteile) * 100}%` }}
+                title={`${SEGMENT_LABEL[s.kategorie]}: ${zahlenformat.format(s.punkte)} Pkt.`}
+              />
+            ))}
         </div>
       </div>
+      <span className="mt-[3px] shrink-0 font-mono text-[10px] font-bold text-anthrazit/70">
+        {initialen(eintrag.name)}
+      </span>
     </div>
   );
 }
@@ -140,28 +189,29 @@ export function MitarbeiterLeaderboard({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-sm">
-      {/* Pferderennen — jetzt der prominentere, obere Bereich (Nutzer-Korrektur: "das
-          Pferderennen etwas prominenter über die Kacheln, so dass es gut erkennbar ist").
-          Eigene Höhe über clamp() statt eines Flex-Anteils der Restfläche — ein Flex-Anteil
-          machte die Bahn bei hohen Viewports unkontrolliert riesig und verzerrte die Avatare
-          (siehe Bahn-Komponente). */}
-      <div className="flex h-[clamp(90px,16vh,150px)] shrink-0 flex-col gap-xs rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)]">
+      {/* Säulendiagramm — der jetzt prominentere, obere Bereich (Nutzer-Korrektur: "den
+          restlichen Platz kannst du für die Darstellung des Gewinnspiels nutzen"). Eigene Höhe
+          über clamp() statt eines Flex-Anteils der Restfläche, damit sie bei hohen Viewports
+          nicht unkontrolliert wächst. */}
+      <div className="flex h-[clamp(160px,30vh,280px)] shrink-0 flex-col gap-xs rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)]">
         <div className="flex shrink-0 items-center justify-between">
           <p className="font-mono text-[10px] font-medium uppercase tracking-[0.04em] text-anthrazit/45">
-            Wettkampf-Rangliste
+            Wettkampf-Punkte
           </p>
           <p className="font-mono text-[10px] text-anthrazit/45">
             Saison bis {saisonBis.toLocaleDateString("de-DE")} · noch {zahlenformat.format(resttage)} Tage
           </p>
         </div>
-        <div className="flex min-h-0 flex-1 items-center gap-xs">
+        <div className="shrink-0">
+          <SegmentLegende />
+        </div>
+        <div className="flex min-h-0 flex-1 items-end gap-xs border-t border-anthrazit/5 pt-xs">
           {rangliste.map((eintrag) => (
-            <Bahn key={eintrag.name} eintrag={eintrag} maxPunkte={maxPunkte} fotoUrl={fotos[eintrag.name]} />
+            <AktivitaetenSaeule key={eintrag.name} eintrag={eintrag} maxPunkte={maxPunkte} />
           ))}
         </div>
       </div>
-      {/* Kacheln — kompakt, in der verbleibenden Fläche vertikal zentriert statt gestreckt
-          (siehe MitarbeiterZahlenKachel, "weiße Fläche"-Korrektur). */}
+      {/* Kacheln — kompakt, in der verbleibenden Fläche vertikal zentriert statt gestreckt. */}
       <div className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden">
         <div className={`grid ${spalten} gap-xs`}>
           {rangliste.map((eintrag, i) => (
