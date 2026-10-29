@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Uebersicht } from "@/components/admin/Uebersicht";
-import { Objektkarte } from "@/components/admin/Objektkarte";
 import { MitarbeiterLeaderboard } from "./MitarbeiterLeaderboard";
 import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
 import { AdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
@@ -16,16 +15,21 @@ import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
 // bewusst OHNE jeden Login/Token (Klarstellung direkt danach: "der Link soll einfach einzugeben
 // sein und nicht passwort geschützt ... alle die Zahlen sehen können") — einfach /tv.
 //
-// Drei Folien aus exakt denselben Bausteinen wie der Admin-Bereich (Uebersicht.tsx,
-// Objektkarte.tsx, MitarbeiterLeaderboard.tsx) — "repräsentativ" heißt hier: dieselben
-// Live-Daten, keine eigene, u.U. abweichende Darstellung (siehe ladeAdminDashboardDaten in
-// onoffice/adminDashboard.ts, von app/tv/page.tsx genauso aufgerufen wie von app/admin/page.tsx).
-// Automatischer Folienwechsel per Timer statt Klick (SLIDE_DAUER_MS), Datenaktualisierung alle
-// 60 Sekunden über denselben useAutoRefresh-Hook wie der Admin-Bereich (ADMIN_REFRESH_INTERVAL_MS).
+// Zwei Folien aus exakt denselben Bausteinen wie der Admin-Bereich (Uebersicht.tsx,
+// MitarbeiterLeaderboard.tsx) — "repräsentativ" heißt hier: dieselben Live-Daten, keine eigene,
+// u.U. abweichende Darstellung (siehe ladeAdminDashboardDaten in onoffice/adminDashboard.ts, von
+// app/tv/page.tsx genauso aufgerufen wie von app/admin/page.tsx). Automatischer Folienwechsel
+// per Timer statt Klick (SLIDE_DAUER_MS), Datenaktualisierung alle 60 Sekunden über denselben
+// useAutoRefresh-Hook wie der Admin-Bereich (ADMIN_REFRESH_INTERVAL_MS).
+//
+// Die Karte war ursprünglich eine dritte Folie, auf Nutzerwunsch Oktober 2026 ("blende mal bitte
+// die Karte aus! Also nur 2 Slides") wieder entfernt — objektkarteDaten wird in
+// AdminDashboardDaten trotzdem weiter mitgeladen (siehe adminDashboard.ts), da app/admin/page.tsx
+// das für den Karte-Navi-Punkt dort weiterhin braucht.
 const SLIDE_DAUER_MS = 20_000;
 
-type SlideId = "uebersicht" | "karte" | "mitarbeiter";
-const SLIDES: SlideId[] = ["uebersicht", "karte", "mitarbeiter"];
+type SlideId = "uebersicht" | "mitarbeiter";
+const SLIDES: SlideId[] = ["uebersicht", "mitarbeiter"];
 
 export function TvSlideshow(
   daten: AdminDashboardDaten & { rangliste: WettkampfEintrag[]; saisonBisIso: string }
@@ -62,11 +66,6 @@ export function TvSlideshow(
       <main className="min-h-0 flex-1 px-lg pb-lg">
         {slide === "uebersicht" && (
           <Uebersicht gesamt={daten.gesamtKennzahlen} neuzugaengeVerlauf={daten.neuzugaengeVerlauf} />
-        )}
-        {slide === "karte" && (
-          <div className="relative h-full w-full overflow-hidden rounded-lg bg-reinweiss shadow-[0_1px_4px_rgba(80,63,61,0.08)]">
-            <Objektkarte daten={daten.objektkarteDaten} interaktiv={false} />
-          </div>
         )}
         {slide === "mitarbeiter" && (
           <MitarbeiterLeaderboard
