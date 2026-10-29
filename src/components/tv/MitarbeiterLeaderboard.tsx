@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import type { WettkampfEintrag, WettkampfKategorie } from "@/lib/onoffice/wettkampf";
@@ -209,28 +206,24 @@ function AktivitaetenSaeule({ eintrag, maxPunkte }: { eintrag: WettkampfEintrag;
   );
 }
 
-// Eine Momentaufnahme der sechs Kachel-Kennzahlen eines Mitarbeiters, für den Änderungs-
-// Abgleich zwischen zwei Ladezyklen (siehe MitarbeiterLeaderboard unten). Schlüssel müssen exakt
-// den `feld`-Werten in MitarbeiterZahlenKachel entsprechen.
-interface Momentaufnahme {
-  telefonateHeute: number | null;
-  termineHeute: number | null;
-  telefonateWoche: number | null;
-  termineWoche: number | null;
-  telefonateGesamt: number;
-  termineGesamt: number;
-}
-
 export function MitarbeiterLeaderboard({
   kennzahlen,
   rangliste,
   alleMitarbeiter,
   saisonBisIso,
+  veraenderteFelder,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   rangliste: WettkampfEintrag[];
   alleMitarbeiter?: Betreuer[];
   saisonBisIso: string;
+  // Welche Kachel-Felder sich seit dem letzten Ladezyklus je Mitarbeiter verändert haben (Nutzer-
+  // Vorgabe: "wenn ein Mitarbeiter aktiv ist und eine Aktivität speichert, ein optisches Feedback
+  // ... Leuchten der Kachel ... Wert der sich verändert hat pulsierend"). Wird in TvSlideshow.tsx
+  // berechnet statt hier: Diese Folie wird beim Folienwechsel aus- und wieder eingehängt (siehe
+  // {slide === "mitarbeiter" && ...}), ein hier gehaltener Vergleichs-State ginge bei jedem
+  // Wechsel verloren — TvSlideshow bleibt dagegen durchgehend gemountet.
+  veraenderteFelder?: Record<string, Set<string>>;
 }) {
   const fotos = fotoLookup(alleMitarbeiter ?? []);
   const maxPunkte = Math.max(1, ...rangliste.map((e) => e.punkte));
@@ -238,46 +231,6 @@ export function MitarbeiterLeaderboard({
   const heute = new Date();
   const resttage = Math.max(0, Math.ceil((saisonBis.getTime() - heute.getTime()) / 86_400_000));
   const spalten = rangliste.length >= 8 ? "grid-cols-5" : rangliste.length >= 4 ? "grid-cols-3" : "grid-cols-2";
-
-  // Optisches Signal bei Datenänderung (Nutzer-Vorgabe Oktober 2026: "wenn ein Mitarbeiter aktiv
-  // ist und eine Aktivität speichert, ein optisches Feedback ... Leuchten der Kachel ... Wert der
-  // sich verändert hat pulsierend ... immer nur einen Ladezyklus bestehen"). Vergleicht bei jedem
-  // Datenabruf (useAutoRefresh löst alle 60s ein router.refresh() aus, siehe TvSlideshow.tsx) die
-  // neuen gegen die zuletzt gesehenen Werte je Mitarbeiter; Treffer werden genau EINEN Zyklus lang
-  // markiert, weil der nächste Abgleich die Markierung automatisch durch einen frischen (meist
-  // leeren) Diff ersetzt — kein eigener Timer nötig.
-  const vorherigeRef = useRef<Record<string, Momentaufnahme> | null>(null);
-  const [veraenderteFelder, setVeraenderteFelder] = useState<Record<string, Set<string>>>({});
-
-  useEffect(() => {
-    const aktuelle: Record<string, Momentaufnahme> = {};
-    for (const eintrag of rangliste) {
-      aktuelle[eintrag.name] = {
-        telefonateHeute: kennzahlen?.[eintrag.name]?.telefonateHeute ?? null,
-        termineHeute: kennzahlen?.[eintrag.name]?.termineHeute ?? null,
-        telefonateWoche: kennzahlen?.[eintrag.name]?.telefonateWoche ?? null,
-        termineWoche: kennzahlen?.[eintrag.name]?.termineWoche ?? null,
-        telefonateGesamt: eintrag.telefonateGesamt,
-        termineGesamt: eintrag.termineGesamt,
-      };
-    }
-
-    const vorherige = vorherigeRef.current;
-    vorherigeRef.current = aktuelle;
-    if (!vorherige) return; // erster Ladevorgang: Startzustand, noch kein Vergleich möglich
-
-    const signale: Record<string, Set<string>> = {};
-    for (const [name, werte] of Object.entries(aktuelle)) {
-      const alt = vorherige[name];
-      if (!alt) continue; // neu zur Rangliste dazugekommen — nichts zum Vergleichen
-      const felder = new Set<string>();
-      (Object.keys(werte) as (keyof Momentaufnahme)[]).forEach((feld) => {
-        if (werte[feld] !== alt[feld]) felder.add(feld);
-      });
-      if (felder.size > 0) signale[name] = felder;
-    }
-    setVeraenderteFelder(signale);
-  }, [rangliste, kennzahlen]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-sm">
@@ -315,7 +268,7 @@ export function MitarbeiterLeaderboard({
               kennzahlen={kennzahlen?.[eintrag.name]}
               telefonateGesamt={eintrag.telefonateGesamt}
               termineGesamt={eintrag.termineGesamt}
-              geaenderteFelder={veraenderteFelder[eintrag.name]}
+              geaenderteFelder={veraenderteFelder?.[eintrag.name]}
             />
           ))}
         </div>

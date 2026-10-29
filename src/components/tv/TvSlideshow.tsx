@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Uebersicht } from "@/components/admin/Uebersicht";
 import { MitarbeiterLeaderboard } from "./MitarbeiterLeaderboard";
@@ -34,6 +34,18 @@ const SLIDE_DAUER_MS = 60_000;
 type SlideId = "uebersicht" | "mitarbeiter";
 const SLIDES: SlideId[] = ["uebersicht", "mitarbeiter"];
 
+// Eine Momentaufnahme der sechs Kachel-Kennzahlen eines Mitarbeiters, für den Änderungs-Abgleich
+// zwischen zwei Ladezyklen (siehe Effekt unten). Schlüssel müssen exakt den `feld`-Werten in
+// MitarbeiterLeaderboard.tsx entsprechen.
+interface Momentaufnahme {
+  telefonateHeute: number | null;
+  termineHeute: number | null;
+  telefonateWoche: number | null;
+  termineWoche: number | null;
+  telefonateGesamt: number;
+  termineGesamt: number;
+}
+
 export function TvSlideshow(
   daten: AdminDashboardDaten & { rangliste: WettkampfEintrag[]; saisonBisIso: string }
 ) {
@@ -48,6 +60,50 @@ export function TvSlideshow(
   }, []);
 
   const slide = SLIDES[index];
+
+  // Optisches Signal bei Datenänderung (Nutzer-Vorgabe Oktober 2026: "wenn ein Mitarbeiter aktiv
+  // ist und eine Aktivität speichert, ein optisches Feedback ... Leuchten der Kachel ... Wert der
+  // sich verändert hat pulsierend ... immer nur einen Ladezyklus bestehen"). Bewusst HIER in
+  // TvSlideshow berechnet statt in MitarbeiterLeaderboard.tsx: Diese Komponente bleibt beim
+  // Folienwechsel durchgehend gemountet, während die Mitarbeiter-Folie selbst bei jedem Wechsel
+  // aus- und wieder eingehängt wird (siehe unten) — ein dort gehaltener Vergleichs-State würde den
+  // Abgleich zwischen zwei Ladezyklen praktisch nie beide Male im gemounteten Zustand antreffen.
+  // Vergleicht bei jedem Datenabruf (useAutoRefresh löst alle 60s ein router.refresh() aus) die
+  // neuen gegen die zuletzt gesehenen Werte je Mitarbeiter; Treffer werden genau EINEN Zyklus lang
+  // markiert, weil der nächste Abgleich die Markierung automatisch durch einen frischen (meist
+  // leeren) Diff ersetzt — kein eigener Timer nötig.
+  const vorherigeRef = useRef<Record<string, Momentaufnahme> | null>(null);
+  const [veraenderteFelder, setVeraenderteFelder] = useState<Record<string, Set<string>>>({});
+
+  useEffect(() => {
+    const aktuelle: Record<string, Momentaufnahme> = {};
+    for (const eintrag of daten.rangliste) {
+      aktuelle[eintrag.name] = {
+        telefonateHeute: daten.kennzahlen?.[eintrag.name]?.telefonateHeute ?? null,
+        termineHeute: daten.kennzahlen?.[eintrag.name]?.termineHeute ?? null,
+        telefonateWoche: daten.kennzahlen?.[eintrag.name]?.telefonateWoche ?? null,
+        termineWoche: daten.kennzahlen?.[eintrag.name]?.termineWoche ?? null,
+        telefonateGesamt: eintrag.telefonateGesamt,
+        termineGesamt: eintrag.termineGesamt,
+      };
+    }
+
+    const vorherige = vorherigeRef.current;
+    vorherigeRef.current = aktuelle;
+    if (!vorherige) return; // erster Ladevorgang: Startzustand, noch kein Vergleich möglich
+
+    const signale: Record<string, Set<string>> = {};
+    for (const [name, werte] of Object.entries(aktuelle)) {
+      const alt = vorherige[name];
+      if (!alt) continue; // neu zur Rangliste dazugekommen — nichts zum Vergleichen
+      const felder = new Set<string>();
+      (Object.keys(werte) as (keyof Momentaufnahme)[]).forEach((feld) => {
+        if (werte[feld] !== alt[feld]) felder.add(feld);
+      });
+      if (felder.size > 0) signale[name] = felder;
+    }
+    setVeraenderteFelder(signale);
+  }, [daten.rangliste, daten.kennzahlen]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-stein">
@@ -81,6 +137,7 @@ export function TvSlideshow(
             rangliste={daten.rangliste}
             alleMitarbeiter={daten.alleMitarbeiter}
             saisonBisIso={daten.saisonBisIso}
+            veraenderteFelder={veraenderteFelder}
           />
         )}
       </main>
