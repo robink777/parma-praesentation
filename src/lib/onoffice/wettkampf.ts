@@ -1,4 +1,4 @@
-import { AKQUISE_NAMEN, FINANZ_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unternehmen";
+import { AKQUISE_NAMEN, FINANZ_NAMEN, TEAM, WETTKAMPF_NAMEN } from "@/data/unternehmen";
 import {
   AKQUISE_TERMINARTEN,
   FINANZIERUNG_TERMINARTEN,
@@ -103,12 +103,13 @@ export interface WettkampfEintrag {
   segmente: WettkampfSegment[];
 }
 
-// Teilnehmerkreis: Vertrieb + Akquise + Parma Finanz (Stefanie Scalone) — alle, für die
-// mindestens eine Punktekategorie existiert. Setting/"Weitere Mitarbeiter" bewusst nicht dabei
-// (keine passende Kategorie, siehe Chat: "bei manchen Mitarbeitern wird es nicht passen, weil
-// sie kein Vertrieb machen").
+// Teilnehmerkreis: siehe WETTKAMPF_NAMEN in data/unternehmen.ts — eine eigene, von den
+// Admin-Statistik-Reitern (VERTRIEB_NAMEN/AKQUISE_NAMEN/FINANZ_NAMEN) entkoppelte Liste, seit
+// die Nutzer-Vorgabe "nimm Daniel und mich aus der Wertung raus, nimm Sarah und Kathi mit rein"
+// zeigte, dass "wer macht welchen Job" und "wer tritt beim Wettkampf an" zwei unterschiedliche
+// Fragen sind.
 function teilnehmerListe() {
-  const namen = new Set([...VERTRIEB_NAMEN, ...AKQUISE_NAMEN, ...FINANZ_NAMEN]);
+  const namen = new Set(WETTKAMPF_NAMEN);
   return TEAM.filter((m) => namen.has(m.name));
 }
 

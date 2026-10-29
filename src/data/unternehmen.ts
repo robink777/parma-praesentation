@@ -212,3 +212,25 @@ export const SETTING_NAMEN = ["Sarah Barth", "Katharina Becker"];
 // Akquise-Termine), Oktober 2026 Chat-Vorgabe: "Hier will ich auch Punkte vergeben um zu sehen
 // wie viel sie telefoniert".
 export const FINANZ_NAMEN = ["Stefanie Scalone"];
+
+// Teilnehmerkreis des Büro-Wettkampfs (TV-Folie, siehe onoffice/wettkampf.ts) — ABSICHTLICH eine
+// eigene, von VERTRIEB_NAMEN/AKQUISE_NAMEN/FINANZ_NAMEN entkoppelte Liste statt deren Vereinigung
+// (ursprünglich so gebaut): Oktober 2026 Chat-Vorgabe "nimm bitte Daniel und mich aus der Wertung
+// raus und nimm Sarah und Kathi mit rein" — Daniel Parma und Robin Kolbe bleiben für die
+// Admin-Statistik weiterhin ganz normal im Akquise-Reiter (siehe AKQUISE_NAMEN), nehmen aber
+// nicht mehr am Wettkampf teil; Sarah Barth und Katharina Becker (Setting-Team, siehe
+// SETTING_NAMEN) kommen NEU dazu. Für Sarah/Kathi greifen in berechnePunkte() automatisch nur die
+// Kategorien Telefonate/Besichtigungen (nicht an istAkquise/istFinanz geknüpft) — passend zu
+// ihrer tatsächlichen Tätigkeit als Terminsetzer.
+export const WETTKAMPF_NAMEN = [
+  "Vanessa Krifft",
+  "Kira Woldt",
+  "Dawid Parma",
+  "Axel Wehmeier",
+  "Stanimira Georgieva",
+  "Leon Otten",
+  "Jacqueline Henot",
+  "Stefanie Scalone",
+  "Sarah Barth",
+  "Katharina Becker",
+];
