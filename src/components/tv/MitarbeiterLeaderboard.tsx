@@ -1,6 +1,12 @@
 import Image from "next/image";
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
-import type { WettkampfEintrag, WettkampfKategorie } from "@/lib/onoffice/wettkampf";
+import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
+import {
+  SEGMENT_FARBEN,
+  SEGMENT_LABEL,
+  SEGMENT_PUNKTE_TEXT,
+  SEGMENT_REIHENFOLGE,
+} from "@/components/shared/wettkampfDarstellung";
 import { Betreuer, MitarbeiterKennzahlen } from "@/types";
 
 // "Mitarbeiter"-Folie der TV-Vorführung — Oktober 2026 Chat-Vorgabe-Korrektur: "Die Kacheln sind
@@ -112,51 +118,10 @@ function MitarbeiterZahlenKachel({
   );
 }
 
-// Feste Reihenfolge/Farben je Punkte-Kategorie (dataviz-Prinzip: Kategorialfarben nie zur
-// Laufzeit neu zugewiesen) — sechs unterscheidbare Töne aus der bereits validierten chart-Palette
-// (siehe tailwind.config.ts), hier frei von der Bedeutung, die dieselben Töne z.B. in
-// Uebersicht.tsx tragen (dort Objekt-Status, hier Aktivitätsart — zwei verschiedene Dimensionen).
-const SEGMENT_REIHENFOLGE: WettkampfKategorie[] = [
-  "telefonate",
-  "besichtigungen",
-  "akquiseTermine",
-  "finanzierungTermine",
-  "auftraege",
-  "verkaeufe",
-];
-
-const SEGMENT_FARBEN: Record<WettkampfKategorie, string> = {
-  telefonate: "bg-chart-2",
-  besichtigungen: "bg-chart-5",
-  akquiseTermine: "bg-chart-4",
-  finanzierungTermine: "bg-chart-8",
-  auftraege: "bg-chart-7",
-  verkaeufe: "bg-chart-1",
-};
-
-const SEGMENT_LABEL: Record<WettkampfKategorie, string> = {
-  telefonate: "Telefonate",
-  besichtigungen: "Besichtigungen",
-  akquiseTermine: "Akquise-Termine",
-  finanzierungTermine: "Finanzierungs-Termine",
-  auftraege: "Aufträge",
-  verkaeufe: "Verkäufe",
-};
-
-// Nutzer-Korrektur: "schreib bitte in die Legende noch welche Aktivität wieviele Punkte bringt" —
-// Werte bewusst hier als Text dupliziert statt PUNKTE aus wettkampf.ts zu importieren: Das wäre
-// ein Wert-Import aus einem Modul, das serverseitigen OnOffice-Code lädt, und würde diesen Code
-// in den Client-Bundle dieser Folie ziehen (siehe TvSlideshow.tsx-Kommentar). Bei einer Änderung
-// an PUNKTE in wettkampf.ts muss dieser Text von Hand mitgezogen werden.
-const SEGMENT_PUNKTE_TEXT: Record<WettkampfKategorie, string> = {
-  telefonate: "1 Pkt.",
-  besichtigungen: "3 Pkt.",
-  akquiseTermine: "6/7 Pkt.",
-  finanzierungTermine: "6/7 Pkt.",
-  auftraege: "10 Pkt.",
-  verkaeufe: "10 Pkt.",
-};
-
+// SEGMENT_REIHENFOLGE/FARBEN/LABEL/PUNKTE_TEXT kommen aus components/shared/
+// wettkampfDarstellung.ts — gemeinsam mit components/tv/TvMobil.tsx, damit Farben/Labels auf TV
+// und Smartphone garantiert identisch bleiben (dataviz-Prinzip: Kategorialfarben nie zur Laufzeit
+// neu zugewiesen, hier zusätzlich nie GERÄTEWEISE abweichend zugewiesen).
 function SegmentLegende() {
   return (
     <div className="flex flex-wrap items-center gap-x-sm gap-y-[2px]">

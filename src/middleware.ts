@@ -10,9 +10,12 @@ import {
 // TV-Vorführung für die Büro-Fernseher (siehe app/tv/page.tsx) — Oktober 2026 Chat-Vorgabe,
 // Klarstellung direkt danach: "der Link soll einfach einzugeben sein und nicht passwort
 // geschützt ... an die Mitarbeiter weitergegeben werden können ... anders als im Admin-Bereich
-// sollen ja alle die Zahlen sehen können". Deshalb ganz ohne Signatur/Token — /tv einfach
-// komplett von der regulären APP_PASSWORD-Prüfung ausgenommen, wie /geteilt unten (dort aber
-// weiterhin mit eigener Signaturprüfung, da /geteilt echte Kundendaten zeigt).
+// sollen ja alle die Zahlen sehen können". Deshalb ganz ohne Signatur/Token — /tv (und seit der
+// Smartphone-Ansicht auch /tv/mobil, siehe app/tv/mobil/page.tsx) einfach komplett von der
+// regulären APP_PASSWORD-Prüfung ausgenommen, wie /geteilt unten (dort aber weiterhin mit eigener
+// Signaturprüfung, da /geteilt echte Kundendaten zeigt). Prüfung als Pfad-PRÄFIX (nicht nur exakt
+// "/tv") deckt /tv/mobil automatisch mit ab, ohne jede künftige /tv/*-Unterseite einzeln
+// nachtragen zu müssen.
 const TV_PFAD = "/tv";
 
 // Schützt die komplette App (Seiten UND API-Routen) hinter dem einen gemeinsamen Passwort aus
@@ -36,7 +39,11 @@ export async function middleware(request: NextRequest) {
   // App-Passwort nicht. /geteilt selbst immer durchlassen: Die Seite prüft die Signatur (d/sig-
   // Query-Parameter) selbst noch einmal und zeigt bei Ungültigkeit eine eigene, kundenfreundliche
   // "Link ungültig"-Meldung statt der internen Login-Seite, die der Kunde nicht kennt.
-  if (request.nextUrl.pathname === "/geteilt" || request.nextUrl.pathname === TV_PFAD) {
+  if (
+    request.nextUrl.pathname === "/geteilt" ||
+    request.nextUrl.pathname === TV_PFAD ||
+    request.nextUrl.pathname.startsWith(`${TV_PFAD}/`)
+  ) {
     return NextResponse.next();
   }
 

@@ -1,3 +1,5 @@
+import { KATEGORIE_BG_KLASSEN, KATEGORIE_FILL_KLASSEN } from "@/components/shared/kategorieFarben";
+import { kategorisiere, stapelFuerWoche } from "@/lib/neuzugaengeKategorisierung";
 import { NeuzugaengeVerteilungsEintrag, NeuzugaengeWoche } from "@/types";
 
 // Deutsches Tausendertrennzeichen, analog zu Leadquellen.tsx/Kontrolle.tsx.
@@ -10,99 +12,23 @@ const UNTEN_PADDING = 22; // Platz für die Datums-Beschriftung je Balken
 const PLOT_HOEHE = CHART_HOEHE - OBEN_PADDING - UNTEN_PADDING;
 
 // Aufschlüsselung der Balken nach Kategorie (Nutzer-Vorgabe Oktober 2026: "Neue Objekte = Status
-// 2 anzeigen, Neue Adressen = Herkunft Kontakt, jeweils bitte mit Legende" — nach demselben
-// Stapel-Prinzip wie die Wettkampf-Säulen auf der TV-Mitarbeiter-Folie, siehe
-// AktivitaetenSaeule in components/tv/MitarbeiterLeaderboard.tsx). Standardmäßig maximal
-// KUNDEN_MAX_KATEGORIEN eigene Farben, der Rest fällt in eine neutrale "Sonstige"-
-// Sammelkategorie (dataviz-Prinzip: Überlauf nie als weitere, beliebige Kategorialfarbe, sondern
-// grau gebündelt) — nötig bei "Herkunft Kontakt", wo der Feldkatalog über 30 mögliche Werte
-// kennt. "Status 2" dagegen ist ein GESCHLOSSENES Feld mit nur 19 möglichen Werten, und der
-// Nutzer stellte nach einer Kontrolle der Einzelliste klar: "ich will dass jeder Status 2
-// abgefragt wird, auch zum Beispiel Marktbeobachtung - Bearbeitet" — für "Neue Objekte" wird die
-// Kategorisierung deshalb OHNE Obergrenze aufgerufen (siehe Neuzugaenge() unten), jede
-// tatsächlich vorkommende Status2-Ausprägung bekommt eine eigene Legenden-Zeile, nie gefaltet.
-//
-// Wiederverwendet bewusst dieselben chart-1…7-Töne, die weiter oben auf derselben Seite
-// (Uebersicht.tsx) schon für die acht KPI-Kacheln stehen — andere Bedeutung auf derselben Fläche,
-// aber jeder Balken trägt seine eigene, direkt daneben stehende Legende, es entsteht keine
-// Verwechslungsgefahr zwischen KPI-Kachel-Farbe und Balken-Segment-Farbe. Kommen mehr
-// Kategorien vor als Farben vorhanden sind (möglich, seit "Neue Objekte" ohne Obergrenze läuft),
-// wiederholt sich die Farbfolge (Modulo) — jede Kategorie bleibt über ihre Legenden-Beschriftung
-// trotzdem eindeutig identifizierbar, nur der Farbton kann sich dann mit einer anderen teilen.
+// 2 anzeigen, Neue Adressen = Herkunft Kontakt, jeweils bitte mit Legende"). Kategorie-Zuordnung/
+// -Farben kommen aus lib/neuzugaengeKategorisierung.ts (gemeinsam mit components/tv/TvMobil.tsx,
+// das dieselbe Aufschlüsselung als HTML-Balken statt SVG zeigt) — "Herkunft Kontakt" bleibt dabei
+// auf die 7 häufigsten Kategorien + "Sonstige" begrenzt (über 30 mögliche Werte im Feldkatalog),
+// "Status 2" läuft dagegen ohne Obergrenze (siehe Neuzugaenge() unten, maxKategorien={Infinity}):
+// ein geschlossenes Feld mit nur 19 möglichen Werten, und der Nutzer stellte nach einer Kontrolle
+// der Einzelliste klar: "ich will dass jeder Status 2 abgefragt wird, auch zum Beispiel
+// Marktbeobachtung - Bearbeitet".
 const KUNDEN_MAX_KATEGORIEN = 7;
-const KATEGORIE_FARBEN = [
-  "fill-chart-1",
-  "fill-chart-2",
-  "fill-chart-3",
-  "fill-chart-4",
-  "fill-chart-5",
-  "fill-chart-6",
-  "fill-chart-7",
-] as const;
-const SONSTIGE_LABEL = "Sonstige";
-const SONSTIGE_FARBE = "fill-asche";
 
-interface Kategorisierung {
-  // Reihenfolge = Stapel-Reihenfolge (von unten nach oben) UND Legenden-Reihenfolge, nach
-  // absteigender Gesamtanzahl über alle Wochen hinweg.
-  kategorien: { label: string; farbKlasse: string }[];
-  // Ordnet einen rohen Verteilungs-Label-Wert seiner Stapel-Kategorie zu (faltet alles jenseits
-  // von maxKategorien in "Sonstige").
-  zuordnen: (label: string) => string;
-}
-
-// maxKategorien = Infinity (siehe Neuzugaenge() unten, "Neue Objekte") schaltet die
-// "Sonstige"-Faltung komplett ab: Array.slice(0, Infinity) liefert dann einfach alle
-// vorkommenden Kategorien.
-function kategorisiere(
-  wochen: NeuzugaengeWoche[],
-  verteilungVon: (w: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[],
-  maxKategorien: number
-): Kategorisierung {
-  const gesamtJeLabel = new Map<string, number>();
-  for (const woche of wochen) {
-    for (const eintrag of verteilungVon(woche)) {
-      gesamtJeLabel.set(eintrag.label, (gesamtJeLabel.get(eintrag.label) ?? 0) + eintrag.anzahl);
-    }
-  }
-  const sortiert = Array.from(gesamtJeLabel.entries()).sort((a, b) => b[1] - a[1]);
-  const top = sortiert.slice(0, maxKategorien).map(([label]) => label);
-  const hatSonstige = sortiert.length > maxKategorien;
-
-  const kategorien: { label: string; farbKlasse: string }[] = top.map((label, i) => ({
-    label,
-    farbKlasse: KATEGORIE_FARBEN[i % KATEGORIE_FARBEN.length],
-  }));
-  if (hatSonstige) kategorien.push({ label: SONSTIGE_LABEL, farbKlasse: SONSTIGE_FARBE });
-
-  const topSet = new Set(top);
-  return { kategorien, zuordnen: (label) => (topSet.has(label) ? label : SONSTIGE_LABEL) };
-}
-
-// Fasst die Verteilung einer einzelnen Woche auf die (ggf. mit "Sonstige" gefalteten)
-// Stapel-Kategorien zusammen.
-function stapelFuerWoche(
-  woche: NeuzugaengeWoche,
-  verteilungVon: (w: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[],
-  kategorisierung: Kategorisierung
-): Map<string, number> {
-  const stapel = new Map<string, number>();
-  for (const eintrag of verteilungVon(woche)) {
-    const kategorie = kategorisierung.zuordnen(eintrag.label);
-    stapel.set(kategorie, (stapel.get(kategorie) ?? 0) + eintrag.anzahl);
-  }
-  return stapel;
-}
-
-function Legende({ kategorien }: { kategorien: { label: string; farbKlasse: string }[] }) {
-  // "fill-chart-1" → "bg-chart-1" für den Legenden-Punkt (gleicher Farbton, anderes CSS-Attribut
-  // als im SVG-Balken).
+function Legende({ kategorien }: { kategorien: { label: string; farbe: string }[] }) {
   return (
     <div className="mt-[2px] flex flex-wrap items-center gap-x-sm gap-y-[2px]">
       {kategorien.map((k) => (
         <span key={k.label} className="flex items-center gap-[3px] text-[10px] text-anthrazit/50">
           <span
-            className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${k.farbKlasse.replace("fill-", "bg-")}`}
+            className={`inline-block h-[7px] w-[7px] shrink-0 rounded-full ${KATEGORIE_BG_KLASSEN[k.farbe]}`}
           />
           {k.label}
         </span>
@@ -212,7 +138,7 @@ function Balkendiagramm({
             const segmenthoehe = maxWert === 0 ? 0 : (anzahl / maxWert) * PLOT_HOEHE;
             const y = yLaufend - segmenthoehe;
             yLaufend = y;
-            return { key: kat.label, farbKlasse: kat.farbKlasse, y, hoehe: segmenthoehe };
+            return { key: kat.label, farbe: kat.farbe, y, hoehe: segmenthoehe };
           });
 
           return (
@@ -227,7 +153,7 @@ function Balkendiagramm({
                     width={balkenbreite}
                     height={s.hoehe}
                     rx={2}
-                    className={s.farbKlasse}
+                    className={KATEGORIE_FILL_KLASSEN[s.farbe]}
                     fillOpacity={laeuft ? 0.45 : 1}
                   />
                 ))}
