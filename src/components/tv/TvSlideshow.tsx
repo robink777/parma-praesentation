@@ -70,6 +70,7 @@ export function TvSlideshow(
         )}
         {slide === "mitarbeiter" && (
           <MitarbeiterLeaderboard
+            kennzahlen={daten.kennzahlen}
             rangliste={daten.rangliste}
             alleMitarbeiter={daten.alleMitarbeiter}
             saisonBisIso={daten.saisonBisIso}
