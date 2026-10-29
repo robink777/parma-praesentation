@@ -66,15 +66,14 @@ function MitarbeiterZahlenKachel({
   const rangFarbe = RANG_FARBEN[rang - 1];
   // Nutzer-Vorgabe: "ein kleines Leuchten der Mitarbeiterkachel (vielleicht Schlagschatten mit
   // Akzentfarbe mit 20% Deckkraft)", solange mindestens ein Wert dieser Kachel sich seit dem
-  // letzten Ladezyklus verändert hat. Korrektur: "das Leuchten muss viel deutlicher sein ... mit
-  // der Deckkraft hoch und etwas mit der Größe des Schlagschattens" — Deckkraft 0,2 → 0,6, Blur/
-  // Spread 18px/4px → 32px/10px.
+  // letzten Ladezyklus verändert hat. Erst auf 0,6/32px/10px verstärkt ("viel deutlicher"), dann
+  // auf Nutzerwunsch ("ok etwas weniger") wieder etwas zurückgenommen auf 0,4/26px/8px.
   const hatAenderung = (geaenderteFelder?.size ?? 0) > 0;
   return (
     <div
       className={`relative rounded-md border-t-2 bg-reinweiss px-sm py-xs transition-shadow ${
         hatAenderung
-          ? "shadow-[0_1px_4px_rgba(80,63,61,0.08),0_0_32px_10px_rgba(203,142,73,0.6)]"
+          ? "shadow-[0_1px_4px_rgba(80,63,61,0.08),0_0_26px_8px_rgba(203,142,73,0.4)]"
           : "shadow-[0_1px_4px_rgba(80,63,61,0.08)]"
       } ${rangFarbe ?? "border-t-transparent"}`}
     >
