@@ -7,10 +7,12 @@ import {
   shareSignaturIstGueltig,
 } from "@/lib/auth";
 
-// /tv selbst prüft seine eigene sig-Signatur (siehe app/tv/page.tsx, tvSignaturIstGueltig in
-// lib/auth.ts) — hier nur von der regulären APP_PASSWORD-Prüfung ausgenommen, analog zu
-// /geteilt unten. Kein zweiter Vergleich hier in der Middleware: Ein TV im Büro soll den Link
-// einmal öffnen und dauerhaft laufen lassen, ohne je wieder ein Passwort einzugeben.
+// TV-Vorführung für die Büro-Fernseher (siehe app/tv/page.tsx) — Oktober 2026 Chat-Vorgabe,
+// Klarstellung direkt danach: "der Link soll einfach einzugeben sein und nicht passwort
+// geschützt ... an die Mitarbeiter weitergegeben werden können ... anders als im Admin-Bereich
+// sollen ja alle die Zahlen sehen können". Deshalb ganz ohne Signatur/Token — /tv einfach
+// komplett von der regulären APP_PASSWORD-Prüfung ausgenommen, wie /geteilt unten (dort aber
+// weiterhin mit eigener Signaturprüfung, da /geteilt echte Kundendaten zeigt).
 const TV_PFAD = "/tv";
 
 // Schützt die komplette App (Seiten UND API-Routen) hinter dem einen gemeinsamen Passwort aus

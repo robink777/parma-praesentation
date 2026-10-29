@@ -12,8 +12,8 @@ import { AdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
 // generieren ... den ich dann auf den Fernsehern in den einzelnen Büros öffne ... zur Motivation,
 // Erziehung der Mitarbeiter ... ein kleines Spiel ... keine Navigation, 2-3 Templates, die wie
 // eine Art Slideshow einfach durchlaufen ... nichts klickbar"). Läuft unter app/tv/page.tsx,
-// durch eine eigene Signatur statt des regulären Admin-Logins geschützt (siehe lib/auth.ts,
-// erzeugeTvSignatur/tvSignaturIstGueltig — ein Fernseher kann kein Passwort eintippen).
+// bewusst OHNE jeden Login/Token (Klarstellung direkt danach: "der Link soll einfach einzugeben
+// sein und nicht passwort geschützt ... alle die Zahlen sehen können") — einfach /tv.
 //
 // Drei Folien aus exakt denselben Bausteinen wie der Admin-Bereich (Uebersicht.tsx,
 // Objektkarte.tsx, MitarbeiterLeaderboard.tsx) — "repräsentativ" heißt hier: dieselben

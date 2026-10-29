@@ -102,24 +102,6 @@ export async function shareSignaturIstGueltig(payload: string, signatur: string 
   return zeitkonstantGleich(signatur, erwarteteSignatur);
 }
 
-// Zugriffsschutz für die TV-Vorführung im Büro (Oktober 2026 Chat-Vorgabe: "ich hätte gerne einen
-// Link generieren ... den ich dann auf den Fernsehern in den einzelnen Büros öffne") — EIN
-// einziger, fester Link ohne Konfigurations-Payload (anders als erzeugeShareSignatur oben, das
-// einen variablen "d"-Parameter signiert): Die TV-Seite zeigt immer denselben Satz an
-// Live-Dashboards, es gibt nichts Individuelles zu signieren. Gleiches HMAC-Schema, eigenes
-// Nachrichten-Präfix ("parma-tv:"), AUTH_SECRET wiederverwendet. Bewusst ohne Ablaufzeitstempel
-// (wie beim Share-Link) — der einmal auf den Büro-Fernsehern hinterlegte Link soll nicht von
-// selbst ungültig werden.
-export async function erzeugeTvSignatur(): Promise<string> {
-  return hmac("parma-tv:dashboard");
-}
-
-export async function tvSignaturIstGueltig(signatur: string | null): Promise<boolean> {
-  if (!signatur) return false;
-  const erwarteteSignatur = await erzeugeTvSignatur();
-  return zeitkonstantGleich(signatur, erwarteteSignatur);
-}
-
 // Zweite, unabhängige Zugriffssperre für den Admin-Bereich (Mitarbeiterstatistik, siehe
 // app/admin/*) — bewusst ein GANZ EIGENES Passwort (Umgebungsvariable ADMIN_PASSWORD) und ein
 // eigenes Session-Cookie, damit nicht jede Person mit App-weitem Zugriff (siehe oben) automatisch
