@@ -166,6 +166,17 @@ export const TEAM: TeamMitglied[] = [
     nutzerNr: "95",
     benutzername: "Leon",
   },
+  // Oktober 2026 Chat-Vorgabe: "bitte Steffi Scaloe als Mitarbeiterin mit aufnehmen! Sie ist für
+  // die Parma Finanz zuständig" — live in OnOffice gesucht (search_users), echter Name ist
+  // "Stefanie Scalone" (E-Mail s.scalone@parmafinanz.de bestätigt Parma Finanz), nicht "Steffi
+  // Scaloe". adressId noch nicht geprüft (kein öffentliches Profil auf der Präsentationsseite
+  // nötig, siehe FINANZ_NAMEN unten) — nutzerNr/benutzername genügen für die TV-Rangliste.
+  {
+    name: "Stefanie Scalone",
+    rolle: "Finanzierungsberaterin, Parma Finanz",
+    nutzerNr: "97",
+    benutzername: "Stefanie",
+  },
 ];
 
 // Reiter-Zuordnung der Mitarbeiterstatistik im Admin-Bereich (siehe Mitarbeiterstatistik.tsx,
@@ -195,3 +206,9 @@ export const AKQUISE_NAMEN = ["Daniel Parma", "Robin Kolbe", "Axel Wehmeier", "J
 
 // "Kathi" = Katharina Becker (siehe TEAM oben).
 export const SETTING_NAMEN = ["Sarah Barth", "Katharina Becker"];
+
+// Parma Finanz (siehe TEAM oben, Stefanie Scalone) — eigene, vierte Gruppe statt Teil von
+// Vertrieb/Akquise/Setting: andere Kennzahlen (Finanzierungstermine statt Besichtigungen/
+// Akquise-Termine), Oktober 2026 Chat-Vorgabe: "Hier will ich auch Punkte vergeben um zu sehen
+// wie viel sie telefoniert".
+export const FINANZ_NAMEN = ["Stefanie Scalone"];

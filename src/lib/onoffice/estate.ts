@@ -2327,6 +2327,59 @@ export async function zaehleTermineNachArt(
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
+// Terminarten für die Finanzierungs-Punkte im Wettkampf-Punktesystem (Oktober 2026 Chat-Vorgabe:
+// "Finanzierung 1 Termin = 6 Punkte, Finanzierung 2 Termin = 7 Punkte" — ersetzt eine zunächst
+// angedachte "Finanzvermittlung"-Kategorie, die sich nicht sauber als "erfolgreich vermittelt"
+// messen ließ). Existieren bereits live im Account (siehe get_activity_action_kinds, actionkind
+// "Termin"), analog zu AKQUISE_TERMINARTEN oben — hier nur für FINANZ_NAMEN (Stefanie Scalone)
+// abgerufen, siehe lib/onoffice/wettkampf.ts.
+export const FINANZIERUNG_TERMINARTEN = {
+  ersttermin: "Finanzierungstermin - Ersttermin",
+  zweittermin: "Finanzierungstermin - Zweittermin",
+} as const;
+
+// Zählt Objekte, bei denen EIN bestimmter Akquisiteur (Auswahlfeld "Akquisiteur",
+// ind_2964_Feld_ObjVerwaltung384 — live geprüft, Oktober 2026: nur drei mögliche Werte, Daniel/
+// Robin/Axel) im Zeitraum [von, bis] den Auftrag akquiriert hat — Grundlage für die
+// "Auftrag Akquiriert"-Punkte im Wettkampf-Punktesystem (siehe onoffice/wettkampf.ts).
+//
+// WICHTIG: Gefiltert wird über das Datumsfeld "Auftrag von" (auftragvon), NICHT über den
+// aktuellen Status2 ("Akquise – Auftrag") — Nutzer-Vorgabe Oktober 2026: "Objekte durchlaufen
+// Statusänderungen ... es wäre blöd wenn ein Mitarbeiter auf einmal Punkte verliert, weil sich
+// richtigerweise etwas in OnOffice ändert". Ein Objekt, das den Auftrag in der Saison bekommen
+// hat und später zu "Aktive Vermarktung" oder "Verkauft" weiterzieht, behält den Punkt — der
+// Status2-Filter würde ihn in dem Moment verlieren, der Datums-Filter nicht. "Auftrag von" ist
+// live geprüft NICHT bei allen Objekten gepflegt (4 von 7 Stichproben) — das ist hier bewusst
+// in Kauf genommen (Nutzer-Entscheidung: "es geht ja auch darum, dass die Mitarbeiter ihre Daten
+// richtig pflegen ... die werden es zwangsläufig machen um Punkte zu sammeln").
+export async function zaehleAuftraegeAkquiriert(
+  akquisiteurSchluessel: string,
+  von: string,
+  bis: string
+): Promise<number> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id"],
+        filter: {
+          ind_2964_Feld_ObjVerwaltung384: [{ op: "=", val: akquisiteurSchluessel }],
+          auftragvon: [
+            { op: ">=", val: von },
+            { op: "<=", val: bis },
+          ],
+        },
+        listlimit: 1,
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
 // Zählt Kunden (Adressen) eines Mitarbeiters mit Adressstatus "Aktiv" (Parameter 5 von 5, siehe
 // Mitarbeiterstatistik.tsx) — reiner Absolut-Snapshot ohne Zeitraum (wie zaehleAktiveObjekte/
 // zaehleObjekteInAufarbeitung oben, siehe Nutzerentscheidung im Chat: kein 30-Tage-/Jahres-Paar

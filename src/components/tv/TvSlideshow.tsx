@@ -7,6 +7,7 @@ import { Objektkarte } from "@/components/admin/Objektkarte";
 import { MitarbeiterLeaderboard } from "./MitarbeiterLeaderboard";
 import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
 import { AdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
+import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
 
 // TV-Vorführung für die Büro-Fernseher (Oktober 2026 Chat-Vorgabe: "ich hätte gerne einen Link
 // generieren ... den ich dann auf den Fernsehern in den einzelnen Büros öffne ... zur Motivation,
@@ -26,7 +27,9 @@ const SLIDE_DAUER_MS = 20_000;
 type SlideId = "uebersicht" | "karte" | "mitarbeiter";
 const SLIDES: SlideId[] = ["uebersicht", "karte", "mitarbeiter"];
 
-export function TvSlideshow(daten: AdminDashboardDaten) {
+export function TvSlideshow(
+  daten: AdminDashboardDaten & { rangliste: WettkampfEintrag[]; saisonBisIso: string }
+) {
   const [index, setIndex] = useState(0);
   useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS);
 
@@ -66,7 +69,11 @@ export function TvSlideshow(daten: AdminDashboardDaten) {
           </div>
         )}
         {slide === "mitarbeiter" && (
-          <MitarbeiterLeaderboard kennzahlen={daten.kennzahlen} alleMitarbeiter={daten.alleMitarbeiter} />
+          <MitarbeiterLeaderboard
+            rangliste={daten.rangliste}
+            alleMitarbeiter={daten.alleMitarbeiter}
+            saisonBisIso={daten.saisonBisIso}
+          />
         )}
       </main>
     </div>
