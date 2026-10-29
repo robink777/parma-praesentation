@@ -12,17 +12,24 @@ const PLOT_HOEHE = CHART_HOEHE - OBEN_PADDING - UNTEN_PADDING;
 // Aufschlüsselung der Balken nach Kategorie (Nutzer-Vorgabe Oktober 2026: "Neue Objekte = Status
 // 2 anzeigen, Neue Adressen = Herkunft Kontakt, jeweils bitte mit Legende" — nach demselben
 // Stapel-Prinzip wie die Wettkampf-Säulen auf der TV-Mitarbeiter-Folie, siehe
-// AktivitaetenSaeule in components/tv/MitarbeiterLeaderboard.tsx). Maximal MAX_KATEGORIEN eigene
-// Farben, der Rest fällt in eine neutrale "Sonstige"-Sammelkategorie (dataviz-Prinzip: Überlauf
-// nie als weitere, beliebige Kategorialfarbe, sondern grau gebündelt) — wichtig vor allem bei
-// "Herkunft Kontakt", wo der Feldkatalog über 30 mögliche Werte kennt, während bei "Status 2"
-// in der Praxis meist nur eine Handvoll Werte pro Wochen-Fenster vorkommt.
+// AktivitaetenSaeule in components/tv/MitarbeiterLeaderboard.tsx). Standardmäßig maximal
+// KUNDEN_MAX_KATEGORIEN eigene Farben, der Rest fällt in eine neutrale "Sonstige"-
+// Sammelkategorie (dataviz-Prinzip: Überlauf nie als weitere, beliebige Kategorialfarbe, sondern
+// grau gebündelt) — nötig bei "Herkunft Kontakt", wo der Feldkatalog über 30 mögliche Werte
+// kennt. "Status 2" dagegen ist ein GESCHLOSSENES Feld mit nur 19 möglichen Werten, und der
+// Nutzer stellte nach einer Kontrolle der Einzelliste klar: "ich will dass jeder Status 2
+// abgefragt wird, auch zum Beispiel Marktbeobachtung - Bearbeitet" — für "Neue Objekte" wird die
+// Kategorisierung deshalb OHNE Obergrenze aufgerufen (siehe Neuzugaenge() unten), jede
+// tatsächlich vorkommende Status2-Ausprägung bekommt eine eigene Legenden-Zeile, nie gefaltet.
 //
 // Wiederverwendet bewusst dieselben chart-1…7-Töne, die weiter oben auf derselben Seite
 // (Uebersicht.tsx) schon für die acht KPI-Kacheln stehen — andere Bedeutung auf derselben Fläche,
 // aber jeder Balken trägt seine eigene, direkt daneben stehende Legende, es entsteht keine
-// Verwechslungsgefahr zwischen KPI-Kachel-Farbe und Balken-Segment-Farbe.
-const MAX_KATEGORIEN = 7;
+// Verwechslungsgefahr zwischen KPI-Kachel-Farbe und Balken-Segment-Farbe. Kommen mehr
+// Kategorien vor als Farben vorhanden sind (möglich, seit "Neue Objekte" ohne Obergrenze läuft),
+// wiederholt sich die Farbfolge (Modulo) — jede Kategorie bleibt über ihre Legenden-Beschriftung
+// trotzdem eindeutig identifizierbar, nur der Farbton kann sich dann mit einer anderen teilen.
+const KUNDEN_MAX_KATEGORIEN = 7;
 const KATEGORIE_FARBEN = [
   "fill-chart-1",
   "fill-chart-2",
@@ -40,13 +47,17 @@ interface Kategorisierung {
   // absteigender Gesamtanzahl über alle Wochen hinweg.
   kategorien: { label: string; farbKlasse: string }[];
   // Ordnet einen rohen Verteilungs-Label-Wert seiner Stapel-Kategorie zu (faltet alles jenseits
-  // von MAX_KATEGORIEN in "Sonstige").
+  // von maxKategorien in "Sonstige").
   zuordnen: (label: string) => string;
 }
 
+// maxKategorien = Infinity (siehe Neuzugaenge() unten, "Neue Objekte") schaltet die
+// "Sonstige"-Faltung komplett ab: Array.slice(0, Infinity) liefert dann einfach alle
+// vorkommenden Kategorien.
 function kategorisiere(
   wochen: NeuzugaengeWoche[],
-  verteilungVon: (w: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[]
+  verteilungVon: (w: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[],
+  maxKategorien: number
 ): Kategorisierung {
   const gesamtJeLabel = new Map<string, number>();
   for (const woche of wochen) {
@@ -55,12 +66,12 @@ function kategorisiere(
     }
   }
   const sortiert = Array.from(gesamtJeLabel.entries()).sort((a, b) => b[1] - a[1]);
-  const top = sortiert.slice(0, MAX_KATEGORIEN).map(([label]) => label);
-  const hatSonstige = sortiert.length > MAX_KATEGORIEN;
+  const top = sortiert.slice(0, maxKategorien).map(([label]) => label);
+  const hatSonstige = sortiert.length > maxKategorien;
 
   const kategorien: { label: string; farbKlasse: string }[] = top.map((label, i) => ({
     label,
-    farbKlasse: KATEGORIE_FARBEN[i],
+    farbKlasse: KATEGORIE_FARBEN[i % KATEGORIE_FARBEN.length],
   }));
   if (hatSonstige) kategorien.push({ label: SONSTIGE_LABEL, farbKlasse: SONSTIGE_FARBE });
 
@@ -121,19 +132,21 @@ function Balkendiagramm({
   wochen,
   wert,
   verteilungVon,
+  maxKategorien,
 }: {
   titel: string;
   einheit: string;
   wochen: NeuzugaengeWoche[];
   wert: (woche: NeuzugaengeWoche) => number | null;
   verteilungVon: (woche: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[];
+  maxKategorien: number;
 }) {
   // Chronologisch (älteste zuerst) für die Lesrichtung links→rechts — ladeNeuzugaengeVerlauf
   // liefert bewusst neueste zuerst (siehe mitarbeiterstatistik.ts), hier fürs Diagramm umgedreht.
   const chronologisch = [...wochen].reverse();
   const werte = chronologisch.map((w) => wert(w) ?? 0);
   const maxWert = Math.max(1, ...werte);
-  const kategorisierung = kategorisiere(chronologisch, verteilungVon);
+  const kategorisierung = kategorisiere(chronologisch, verteilungVon, maxKategorien);
 
   const abgeschlosseneWerte = chronologisch
     .filter((w) => !w.label.includes("(laufend)"))
@@ -270,6 +283,7 @@ export function Neuzugaenge({ verlauf }: { verlauf?: NeuzugaengeWoche[] }) {
         wochen={verlauf}
         wert={(w) => w.neueObjekte}
         verteilungVon={(w) => w.neueObjekteVerteilung}
+        maxKategorien={Infinity}
       />
       <Balkendiagramm
         titel="Neue Kunden"
@@ -277,6 +291,7 @@ export function Neuzugaenge({ verlauf }: { verlauf?: NeuzugaengeWoche[] }) {
         wochen={verlauf}
         wert={(w) => w.neueKunden}
         verteilungVon={(w) => w.neueKundenVerteilung}
+        maxKategorien={KUNDEN_MAX_KATEGORIEN}
       />
     </div>
   );
