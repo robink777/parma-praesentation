@@ -6,6 +6,7 @@ import {
   Kunde,
   LeadquellenKennzahlen,
   MitarbeiterObjekt,
+  NeuzugaengeVerteilungsEintrag,
   ObjektDokument,
   ObjektkarteDaten,
   ObjektkartePlzEintrag,
@@ -2435,17 +2436,61 @@ const KEIN_EIGENES_OBJEKT_STATUS2 = new Set([
 // großzügig Luft, ohne eine echte Seitenweise-Abfrage (offset-Schleife) zu brauchen.
 const NEUE_OBJEKTE_LISTLIMIT = 500;
 
-// Zählt Objekte, die in einem Datumsfenster in OnOffice ANGELEGT wurden (Feld "erstellt_am",
-// System-Zeitstempel bei Objekterstellung, live per get_field_definitions/search_estates
-// bestätigt — Oktober 2026) — Grundlage für den "Neuzugänge"-Navi-Punkt im Admin-Bereich (siehe
+// Klartext-Zuordnung für "Status 2" (Objekt-Feld, live per get_field_definitions geprüft —
+// Oktober 2026) — für die Status2-Aufschlüsselung der "Neue Objekte"-Säulen auf der Übersicht
+// (Nutzer-Vorgabe: "Neue Objekte = Status 2 anzeigen ... mit Legende", siehe
+// Neuzugaenge.tsx). Enthält bewusst auch die drei Werte aus KEIN_EIGENES_OBJEKT_STATUS2 nicht
+// extra, weil zaehleNeueObjekte unten diese Datensätze schon VOR der Aufschlüsselung
+// herausfiltert (kein Parma-Objekt) — sie tauchen hier also nie auf. "" (leeres Status2) ist ein
+// validierter Bestandsfall (siehe Korrektur 2 bei ladeObjektkarteDaten oben), deshalb mit
+// eigenem Label statt als "Unbekannt" zu erscheinen.
+const STATUS2_LABELS: Record<string, string> = {
+  "": "Ohne Status 2",
+  status2obj_inaktiv: "Inaktiv",
+  status2obj_aktiv: "Aktiv",
+  ind_Schl_4903: "Akquise - Absage",
+  in_akquise: "Akquise - In Akquise",
+  vorbereitung: "Vorbereitung",
+  ind_Schl_4905: "Akquise - Vertragstermin",
+  verkauft: "Verkauft",
+  fremd_verkauft_vermietet: "Fremd verkauft/vermietet",
+  vermietet: "Vermietet",
+  ind_Schl_5461: "Akquise – Auftrag",
+  ind_Schl_5459: "Akquise – ReAkquise",
+  ind_Schl_5547: "Akquise - Nachfass",
+  ind_Schl_5545: "Akquise - Nur Bewertung",
+  aktive_vermarktung: "Aktive Vermarktung",
+  reserviert: "Reserviert",
+  auftrag_entzogen: "Ohne Vermarktung",
+};
+
+function status2Label(rohwert: string): string {
+  return STATUS2_LABELS[rohwert] ?? rohwert;
+}
+
+function baueVerteilung(labels: string[]): NeuzugaengeVerteilungsEintrag[] {
+  const zaehler = new Map<string, number>();
+  for (const label of labels) zaehler.set(label, (zaehler.get(label) ?? 0) + 1);
+  return Array.from(zaehler.entries())
+    .map(([label, anzahl]) => ({ label, anzahl }))
+    .sort((a, b) => b.anzahl - a.anzahl);
+}
+
+// Objekte, die in einem Datumsfenster in OnOffice ANGELEGT wurden (Feld "erstellt_am", System-
+// Zeitstempel bei Objekterstellung, live per get_field_definitions/search_estates bestätigt —
+// Oktober 2026) — Grundlage für den "Neuzugänge"-Navi-Punkt im Admin-Bereich (siehe
 // ladeNeuzugaengeVerlauf in mitarbeiterstatistik.ts, Chat-Vorgabe: "wieviele Objekte und wieviele
-// Kunden in einer Woche angelegt worden sind"). bis optional — ohne bis "seit von bis heute"
-// (offenes Fenster), mit bis ein abgeschlossenes Wochenfenster (siehe Datumsfilter-Muster bei
-// zaehleVerkaufteObjekteFuerMitarbeiter oben). Lädt (anders als die übrigen zaehle*-Funktionen)
-// echte Datensätze statt nur meta.cntabsolute zu lesen, weil status2 erst NACH dem Laden gegen
-// KEIN_EIGENES_OBJEKT_STATUS2 geprüft werden kann — die onOffice-Filtersyntax bietet keinen
-// "status2 nicht in [...]"-Operator, den man stattdessen serverseitig anwenden könnte.
-export async function zaehleNeueObjekte(von: string, bis?: string): Promise<number> {
+// Kunden in einer Woche angelegt worden sind", später ergänzt um "Neue Objekte = Status 2
+// anzeigen, jeweils mit Legende" — siehe verteilung unten). bis optional — ohne bis "seit von bis
+// heute" (offenes Fenster), mit bis ein abgeschlossenes Wochenfenster (siehe Datumsfilter-Muster
+// bei zaehleVerkaufteObjekteFuerMitarbeiter oben). Lädt echte Datensätze statt nur
+// meta.cntabsolute zu lesen, weil status2 erst NACH dem Laden gegen KEIN_EIGENES_OBJEKT_STATUS2
+// geprüft werden kann — die onOffice-Filtersyntax bietet keinen "status2 nicht in [...]"-
+// Operator, den man stattdessen serverseitig anwenden könnte.
+export async function zaehleNeueObjekte(
+  von: string,
+  bis?: string
+): Promise<{ gesamt: number; verteilung: NeuzugaengeVerteilungsEintrag[] }> {
   const result = await callOnOfficeApi<RawEstateRecord>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
@@ -2465,17 +2510,33 @@ export async function zaehleNeueObjekte(von: string, bis?: string): Promise<numb
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records ?? [];
-  return records.filter((r) => !KEIN_EIGENES_OBJEKT_STATUS2.has(r.elements.status2 ?? "")).length;
+  const eigene = records.filter((r) => !KEIN_EIGENES_OBJEKT_STATUS2.has(r.elements.status2 ?? ""));
+  return {
+    gesamt: eigene.length,
+    verteilung: baueVerteilung(eigene.map((r) => status2Label(r.elements.status2 ?? ""))),
+  };
 }
 
-// Zählt Adressen (Kunden/Kontakte jeder Art), die in einem Datumsfenster in OnOffice angelegt
-// wurden — Feld "Eintragsdatum", NICHT "kunde_seit" (das ist ein manuell gepflegtes Datum, kein
+// Oberste sinnvolle Obergrenze für eine einzelne Kalenderwoche neu angelegter Adressen — live
+// beobachtete Spitzenwoche lag bei 134 (siehe Uebersicht-Screenshots Oktober 2026), 500 lässt
+// großzügig Luft, analog zu NEUE_OBJEKTE_LISTLIMIT oben.
+const NEUE_KUNDEN_LISTLIMIT = 500;
+
+// Adressen (Kunden/Kontakte jeder Art), die in einem Datumsfenster in OnOffice angelegt wurden —
+// Feld "Eintragsdatum", NICHT "kunde_seit" (das ist ein manuell gepflegtes Datum, kein
 // Anlegezeitpunkt: live gegen den Account geprüft, Oktober 2026 — Eintragsdatum trägt echte
 // Uhrzeiten und steigt mit jedem neu angelegten Datensatz). bis optional, gleiches Muster wie
-// zaehleNeueObjekte oben. resourcetype "address" braucht "Name" statt "Id" als data-Feld (siehe
-// Kommentar bei zaehleAktiveKunden oben) — gleiches listlimit:1 + meta.cntabsolute-Muster.
-export async function zaehleNeueKunden(von: string, bis?: string): Promise<number> {
-  const result = await callOnOfficeApi([
+// zaehleNeueObjekte oben. Lädt (seit der Status2/Herkunft-Aufschlüsselung, Nutzer-Vorgabe "Neue
+// Adressen = Herkunft Kontakt") echte Datensätze mit "HerkunftKontakt" statt nur
+// meta.cntabsolute zu lesen — HerkunftKontakt ist ein Mehrfachauswahlfeld (pipe-getrennt, siehe
+// ladeLeadquellenKennzahlen oben); für die Aufschlüsselung zählt bewusst nur der ERSTE eingetragene
+// Wert je Kontakt (die "primäre" Herkunft), sonst würde ein Kontakt mit zwei Herkunft-Werten in
+// zwei Segmenten zugleich auftauchen und die Segment-Summe überstiege die Balkenhöhe.
+export async function zaehleNeueKunden(
+  von: string,
+  bis?: string
+): Promise<{ gesamt: number; verteilung: NeuzugaengeVerteilungsEintrag[] }> {
+  const result = await callOnOfficeApi<{ elements: { HerkunftKontakt?: string } }>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
       resourcetype: "address",
@@ -2483,17 +2544,22 @@ export async function zaehleNeueKunden(von: string, bis?: string): Promise<numbe
       identifier: "",
       cacheable: false,
       parameters: {
-        data: ["Name"],
+        data: ["Name", "HerkunftKontakt"],
         filter: {
           Eintragsdatum: bis
             ? [{ op: ">=", val: von }, { op: "<=", val: bis }]
             : [{ op: ">=", val: von }],
         },
-        listlimit: 1,
+        listlimit: NEUE_KUNDEN_LISTLIMIT,
       },
     },
   ]);
-  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+  const records = result?.response?.results?.[0]?.data?.records ?? [];
+  const labels = records.map((r) => {
+    const erster = (r.elements.HerkunftKontakt || "").split("|").map((s) => s.trim()).filter(Boolean)[0];
+    return erster ? herkunftLabel(erster) : "Ohne Herkunft";
+  });
+  return { gesamt: records.length, verteilung: baueVerteilung(labels) };
 }
 
 // Ermittelt die zuletzt vergebene Kundennummer (KdNr, Feld im address-Modul) für die

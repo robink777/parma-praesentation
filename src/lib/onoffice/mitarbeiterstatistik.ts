@@ -164,8 +164,10 @@ export async function ladeNeuzugaengeVerlauf(): Promise<NeuzugaengeWoche[]> {
         von: vonStr,
         bis: bisStr,
         label: `${formatiereDatumKurz(von)}–${formatiereDatumKurz(bis)}${istAktuelleWoche ? " (laufend)" : ""}`,
-        neueObjekte,
-        neueKunden,
+        neueObjekte: neueObjekte?.gesamt ?? null,
+        neueObjekteVerteilung: neueObjekte?.verteilung ?? [],
+        neueKunden: neueKunden?.gesamt ?? null,
+        neueKundenVerteilung: neueKunden?.verteilung ?? [],
       };
     })
   );

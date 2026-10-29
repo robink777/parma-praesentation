@@ -413,12 +413,23 @@ export interface ObjektGesamtKennzahlen {
 // hier aber inhaltlich als EIN "Neuzugänge"-Block zusammen. von/bis im Format "YYYY-MM-DD"
 // (Montag-Sonntag der jeweiligen Kalenderwoche), label die fertig formatierte Anzeige
 // ("20.10.–26.10." bzw. mit Zusatz "(laufend)" für die noch nicht abgeschlossene aktuelle Woche).
+// Ein Eintrag der Status2- bzw. Herkunft-Aufschlüsselung einer Woche (siehe NeuzugaengeWoche
+// unten) — Nutzer-Vorgabe: "Neue Objekte = Status 2 anzeigen, Neue Adressen = Herkunft Kontakt,
+// jeweils bitte mit Legende", nach demselben Aufschlüsselungs-Prinzip wie die Wettkampf-Säulen auf
+// der TV-Folie (siehe WettkampfSegment in onoffice/wettkampf.ts).
+export interface NeuzugaengeVerteilungsEintrag {
+  label: string;
+  anzahl: number;
+}
+
 export interface NeuzugaengeWoche {
   von: string;
   bis: string;
   label: string;
   neueObjekte: number | null;
+  neueObjekteVerteilung: NeuzugaengeVerteilungsEintrag[];
   neueKunden: number | null;
+  neueKundenVerteilung: NeuzugaengeVerteilungsEintrag[];
 }
 
 // Ein Objekt mit mindestens einer erkannten Dateninkonsistenz in OnOffice, für die "Kontrolle"-
