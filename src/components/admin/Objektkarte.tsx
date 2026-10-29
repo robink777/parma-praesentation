@@ -216,51 +216,6 @@ function formatiereKarte(daten: ObjektkarteDaten | undefined) {
   return { orte, summe };
 }
 
-function erzeugeMarkerElement(ort: ReturnType<typeof formatiereKarte>["orte"][number]) {
-  const gesamt = ort.akquise + ort.verkaufen + ort.verkauft;
-  const el = document.createElement("div");
-  el.style.cssText = "display:flex;flex-direction:column;align-items:center;pointer-events:none;";
-
-  const karte = document.createElement("div");
-  karte.style.cssText =
-    "pointer-events:auto;background:#FCFCFB;border:1px solid rgba(80,63,61,0.15);border-radius:8px;" +
-    "box-shadow:0 2px 8px rgba(80,63,61,0.18);padding:6px 9px;min-width:84px;text-align:center;" +
-    "font-family:Inter,system-ui,sans-serif;";
-
-  const kopf = document.createElement("p");
-  kopf.style.cssText =
-    "margin:0 0 4px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.06em;color:#503F3D;opacity:0.7;white-space:nowrap;";
-  kopf.textContent = `${ort.plz} · ${ort.ort}`;
-  karte.appendChild(kopf);
-
-  const zeilen = document.createElement("div");
-  zeilen.style.cssText = "display:flex;gap:6px;justify-content:center;";
-  for (const kat of KATEGORIEN) {
-    const anzahl = ort[kat.key];
-    const chip = document.createElement("div");
-    chip.style.cssText = "display:flex;align-items:center;gap:3px;";
-    chip.title = `${kat.label}: ${anzahl}`;
-    const dot = document.createElement("span");
-    dot.style.cssText = `display:inline-block;width:7px;height:7px;border-radius:50%;background:${FARBE[kat.key]};opacity:${anzahl > 0 ? 1 : 0.25};`;
-    const zahl = document.createElement("span");
-    zahl.style.cssText = `font-family:'Roboto Slab',serif;font-weight:700;font-size:12px;color:#503F3D;opacity:${anzahl > 0 ? 1 : 0.35};`;
-    zahl.textContent = String(anzahl);
-    chip.appendChild(dot);
-    chip.appendChild(zahl);
-    zeilen.appendChild(chip);
-  }
-  karte.appendChild(zeilen);
-  el.appendChild(karte);
-
-  if (gesamt === 0) karte.style.opacity = "0.55";
-
-  const stiel = document.createElement("div");
-  stiel.style.cssText = "width:1.5px;height:10px;background:rgba(80,63,61,0.35);";
-  el.appendChild(stiel);
-
-  return el;
-}
-
 // Kleiner, einzelner Objekt-Pin (nicht die große Stat-Karte oben) — Chat-Vorgabe Oktober 2026:
 // "für die Immobilien, die wir als Adresse gelistet haben, in der jeweiligen Postleitzahl die
 // Pins setzen, wenn ich anklicke". title = native Browser-Tooltip bei Hover (kurzer Hinweis),
@@ -492,33 +447,14 @@ export function Objektkarte({
     };
   }, []);
 
-  const { orte, summe } = formatiereKarte(daten);
+  // Die früheren schwebenden Stat-Karten je PLZ-Fläche (erzeugeMarkerElement) sind entfernt —
+  // Oktober 2026 Chat-Vorgabe: "Die Ebenen mit den PLZ Angaben, die du über die Karte gelegt
+  // hast, machen die Karte unübersichtlich, leg diese Informationen lieber in die Navi rechts
+  // daneben und lass die Karte frei". Dieselben Zahlen stehen jetzt als Liste im rechten Panel
+  // (siehe PlzObjekte.tsx) — die Karte selbst zeigt nur noch die eingefärbten Flächen, den
+  // Umriss und (für die ausgewählte PLZ) die einzelnen Objekt-Pins unten.
+  const { summe } = formatiereKarte(daten);
   const gesamtSumme = summe.akquise + summe.verkaufen + summe.verkauft;
-
-  // Nur die Marker (nicht Quelle/Ebenen, siehe Effekt oben) — läuft erneut, wenn sich die
-  // geladenen Objektzahlen ändern (z.B. nach einem erneuten Live-Abruf), ohne die Karte selbst
-  // neu aufzubauen.
-  useEffect(() => {
-    const karte = kartenRef.current;
-    if (!karte || !bereit) return;
-
-    const marker: Marker[] = [];
-    for (const ort of orte) {
-      // Die ausgewählte PLZ zeigt stattdessen einzelne Objekt-Pins (siehe Effekt weiter unten) —
-      // beides gleichzeitig (die große Stat-Karte UND Dutzende Pins an derselben Stelle) wäre
-      // unübersichtlich.
-      if (ort.plz === ausgewaehltePlz) continue;
-      marker.push(
-        new Marker({ element: erzeugeMarkerElement(ort), anchor: "bottom" })
-          .setLngLat(ort.label)
-          .addTo(karte)
-      );
-    }
-
-    return () => {
-      marker.forEach((m) => m.remove());
-    };
-  }, [bereit, orte, ausgewaehltePlz]);
 
   // Dauerhafte Hervorhebung der ausgewählten PLZ-Fläche (feature-state "selected", siehe
   // fill-opacity oben) — Chat-Vorgabe Oktober 2026: "die Farbe des Postleitzahlbereichs halten,

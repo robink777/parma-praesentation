@@ -28,7 +28,12 @@ export function KarteBereich({
         <Objektkarte daten={daten} onPlzKlick={onPlzKlick} ausgewaehltePlz={gewaehltePlz?.plz ?? null} />
       </div>
       <div className="h-full min-h-0 w-1/4 overflow-y-auto rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
-        <PlzObjekte plz={gewaehltePlz?.plz ?? null} ort={gewaehltePlz?.ort ?? null} daten={daten} />
+        <PlzObjekte
+          plz={gewaehltePlz?.plz ?? null}
+          ort={gewaehltePlz?.ort ?? null}
+          daten={daten}
+          onPlzWahl={onPlzKlick}
+        />
       </div>
     </div>
   );
