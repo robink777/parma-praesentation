@@ -7,6 +7,12 @@ import {
   shareSignaturIstGueltig,
 } from "@/lib/auth";
 
+// /tv selbst prüft seine eigene sig-Signatur (siehe app/tv/page.tsx, tvSignaturIstGueltig in
+// lib/auth.ts) — hier nur von der regulären APP_PASSWORD-Prüfung ausgenommen, analog zu
+// /geteilt unten. Kein zweiter Vergleich hier in der Middleware: Ein TV im Büro soll den Link
+// einmal öffnen und dauerhaft laufen lassen, ohne je wieder ein Passwort einzugeben.
+const TV_PFAD = "/tv";
+
 // Schützt die komplette App (Seiten UND API-Routen) hinter dem einen gemeinsamen Passwort aus
 // lib/auth.ts — es gibt bewusst kein Konten-/Nutzersystem, nur diese eine Sperre gegen
 // unautorisierten Zugriff aus dem offenen Internet (insbesondere auf /api/onoffice, das sonst
@@ -28,7 +34,7 @@ export async function middleware(request: NextRequest) {
   // App-Passwort nicht. /geteilt selbst immer durchlassen: Die Seite prüft die Signatur (d/sig-
   // Query-Parameter) selbst noch einmal und zeigt bei Ungültigkeit eine eigene, kundenfreundliche
   // "Link ungültig"-Meldung statt der internen Login-Seite, die der Kunde nicht kennt.
-  if (request.nextUrl.pathname === "/geteilt") {
+  if (request.nextUrl.pathname === "/geteilt" || request.nextUrl.pathname === TV_PFAD) {
     return NextResponse.next();
   }
 

@@ -313,6 +313,7 @@ export function Objektkarte({
   daten,
   onPlzKlick,
   ausgewaehltePlz,
+  interaktiv = true,
 }: {
   daten?: ObjektkarteDaten;
   // Chat-Vorgabe Oktober 2026: "ich will dass jedes Mal wenn man in den einzelnen PLZ Bereich
@@ -326,6 +327,11 @@ export function Objektkarte({
   // (siehe die beiden Effekte unten), damit beides zum tatsächlich angezeigten "PLZ"-Navi-Bereich
   // passt, auch wenn die Auswahl künftig von woanders als einem Kartenklick ausgelöst wird.
   ausgewaehltePlz?: string | null;
+  // false für die TV-Vorführung (siehe tv/TvSlideshow.tsx, Oktober 2026 Chat-Vorgabe: "da soll
+  // nichts klickbar sein") — kein Zoom-Control, keine Maus-/Touch-Gesten, kein Klick-auf-PLZ.
+  // Die Karte bleibt exakt im fitBounds-Ausschnitt stehen, rein zur Ansicht. Im Admin-Bereich
+  // (KarteBereich.tsx) weiterhin Standard true, dort bleibt alles wie bisher interaktiv.
+  interaktiv?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const kartenRef = useRef<MaplibreMap | null>(null);
@@ -368,17 +374,21 @@ export function Objektkarte({
       // Mitarbeiterstatistik.tsx). Drehen/Kippen bleiben deaktiviert (für eine 2D-Übersichtskarte
       // nicht sinnvoll), minZoom/maxBounds bleiben als sanfte Leitplanken bestehen, damit man sich
       // nicht komplett aus dem Landkreis heraus verschieben/zoomen kann.
-      dragPan: true,
+      dragPan: interaktiv,
       dragRotate: false,
       touchPitch: false,
       boxZoom: false,
-      keyboard: true,
-      doubleClickZoom: true,
+      keyboard: interaktiv,
+      doubleClickZoom: interaktiv,
+      scrollZoom: interaktiv,
+      touchZoomRotate: interaktiv,
     });
     // Pinch-Rotation auf Touch-Geräten bleibt deaktiviert (für eine 2D-Übersichtskarte nicht
     // sinnvoll), Pinch-Zoom bleibt erlaubt — dragRotate oben deckt nur die Maus-Variante ab.
     karte.touchZoomRotate.disableRotation();
-    karte.addControl(new NavigationControl({ showCompass: false, showZoom: true }), "top-right");
+    if (interaktiv) {
+      karte.addControl(new NavigationControl({ showCompass: false, showZoom: true }), "top-right");
+    }
     // "resize" feuert MapLibre-intern, sobald sich die tatsächliche Größe des Containers ändert
     // (z.B. Fenster verkleinert/vergrößert, Orientierungswechsel auf Mobilgeräten), nicht bei
     // normaler Interaktion (Klick-Zoom, Scroll-Zoom, Verschieben) — ein erneutes fitBounds stellt
@@ -444,30 +454,32 @@ export function Objektkarte({
       // nächste (ohne dazwischen die Karte zu verlassen) die vorherige zuverlässig zurückgesetzt
       // wird — mouseenter/mouseleave feuern pro Layer nur einmal beim Betreten/Verlassen der
       // gesamten Ebene, nicht pro einzelnem Feature.
-      let gehoverteFlaecheId: number | string | undefined;
-      karte.on("mousemove", "plz-fill", (e) => {
-        karte.getCanvas().style.cursor = "pointer";
-        const id = e.features?.[0]?.id;
-        if (id === undefined || id === gehoverteFlaecheId) return;
-        if (gehoverteFlaecheId !== undefined) {
-          karte.setFeatureState({ source: "plz", id: gehoverteFlaecheId }, { hover: false });
-        }
-        gehoverteFlaecheId = id;
-        karte.setFeatureState({ source: "plz", id }, { hover: true });
-      });
-      karte.on("mouseleave", "plz-fill", () => {
-        karte.getCanvas().style.cursor = "";
-        if (gehoverteFlaecheId !== undefined) {
-          karte.setFeatureState({ source: "plz", id: gehoverteFlaecheId }, { hover: false });
-        }
-        gehoverteFlaecheId = undefined;
-      });
-      karte.on("click", "plz-fill", (e) => {
-        karte.easeTo({ center: e.lngLat, zoom: KLICK_ZOOM, duration: 500 });
-        const feature = e.features?.[0];
-        const plz = feature?.properties?.plz;
-        if (plz) onPlzKlickRef.current?.(String(plz), String(feature?.properties?.st ?? ""));
-      });
+      if (interaktiv) {
+        let gehoverteFlaecheId: number | string | undefined;
+        karte.on("mousemove", "plz-fill", (e) => {
+          karte.getCanvas().style.cursor = "pointer";
+          const id = e.features?.[0]?.id;
+          if (id === undefined || id === gehoverteFlaecheId) return;
+          if (gehoverteFlaecheId !== undefined) {
+            karte.setFeatureState({ source: "plz", id: gehoverteFlaecheId }, { hover: false });
+          }
+          gehoverteFlaecheId = id;
+          karte.setFeatureState({ source: "plz", id }, { hover: true });
+        });
+        karte.on("mouseleave", "plz-fill", () => {
+          karte.getCanvas().style.cursor = "";
+          if (gehoverteFlaecheId !== undefined) {
+            karte.setFeatureState({ source: "plz", id: gehoverteFlaecheId }, { hover: false });
+          }
+          gehoverteFlaecheId = undefined;
+        });
+        karte.on("click", "plz-fill", (e) => {
+          karte.easeTo({ center: e.lngLat, zoom: KLICK_ZOOM, duration: 500 });
+          const feature = e.features?.[0];
+          const plz = feature?.properties?.plz;
+          if (plz) onPlzKlickRef.current?.(String(plz), String(feature?.properties?.st ?? ""));
+        });
+      }
 
       setBereit(true);
     });
