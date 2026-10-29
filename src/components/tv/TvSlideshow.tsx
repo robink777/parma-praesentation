@@ -27,9 +27,9 @@ import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
 // AdminDashboardDaten trotzdem weiter mitgeladen (siehe adminDashboard.ts), da app/admin/page.tsx
 // das für den Karte-Navi-Punkt dort weiterhin braucht.
 //
-// Taktgeschwindigkeit auf Nutzerwunsch verdoppelt ("die Slidewechselgeschwindigkeit kann
-// verdoppelt werden") — ursprünglich 20_000ms.
-const SLIDE_DAUER_MS = 10_000;
+// Taktgeschwindigkeit nach kurzem Zwischenstand (10_000ms, zu kurz) auf eine Minute je Folie
+// gesetzt (Nutzer-Vorgabe: "mach bitte eine Minute pro Folie").
+const SLIDE_DAUER_MS = 60_000;
 
 type SlideId = "uebersicht" | "mitarbeiter";
 const SLIDES: SlideId[] = ["uebersicht", "mitarbeiter"];
