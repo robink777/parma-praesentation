@@ -94,6 +94,12 @@ export interface WettkampfSegment {
 export interface WettkampfEintrag {
   name: string;
   punkte: number;
+  // Rohe Gesamtzahlen (Saison, nicht Punkte) für die TV-Kacheln — Nutzer-Vorgabe: "ich brauche
+  // bei allen Mitarbeitern ja auch immer die Gesamtzahlen der einzelnen Punkte". telefonateGesamt
+  // = Rohzahl Telefonate; termineGesamt = Summe aller Termin-Kategorien (Besichtigung, Akquise-
+  // und Finanzierungstermine) — ohne Aufträge/Verkäufe, die sind keine "Termine".
+  telefonateGesamt: number;
+  termineGesamt: number;
   segmente: WettkampfSegment[];
 }
 
@@ -165,8 +171,9 @@ async function berechnePunkte(
     { kategorie: "verkaeufe", punkte: verkaeufe * PUNKTE.verkauf },
   ];
   const punkte = segmente.reduce((summe, s) => summe + s.punkte, 0);
+  const termineGesamt = besichtigungen + akquiseErst + akquiseZweit + finanzErst + finanzZweit;
 
-  return { name: mitgliedName, punkte, segmente };
+  return { name: mitgliedName, punkte, telefonateGesamt: telefonate, termineGesamt, segmente };
 }
 
 // Live-Rangliste für den Büro-Wettkampf, absteigend nach Punkten — siehe
@@ -183,7 +190,13 @@ export async function ladeWettkampfRangliste(): Promise<WettkampfEintrag[]> {
   const eintraege = await Promise.all(
     teilnehmerListe().map((mitglied) =>
       berechnePunkte(mitglied.name, vonZeit, bisZeit, vonDatum, bisDatum).catch(
-        (): WettkampfEintrag => ({ name: mitglied.name, punkte: 0, segmente: [] })
+        (): WettkampfEintrag => ({
+          name: mitglied.name,
+          punkte: 0,
+          telefonateGesamt: 0,
+          termineGesamt: 0,
+          segmente: [],
+        })
       )
     )
   );

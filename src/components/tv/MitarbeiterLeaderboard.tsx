@@ -38,17 +38,26 @@ function MitarbeiterZahlenKachel({
   rang,
   fotoUrl,
   kennzahlen,
+  telefonateGesamt,
+  termineGesamt,
 }: {
   name: string;
   rang: number;
   fotoUrl?: string;
   kennzahlen?: MitarbeiterKennzahlen;
+  telefonateGesamt: number;
+  termineGesamt: number;
 }) {
+  // Nutzer-Korrektur: "ich brauche bei allen Mitarbeitern ja auch immer die Gesamtzahlen der
+  // einzelnen Punkte ... noch etwas safespace ... ergänzen für Anrufe gesamt, Termine gesamt" —
+  // dritte Zeile (Saison-Gesamtzahl) unter heute/Woche, je Zeile ein Zeitraum.
   const werte = [
     { label: "Anrufe heute", wert: formatWert(kennzahlen?.telefonateHeute) },
-    { label: "Anrufe Woche", wert: formatWert(kennzahlen?.telefonateWoche) },
     { label: "Termine heute", wert: formatWert(kennzahlen?.termineHeute) },
+    { label: "Anrufe Woche", wert: formatWert(kennzahlen?.telefonateWoche) },
     { label: "Termine Woche", wert: formatWert(kennzahlen?.termineWoche) },
+    { label: "Anrufe gesamt", wert: formatWert(telefonateGesamt) },
+    { label: "Termine gesamt", wert: formatWert(termineGesamt) },
   ];
   const rangFarbe = RANG_FARBEN[rang - 1];
   return (
@@ -119,13 +128,27 @@ const SEGMENT_LABEL: Record<WettkampfKategorie, string> = {
   verkaeufe: "Verkäufe",
 };
 
+// Nutzer-Korrektur: "schreib bitte in die Legende noch welche Aktivität wieviele Punkte bringt" —
+// Werte bewusst hier als Text dupliziert statt PUNKTE aus wettkampf.ts zu importieren: Das wäre
+// ein Wert-Import aus einem Modul, das serverseitigen OnOffice-Code lädt, und würde diesen Code
+// in den Client-Bundle dieser Folie ziehen (siehe TvSlideshow.tsx-Kommentar). Bei einer Änderung
+// an PUNKTE in wettkampf.ts muss dieser Text von Hand mitgezogen werden.
+const SEGMENT_PUNKTE_TEXT: Record<WettkampfKategorie, string> = {
+  telefonate: "1 Pkt.",
+  besichtigungen: "3 Pkt.",
+  akquiseTermine: "6/7 Pkt.",
+  finanzierungTermine: "6/7 Pkt.",
+  auftraege: "10 Pkt.",
+  verkaeufe: "10 Pkt.",
+};
+
 function SegmentLegende() {
   return (
     <div className="flex flex-wrap items-center gap-x-sm gap-y-[2px]">
       {SEGMENT_REIHENFOLGE.map((kat) => (
         <span key={kat} className="flex items-center gap-[3px] text-[9px] text-anthrazit/50">
           <span className={`inline-block h-[7px] w-[7px] rounded-full ${SEGMENT_FARBEN[kat]}`} />
-          {SEGMENT_LABEL[kat]}
+          {SEGMENT_LABEL[kat]} ({SEGMENT_PUNKTE_TEXT[kat]})
         </span>
       ))}
     </div>
@@ -221,6 +244,8 @@ export function MitarbeiterLeaderboard({
               rang={i + 1}
               fotoUrl={fotos[eintrag.name]}
               kennzahlen={kennzahlen?.[eintrag.name]}
+              telefonateGesamt={eintrag.telefonateGesamt}
+              termineGesamt={eintrag.termineGesamt}
             />
           ))}
         </div>
