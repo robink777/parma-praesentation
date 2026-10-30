@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { AKQUISE_NAMEN, SETTING_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unternehmen";
+import { InfoTooltip } from "@/components/shared/InfoTooltip";
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import { Betreuer, MitarbeiterKennzahlen, TeamMitglied } from "@/types";
 
@@ -164,6 +165,46 @@ function baueMetriken(
   ];
 }
 
+// Erläuterungstext je Kennzahl-Label (Nutzer-Vorgabe Oktober 2026: "bei jedem statistischen Wert
+// ... ein kleines (i) ... welche OnOffice-Felder und welche Formeln dahinterstecken"). EIN (i) pro
+// Kachel statt eines pro Einzelwert (siehe baueKachelInfo unten) — Formeln/Felder 1:1 aus den
+// Kommentaren bei zaehleAktiveObjekte/zaehleObjekteInAufarbeitung/zaehleTermine/
+// zaehleBesichtigungen/zaehleTelefonate/zaehleTermineNachArt/zaehleAktiveKunden/
+// zaehleVerkaufteObjekteFuerMitarbeiter (onoffice/estate.ts) übernommen.
+const METRIK_INFO: Record<string, string> = {
+  "Anrufe heute": 'Aktivitäten vom Typ "Telefonat" (Maklerbuch, resourcetype agentslog, Feld Aktionsart), heute.',
+  "Anrufe Woche": 'Aktivitäten vom Typ "Telefonat", diese Kalenderwoche (Mo–So).',
+  "Termine heute": "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, heute.",
+  "Termine Woche": "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, diese Kalenderwoche (Mo–So).",
+  "Aktive Objekte": 'Objekte mit status=1 (Aktiv), vermarktungsart=kauf, Betreuer (Feld "benutzer") = diese Person.',
+  Aufarbeitung: "Objekte mit status=2 (Inaktiv) UND status2=vorbereitung, vermarktungsart=kauf, Betreuer = diese Person.",
+  "Erst 30T": 'Kalendertermine der Terminart "Akquise - Ersttermin", letzte 30 Tage.',
+  "Erst Jahr": 'Kalendertermine der Terminart "Akquise - Ersttermin", laufendes Kalenderjahr.',
+  "Zweit 30T": 'Terminart "Akquise - Zweittermin", letzte 30 Tage.',
+  "Zweit Jahr": 'Terminart "Akquise - Zweittermin", laufendes Kalenderjahr.',
+  "Quote 1→2": "Akquise-Zweittermine ÷ Akquise-Ersttermine (jeweils laufendes Jahr) × 100, gerundet.",
+  "Vertrag 30T": 'Terminart "Akquise - Vertragstermin", letzte 30 Tage.',
+  "Vertrag Jahr": 'Terminart "Akquise - Vertragstermin", laufendes Kalenderjahr.',
+  "Termine 30T": "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, letzte 30 Tage.",
+  "Termine Jahr": "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, laufendes Kalenderjahr.",
+  "Besicht. 30T": 'Kalendertermine der Arten "Besichtigung" und "Folgebesichtigung", letzte 30 Tage.',
+  "Besicht. Jahr": 'Kalendertermine der Arten "Besichtigung" und "Folgebesichtigung", laufendes Kalenderjahr.',
+  "Kunden aktiv": 'Adressen mit Status2Adr="Aktiv" und Feld "Benutzer" (OnOffice-Kurzname) = diese Person — Schnappschuss ohne Zeitfenster.',
+  Verkauft: 'Objekte mit Feld "verkauft_am" im laufenden Kalenderjahr, Betreuer = diese Person.',
+  // Dieselbe Bedeutung wie "Aktive Objekte"/Verkauft oben, nur unter dem abweichenden Label des
+  // ObjektBalken-Segments (siehe OBJEKT_BALKEN_SEGMENTE unten).
+  "Aktive Immobilien": 'Objekte mit status=1 (Aktiv), vermarktungsart=kauf, Betreuer (Feld "benutzer") = diese Person.',
+  "Verkäufe": 'Objekte mit Feld "verkauft_am" im laufenden Kalenderjahr, Betreuer = diese Person.',
+};
+
+// Baut den gebündelten Tooltip-Text für eine Kachel aus allen dort sichtbaren Kennzahlen-Labels
+// (siehe baueMetriken oben) — EIN (i) pro Kachel statt eines pro Zelle.
+function baueKachelInfo(metriken: { label: string; wert: string }[]): string {
+  return metriken
+    .map((m) => `${m.label}: ${METRIK_INFO[m.label] ?? "–"}`)
+    .join("\n\n");
+}
+
 // Die drei Objekt-Kennzahlen als EIN gemeinsamer Balken statt eigener Kacheln-Felder (Chat-
 // Vorgabe: "Die Objektstatistik hätte ich gerne darunter als Balkendiagramm. Einen Balken mit
 // den Werten darin"). Farben bewusst dieselben wie an anderer Stelle im Dashboard für dieselbe
@@ -242,8 +283,14 @@ function MitarbeiterKachel({
   zeitraum?: Zeitraum;
 }) {
   const metriken = baueMetriken(kennzahlen, modus, zeitraum);
+  const balkenMetriken =
+    modus === "vertrieb"
+      ? OBJEKT_BALKEN_SEGMENTE.map((segment) => ({ label: segment.label, wert: "" }))
+      : [];
+  const info = baueKachelInfo([...metriken, ...balkenMetriken]);
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
+    <div className="relative flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
+      <InfoTooltip text={info} breit className="absolute right-sm top-sm" />
       <div className="mb-sm flex shrink-0 items-center gap-sm">
         <div className="relative h-[clamp(36px,6vh,56px)] w-[clamp(36px,6vh,56px)] shrink-0 overflow-hidden rounded-full bg-sand">
           {fotoUrl ? (

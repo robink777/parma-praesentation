@@ -1,3 +1,4 @@
+import { InfoTooltip } from "@/components/shared/InfoTooltip";
 import { ObjektkarteDaten, ObjektkartePlzEintrag, ObjektkartePlzObjekt } from "@/types";
 import plzOrte from "@/data/geo/landkreis-dueren-plz-orte.json";
 
@@ -133,7 +134,15 @@ export function PlzObjekte({
   if (!plz) {
     return (
       <div>
-        <p className="label mb-sm">Alle PLZ-Gebiete</p>
+        <p className="mb-sm flex items-center gap-xs">
+          <span className="label">Alle PLZ-Gebiete</span>
+          <InfoTooltip
+            text={
+              "Kategorie je Objekt (status2 hat Vorrang vor status): status2=verkauft → \"Verkauft\". status2 eine der Akquise-Unterstufen (z.B. in_akquise, vorbereitung, Akquise - Auftrag) → \"Akquise\". Sonst status=1 (Aktiv) → \"Verkaufen\". Alles andere (z.B. Marktbeobachtung) zählt in keiner der drei Kategorien."
+            }
+            breit
+          />
+        </p>
         <div className="flex flex-col">
           {PLZ_REIHENFOLGE.map((einePlz) => {
             const eintrag = daten.jePlz.find((e) => e.plz === einePlz) ?? leereEintrag(einePlz);

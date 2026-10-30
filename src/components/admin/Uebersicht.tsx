@@ -12,10 +12,12 @@ import { Neuzugaenge } from "./Neuzugaenge";
 //
 // Dieselbe Komponente läuft sowohl im Admin-Bereich (AdminDashboard.tsx) als auch auf der
 // öffentlichen, unauthentifizierten TV-Folie (TvSlideshow.tsx) — "interaktiv" schaltet deshalb
-// bewusst einzeln zu, ob die "N ohne Angabe"-Hinweise zu den neuen Detailseiten verlinken (Nutzer-
-// Vorgabe Oktober 2026: "im Admin-Bereich ... eine neue Seite öffnen wo genau diese Objekte
-// angezeigt werden"). Auf der TV-Folie bleibt es bei der ursprünglichen Vorgabe "da soll nichts
-// klickbar sein" — Default false, damit TvSlideshow.tsx unverändert bleiben kann.
+// bewusst einzeln zu, ob (a) die "N ohne Angabe"-Hinweise zu den Detailseiten verlinken und (b)
+// die (i)-Erläuterungen (OnOffice-Feld/Formel je Wert) erscheinen (Nutzer-Vorgabe Oktober 2026:
+// "im Admin-Bereich ... eine neue Seite öffnen ..." bzw. später "bei jedem statistischen Wert ...
+// ein kleines (i) ... nicht im TV- oder Smartphone-Bereich"). Auf der TV-Folie bleibt es bei der
+// ursprünglichen Vorgabe "da soll nichts klickbar sein" — Default false, damit TvSlideshow.tsx
+// unverändert bleiben kann.
 export function Uebersicht({
   gesamt,
   neuzugaengeVerlauf,
@@ -32,7 +34,8 @@ export function Uebersicht({
           provisionsvorlauf: "/admin/provisionsfehler?quelle=gesamt",
           provisionsvolumenJahr: "/admin/provisionsfehler?quelle=verkauft",
         }
-      : undefined
+      : undefined,
+    interaktiv
   );
 
   return (
@@ -43,7 +46,7 @@ export function Uebersicht({
         ))}
       </div>
       <div className="min-h-0 flex-1 rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
-        <Neuzugaenge verlauf={neuzugaengeVerlauf} />
+        <Neuzugaenge verlauf={neuzugaengeVerlauf} interaktiv={interaktiv} />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { KATEGORIE_BG_KLASSEN, KATEGORIE_FILL_KLASSEN } from "@/components/shared/kategorieFarben";
+import { InfoTooltip } from "@/components/shared/InfoTooltip";
 import { kategorisiere, stapelFuerWoche } from "@/lib/neuzugaengeKategorisierung";
 import { NeuzugaengeVerteilungsEintrag, NeuzugaengeWoche } from "@/types";
 
@@ -59,6 +60,7 @@ function Balkendiagramm({
   wert,
   verteilungVon,
   maxKategorien,
+  info,
 }: {
   titel: string;
   einheit: string;
@@ -66,6 +68,7 @@ function Balkendiagramm({
   wert: (woche: NeuzugaengeWoche) => number | null;
   verteilungVon: (woche: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[];
   maxKategorien: number;
+  info?: string;
 }) {
   // Chronologisch (älteste zuerst) für die Lesrichtung links→rechts — ladeNeuzugaengeVerlauf
   // liefert bewusst neueste zuerst (siehe mitarbeiterstatistik.ts), hier fürs Diagramm umgedreht.
@@ -88,7 +91,10 @@ function Balkendiagramm({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <p className="mb-xs shrink-0 font-slab text-lg font-bold text-anthrazit">{titel}</p>
+      <p className="mb-xs flex shrink-0 items-center gap-xs font-slab text-lg font-bold text-anthrazit">
+        {titel}
+        {info && <InfoTooltip text={info} />}
+      </p>
       <div className="min-h-0 flex-1">
       <svg
         viewBox={`0 0 ${CHART_BREITE} ${CHART_HOEHE}`}
@@ -194,7 +200,15 @@ function Balkendiagramm({
 // Landingscreen mit echten Diagrammen statt eines weiteren Klickschritts. Balken seit der
 // Status2-/Herkunft-Aufschlüsselung (Nutzer-Vorgabe: "Neue Objekte = Status 2 anzeigen, Neue
 // Adressen = Herkunft Kontakt, jeweils mit Legende") gestapelt statt einfarbig.
-export function Neuzugaenge({ verlauf }: { verlauf?: NeuzugaengeWoche[] }) {
+export function Neuzugaenge({
+  verlauf,
+  interaktiv = false,
+}: {
+  verlauf?: NeuzugaengeWoche[];
+  // Siehe Uebersicht.tsx — dieselbe Komponente läuft auch auf der öffentlichen TV-Folie, die
+  // (i)-Erläuterungen erscheinen deshalb nur, wenn der Admin-Aufrufer das explizit anfordert.
+  interaktiv?: boolean;
+}) {
   if (verlauf === undefined) {
     return (
       <p className="text-small text-anthrazit/50">Neuzugänge konnten nicht geladen werden.</p>
@@ -210,6 +224,11 @@ export function Neuzugaenge({ verlauf }: { verlauf?: NeuzugaengeWoche[] }) {
         wert={(w) => w.neueObjekte}
         verteilungVon={(w) => w.neueObjekteVerteilung}
         maxKategorien={Infinity}
+        info={
+          interaktiv
+            ? 'Objekte mit Feld "erstellt_am" in dieser Kalenderwoche, aufgeschlüsselt nach "Status 2" (status2). Zählt ALLE angelegten Datensätze, auch Marktbeobachtung/Fremdobjekte.'
+            : undefined
+        }
       />
       <Balkendiagramm
         titel="Neue Kunden"
@@ -218,6 +237,11 @@ export function Neuzugaenge({ verlauf }: { verlauf?: NeuzugaengeWoche[] }) {
         wert={(w) => w.neueKunden}
         verteilungVon={(w) => w.neueKundenVerteilung}
         maxKategorien={KUNDEN_MAX_KATEGORIEN}
+        info={
+          interaktiv
+            ? 'Adressen mit Feld "Eintragsdatum" in dieser Kalenderwoche, aufgeschlüsselt nach dem ersten Wert im Mehrfachauswahlfeld "HerkunftKontakt" (Herkunft Kontakt).'
+            : undefined
+        }
       />
     </div>
   );

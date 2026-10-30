@@ -1,5 +1,6 @@
 import { Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
+import { InfoTooltip } from "@/components/shared/InfoTooltip";
 import { KontrollObjekt } from "@/types";
 
 // Deutsches Tausendertrennzeichen, analog zu Mitarbeiterstatistik.tsx.
@@ -65,10 +66,19 @@ export function Kontrolle({ objekte }: { objekte?: KontrollObjekt[] }) {
 
   return (
     <>
-      <p className="mb-md max-w-[65ch] text-body text-anthrazit/60">
-        {zahlenformat.format(objekte.length)} Objekt{objekte.length === 1 ? "" : "e"} mit
-        erkannten Auffälligkeiten — fehlende Provisionsangabe, ein Status, der einem bereits
-        gesetzten Verkaufsdatum widerspricht, oder ein möglicherweise doppelt angelegtes Objekt.
+      <p className="mb-md flex max-w-[65ch] items-start gap-xs text-body text-anthrazit/60">
+        <span>
+          {zahlenformat.format(objekte.length)} Objekt{objekte.length === 1 ? "" : "e"} mit
+          erkannten Auffälligkeiten — fehlende Provisionsangabe, ein Status, der einem bereits
+          gesetzten Verkaufsdatum widerspricht, oder ein möglicherweise doppelt angelegtes Objekt.
+        </span>
+        <InfoTooltip
+          text={
+            'Drei geprüfte Regeln: (1) "Provisionsangabe fehlt" — prozent_aussenprovision/prozent_innenprovision leer oder nicht auswertbar. (2) "Status widerspricht Verkaufsdatum" — Feld verkauft_am ist gesetzt, status2 steht aber noch auf einem aktiven/Vorbereitungs-Wert. (3) "Möglicherweise doppelt angelegt" — zwei Datensätze mit identischem objekttitel UND identischem verkauft_am.'
+          }
+          breit
+          className="mt-[3px]"
+        />
       </p>
       <Card>
         <div className="flex flex-col">

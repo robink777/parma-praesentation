@@ -1,5 +1,6 @@
 import { Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
+import { InfoTooltip } from "@/components/shared/InfoTooltip";
 import { LeadquellenKennzahlen } from "@/types";
 
 // Deutsches Tausendertrennzeichen, analog zu Mitarbeiterstatistik.tsx/Kontrolle.tsx.
@@ -66,7 +67,11 @@ export function Leadquellen({ kennzahlen }: { kennzahlen?: LeadquellenKennzahlen
       {(objekteOhneEigentuemer > 0 || eigentuemerOhneHerkunft > 0) && (
         <div className="mb-md grid grid-cols-1 gap-md sm:grid-cols-2">
           {objekteOhneEigentuemer > 0 && (
-            <Card className="flex items-center gap-sm">
+            <Card className="relative flex items-center gap-sm">
+              <InfoTooltip
+                text='Objekte, für die OnOffice keine Eigentümer-Adress-Relation (urn:...:relationTypes:estate:address:owner) hinterlegt hat.'
+                className="absolute right-sm top-sm"
+              />
               <Icon name="warning" size={24} className="shrink-0 text-status-warnung" />
               <div className="min-w-0">
                 <p className="font-slab text-2xl font-bold leading-tight text-anthrazit">
@@ -77,7 +82,11 @@ export function Leadquellen({ kennzahlen }: { kennzahlen?: LeadquellenKennzahlen
             </Card>
           )}
           {eigentuemerOhneHerkunft > 0 && (
-            <Card className="flex items-center gap-sm">
+            <Card className="relative flex items-center gap-sm">
+              <InfoTooltip
+                text='Verknüpfte Eigentümer-Adressen (siehe Relation oben), bei denen das Adressfeld "HerkunftKontakt" leer ist.'
+                className="absolute right-sm top-sm"
+              />
               <Icon name="warning" size={24} className="shrink-0 text-status-warnung" />
               <div className="min-w-0">
                 <p className="font-slab text-2xl font-bold leading-tight text-anthrazit">
@@ -92,7 +101,12 @@ export function Leadquellen({ kennzahlen }: { kennzahlen?: LeadquellenKennzahlen
         </div>
       )}
 
-      <Card>
+      <Card className="relative">
+        <InfoTooltip
+          text='Je Objekt wird über die OnOffice-Relation "estate:address:owner" die verknüpfte Eigentümer-Adresse ermittelt, dann deren Feld "HerkunftKontakt" ausgelesen (Mehrfachauswahl, pipe-getrennt — jeder einzelne Wert zählt als eigene Nennung, ein Eigentümer kann also in mehreren Zeilen auftauchen).'
+          className="absolute right-sm top-sm"
+          breit
+        />
         <h3 className="mb-sm font-slab text-2xl font-bold text-anthrazit">Herkunft der Kontakte</h3>
         {herkunftVerteilung.length === 0 ? (
           <p className="py-sm text-body text-anthrazit/50">
