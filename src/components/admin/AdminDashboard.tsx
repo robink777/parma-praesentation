@@ -70,7 +70,7 @@ export function AdminDashboard({
         }`}
       >
         {abschnitt === "uebersicht" && (
-          <Uebersicht gesamt={gesamtKennzahlen} neuzugaengeVerlauf={neuzugaengeVerlauf} />
+          <Uebersicht gesamt={gesamtKennzahlen} neuzugaengeVerlauf={neuzugaengeVerlauf} interaktiv />
         )}
         {abschnitt === "karte" && (
           <KarteBereich

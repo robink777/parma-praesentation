@@ -9,14 +9,31 @@ import { Neuzugaenge } from "./Neuzugaenge";
 // (siehe components/shared/KpiKachel.tsx — von dort auch die Smartphone-Ansicht,
 // components/tv/TvMobil.tsx, dieselben Definitionen bezieht), jede mit fester, eigener
 // Akzentfarbe, plus die beiden Neuzugänge-Balkendiagramme darunter.
+//
+// Dieselbe Komponente läuft sowohl im Admin-Bereich (AdminDashboard.tsx) als auch auf der
+// öffentlichen, unauthentifizierten TV-Folie (TvSlideshow.tsx) — "interaktiv" schaltet deshalb
+// bewusst einzeln zu, ob die "N ohne Angabe"-Hinweise zu den neuen Detailseiten verlinken (Nutzer-
+// Vorgabe Oktober 2026: "im Admin-Bereich ... eine neue Seite öffnen wo genau diese Objekte
+// angezeigt werden"). Auf der TV-Folie bleibt es bei der ursprünglichen Vorgabe "da soll nichts
+// klickbar sein" — Default false, damit TvSlideshow.tsx unverändert bleiben kann.
 export function Uebersicht({
   gesamt,
   neuzugaengeVerlauf,
+  interaktiv = false,
 }: {
   gesamt?: ObjektGesamtKennzahlen;
   neuzugaengeVerlauf?: NeuzugaengeWoche[];
+  interaktiv?: boolean;
 }) {
-  const kacheln = baueUebersichtKacheln(gesamt);
+  const kacheln = baueUebersichtKacheln(
+    gesamt,
+    interaktiv
+      ? {
+          provisionsvorlauf: "/admin/provisionsfehler?quelle=gesamt",
+          provisionsvolumenJahr: "/admin/provisionsfehler?quelle=verkauft",
+        }
+      : undefined
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-sm">

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon, IconName } from "@/components/icons/Icon";
 import { ObjektGesamtKennzahlen } from "@/types";
 
@@ -51,6 +52,11 @@ export interface KpiKachelDaten {
   icon: IconName;
   akzent: string;
   hinweisAnzahl?: number;
+  // Ziel der Detailseite für den "N ohne Angabe"-Hinweis (siehe app/admin/provisionsfehler/
+  // page.tsx) — NUR im Admin-Bereich gesetzt (siehe Uebersicht.tsx, interaktiv-Prop). Auf der
+  // TV-/Smartphone-Ansicht bleibt dieses Feld bewusst immer undefined: "da soll nichts klickbar
+  // sein" galt schon für die ursprüngliche TV-Vorgabe und gilt genauso für die Smartphone-Ansicht.
+  hinweisHref?: string;
 }
 
 // Oktober 2026 Chat-Vorgabe: "mehr Akzentfarben an den Datenpunkten ... jetzt ist es mir viel zu
@@ -60,7 +66,7 @@ export interface KpiKachelDaten {
 // konsistent (Wiedererkennung statt zufälliger Buntheit). Zahl selbst bleibt bewusst in Anthrazit
 // (Text trägt Text-Farbe, nie die Akzentfarbe — dataviz-Richtlinie), nur Icon-Kreis und
 // Hintergrund-Tönung tragen die Akzentfarbe.
-export function KpiKachel({ label, wert, icon, akzent, hinweisAnzahl }: KpiKachelDaten) {
+export function KpiKachel({ label, wert, icon, akzent, hinweisAnzahl, hinweisHref }: KpiKachelDaten) {
   return (
     <div className="min-w-0 rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
       <div className="flex items-center gap-sm">
@@ -78,19 +84,34 @@ export function KpiKachel({ label, wert, icon, akzent, hinweisAnzahl }: KpiKache
           </p>
         </div>
       </div>
-      {hinweisAnzahl !== undefined && hinweisAnzahl > 0 && (
-        <p className="mt-xs flex items-center gap-[4px] truncate text-small text-anthrazit/50">
-          <Icon name="warning" size={13} className="shrink-0" />
-          {zahlenformat.format(hinweisAnzahl)} ohne Angabe
-        </p>
-      )}
+      {hinweisAnzahl !== undefined &&
+        hinweisAnzahl > 0 &&
+        (hinweisHref ? (
+          <Link
+            href={hinweisHref}
+            className="mt-xs flex items-center gap-[4px] truncate text-small text-anthrazit/50 underline decoration-dotted underline-offset-2 hover:text-anthrazit"
+          >
+            <Icon name="warning" size={13} className="shrink-0" />
+            {zahlenformat.format(hinweisAnzahl)} ohne Angabe
+          </Link>
+        ) : (
+          <p className="mt-xs flex items-center gap-[4px] truncate text-small text-anthrazit/50">
+            <Icon name="warning" size={13} className="shrink-0" />
+            {zahlenformat.format(hinweisAnzahl)} ohne Angabe
+          </p>
+        ))}
     </div>
   );
 }
 
 // Die acht KPI-Kacheln-Definitionen (Reihenfolge + feste Akzentfarbe je Kennzahl) — einzige
 // Quelle der Wahrheit, damit TV/Admin-Desktop und Smartphone-Ansicht nie auseinanderlaufen.
-export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen): KpiKachelDaten[] {
+// `hinweisHrefs` bleibt optional/leer auf TV und Smartphone (siehe Uebersicht.tsx/TvMobil.tsx) —
+// nur der Admin-Aufrufer übergibt die beiden Detailseiten-Links.
+export function baueUebersichtKacheln(
+  gesamt?: ObjektGesamtKennzahlen,
+  hinweisHrefs?: { provisionsvorlauf?: string; provisionsvolumenJahr?: string }
+): KpiKachelDaten[] {
   const jahr = new Date().getFullYear();
   const verkauftFehltAnzahl = gesamt?.provisionsvolumenVerkauftJahrFehltAnzahl ?? 0;
   const provisionsvorlaufFehltAnzahl = gesamt?.provisionsvorlaufFehltAnzahl ?? 0;
@@ -126,6 +147,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen): KpiKache
       icon: "handshake",
       akzent: "chart-5",
       hinweisAnzahl: provisionsvorlaufFehltAnzahl,
+      hinweisHref: hinweisHrefs?.provisionsvorlauf,
     },
     {
       label: "In Aufarbeitung gesamt",
@@ -139,6 +161,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen): KpiKache
       icon: "handshake",
       akzent: "chart-7",
       hinweisAnzahl: verkauftFehltAnzahl,
+      hinweisHref: hinweisHrefs?.provisionsvolumenJahr,
     },
     {
       label: "Ø Vermarktungsdauer",

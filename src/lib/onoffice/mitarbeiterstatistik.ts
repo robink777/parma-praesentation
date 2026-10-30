@@ -385,3 +385,27 @@ export async function ladeObjektGesamtKennzahlen(): Promise<ObjektGesamtKennzahl
     provisionsvolumenVerkauftJahrFehltAnzahl,
   };
 }
+
+// Liefert die EINZELNEN Objekte hinter provisionsvorlaufFehltAnzahl/
+// provisionsvolumenVerkauftJahrFehltAnzahl oben (gleicher Filter: provisionsvorlaufFehlt) — für
+// die neue Admin-Detailseite app/admin/provisionsfehler/page.tsx (Oktober 2026 Chat-Vorgabe: "beim
+// Hovern über die ... Objekte ohne Provisionseintrag eine neue Seite öffnen wo genau diese Objekte
+// angezeigt werden, damit man die Fehler direkt in OnOffice suchen kann"). Lädt bewusst NICHT aus
+// derselben Promise.all wie ladeObjektGesamtKennzahlen (die nur die Summen zurückgibt, nicht die
+// Rohdaten) — ein eigener, separater Live-Abruf, nur wenn die Detailseite tatsächlich aufgerufen
+// wird, analog zu ladeKontrollObjekte in estate.ts.
+export async function ladeObjekteOhneProvisionsangabe(
+  quelle: "gesamt" | "verkauftJahr"
+): Promise<MitarbeiterObjekt[]> {
+  if (quelle === "verkauftJahr") {
+    const { vonJahr, bisJahr } = ermittleJahresDatumsfenster();
+    const verkauftJahr = await ladeAlleVerkauftenObjekte(vonJahr, bisJahr);
+    return verkauftJahr.filter((objekt) => objekt.provisionsvorlaufFehlt);
+  }
+
+  const [aktiv, aufarbeitung] = await Promise.all([
+    ladeAlleAktivenObjekte(),
+    ladeAlleObjekteInAufarbeitung(),
+  ]);
+  return [...aktiv, ...aufarbeitung].filter((objekt) => objekt.provisionsvorlaufFehlt);
+}
