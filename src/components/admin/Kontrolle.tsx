@@ -73,8 +73,9 @@ export function Kontrolle({ objekte }: { objekte?: KontrollObjekt[] }) {
           gesetzten Verkaufsdatum widerspricht, oder ein möglicherweise doppelt angelegtes Objekt.
         </span>
         <InfoTooltip
+          felder={["prozent_aussenprovision", "prozent_innenprovision", "verkauft_am", "status2", "objekttitel"]}
           text={
-            'Drei geprüfte Regeln: (1) "Provisionsangabe fehlt" — prozent_aussenprovision/prozent_innenprovision leer oder nicht auswertbar. (2) "Status widerspricht Verkaufsdatum" — Feld verkauft_am ist gesetzt, status2 steht aber noch auf einem aktiven/Vorbereitungs-Wert. (3) "Möglicherweise doppelt angelegt" — zwei Datensätze mit identischem objekttitel UND identischem verkauft_am.'
+            'Drei geprüfte Regeln: (1) "Provisionsangabe fehlt" — Provisionsfelder leer oder nicht auswertbar. (2) "Status widerspricht Verkaufsdatum" — verkauft_am ist gesetzt, status2 steht aber noch auf einem aktiven/Vorbereitungs-Wert. (3) "Möglicherweise doppelt angelegt" — zwei Datensätze mit identischem Objekttitel UND identischem Verkaufsdatum.'
           }
           breit
           className="mt-[3px]"

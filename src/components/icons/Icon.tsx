@@ -33,7 +33,8 @@ export type IconName =
   | "eye"
   | "eyeOff"
   | "chevronUp"
-  | "chevronDown";
+  | "chevronDown"
+  | "info";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   greeting: (
@@ -221,6 +222,16 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   chevronUp: <path d="M5 15l7-7 7 7" />,
   chevronDown: <path d="M5 9l7 7 7-7" />,
+  // Für das Hover-(i) bei statistischen Werten im Admin-Bereich (siehe InfoTooltip.tsx) — Kreis +
+  // Punkt + Strich, dieselbe Bauart wie "warning" oben (Kreis-Varianten), aber bewusst neutral
+  // statt einer Status-Bedeutung.
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5" />
+      <circle cx="12" cy="8" r="0.75" fill="currentColor" stroke="none" />
+    </>
+  ),
 };
 
 export function Icon({

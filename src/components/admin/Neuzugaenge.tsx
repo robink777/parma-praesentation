@@ -68,7 +68,7 @@ function Balkendiagramm({
   wert: (woche: NeuzugaengeWoche) => number | null;
   verteilungVon: (woche: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[];
   maxKategorien: number;
-  info?: string;
+  info?: { felder: string[]; text: string };
 }) {
   // Chronologisch (älteste zuerst) für die Lesrichtung links→rechts — ladeNeuzugaengeVerlauf
   // liefert bewusst neueste zuerst (siehe mitarbeiterstatistik.ts), hier fürs Diagramm umgedreht.
@@ -93,7 +93,7 @@ function Balkendiagramm({
     <div className="flex h-full min-h-0 flex-col">
       <p className="mb-xs flex shrink-0 items-center gap-xs font-slab text-lg font-bold text-anthrazit">
         {titel}
-        {info && <InfoTooltip text={info} />}
+        {info && <InfoTooltip felder={info.felder} text={info.text} />}
       </p>
       <div className="min-h-0 flex-1">
       <svg
@@ -226,7 +226,10 @@ export function Neuzugaenge({
         maxKategorien={Infinity}
         info={
           interaktiv
-            ? 'Objekte mit Feld "erstellt_am" in dieser Kalenderwoche, aufgeschlüsselt nach "Status 2" (status2). Zählt ALLE angelegten Datensätze, auch Marktbeobachtung/Fremdobjekte.'
+            ? {
+                felder: ["erstellt_am", "status2"],
+                text: "Objekte in dieser Kalenderwoche, aufgeschlüsselt nach Status 2. Zählt ALLE angelegten Datensätze, auch Marktbeobachtung/Fremdobjekte.",
+              }
             : undefined
         }
       />
@@ -239,7 +242,10 @@ export function Neuzugaenge({
         maxKategorien={KUNDEN_MAX_KATEGORIEN}
         info={
           interaktiv
-            ? 'Adressen mit Feld "Eintragsdatum" in dieser Kalenderwoche, aufgeschlüsselt nach dem ersten Wert im Mehrfachauswahlfeld "HerkunftKontakt" (Herkunft Kontakt).'
+            ? {
+                felder: ["Eintragsdatum", "HerkunftKontakt"],
+                text: "Adressen in dieser Kalenderwoche, aufgeschlüsselt nach dem ersten Wert im Mehrfachauswahlfeld Herkunft Kontakt.",
+              }
             : undefined
         }
       />

@@ -137,8 +137,9 @@ export function PlzObjekte({
         <p className="mb-sm flex items-center gap-xs">
           <span className="label">Alle PLZ-Gebiete</span>
           <InfoTooltip
+            felder={["status2", "status"]}
             text={
-              "Kategorie je Objekt (status2 hat Vorrang vor status): status2=verkauft → \"Verkauft\". status2 eine der Akquise-Unterstufen (z.B. in_akquise, vorbereitung, Akquise - Auftrag) → \"Akquise\". Sonst status=1 (Aktiv) → \"Verkaufen\". Alles andere (z.B. Marktbeobachtung) zählt in keiner der drei Kategorien."
+              'Kategorie je Objekt (status2 hat Vorrang vor status): status2 = verkauft → "Verkauft". status2 eine Akquise-Unterstufe (z.B. in_akquise, vorbereitung, Akquise - Auftrag) → "Akquise". Sonst status = 1 (Aktiv) → "Verkaufen". Alles andere (z.B. Marktbeobachtung) zählt in keiner der drei Kategorien.'
             }
             breit
           />

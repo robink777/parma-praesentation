@@ -67,28 +67,24 @@ export function Leadquellen({ kennzahlen }: { kennzahlen?: LeadquellenKennzahlen
       {(objekteOhneEigentuemer > 0 || eigentuemerOhneHerkunft > 0) && (
         <div className="mb-md grid grid-cols-1 gap-md sm:grid-cols-2">
           {objekteOhneEigentuemer > 0 && (
-            <Card className="relative flex items-center gap-sm">
-              <InfoTooltip
-                text='Objekte, für die OnOffice keine Eigentümer-Adress-Relation (urn:...:relationTypes:estate:address:owner) hinterlegt hat.'
-                className="absolute right-sm top-sm"
-              />
+            <Card className="flex items-center gap-sm">
               <Icon name="warning" size={24} className="shrink-0 text-status-warnung" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-slab text-2xl font-bold leading-tight text-anthrazit">
                   {zahlenformat.format(objekteOhneEigentuemer)}
                 </p>
                 <p className="label">Ohne verknüpften Eigentümer</p>
               </div>
+              <InfoTooltip
+                felder={["estate:address:owner"]}
+                text="Objekte, für die OnOffice keine Eigentümer-Adress-Relation hinterlegt hat."
+              />
             </Card>
           )}
           {eigentuemerOhneHerkunft > 0 && (
-            <Card className="relative flex items-center gap-sm">
-              <InfoTooltip
-                text='Verknüpfte Eigentümer-Adressen (siehe Relation oben), bei denen das Adressfeld "HerkunftKontakt" leer ist.'
-                className="absolute right-sm top-sm"
-              />
+            <Card className="flex items-center gap-sm">
               <Icon name="warning" size={24} className="shrink-0 text-status-warnung" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-slab text-2xl font-bold leading-tight text-anthrazit">
                   {zahlenformat.format(eigentuemerOhneHerkunft)}
                 </p>
@@ -96,18 +92,24 @@ export function Leadquellen({ kennzahlen }: { kennzahlen?: LeadquellenKennzahlen
                   von {zahlenformat.format(eigentuemerGesamt)} ohne Herkunft
                 </p>
               </div>
+              <InfoTooltip
+                felder={["HerkunftKontakt"]}
+                text="Verknüpfte Eigentümer-Adressen (siehe Relation oben), bei denen dieses Feld leer ist."
+              />
             </Card>
           )}
         </div>
       )}
 
-      <Card className="relative">
-        <InfoTooltip
-          text='Je Objekt wird über die OnOffice-Relation "estate:address:owner" die verknüpfte Eigentümer-Adresse ermittelt, dann deren Feld "HerkunftKontakt" ausgelesen (Mehrfachauswahl, pipe-getrennt — jeder einzelne Wert zählt als eigene Nennung, ein Eigentümer kann also in mehreren Zeilen auftauchen).'
-          className="absolute right-sm top-sm"
-          breit
-        />
-        <h3 className="mb-sm font-slab text-2xl font-bold text-anthrazit">Herkunft der Kontakte</h3>
+      <Card>
+        <h3 className="mb-sm flex items-center gap-xs font-slab text-2xl font-bold text-anthrazit">
+          Herkunft der Kontakte
+          <InfoTooltip
+            felder={["estate:address:owner", "HerkunftKontakt"]}
+            text="Je Objekt wird über die erste Relation die verknüpfte Eigentümer-Adresse ermittelt, dann deren zweites Feld ausgelesen (Mehrfachauswahl, pipe-getrennt — jeder einzelne Wert zählt als eigene Nennung, ein Eigentümer kann also in mehreren Zeilen auftauchen)."
+            breit
+          />
+        </h3>
         {herkunftVerteilung.length === 0 ? (
           <p className="py-sm text-body text-anthrazit/50">
             Für keinen der verknüpften Eigentümer ist bisher eine Herkunft hinterlegt.

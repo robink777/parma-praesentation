@@ -171,38 +171,45 @@ function baueMetriken(
 // Kommentaren bei zaehleAktiveObjekte/zaehleObjekteInAufarbeitung/zaehleTermine/
 // zaehleBesichtigungen/zaehleTelefonate/zaehleTermineNachArt/zaehleAktiveKunden/
 // zaehleVerkaufteObjekteFuerMitarbeiter (onoffice/estate.ts) übernommen.
-const METRIK_INFO: Record<string, string> = {
-  "Anrufe heute": 'Aktivitäten vom Typ "Telefonat" (Maklerbuch, resourcetype agentslog, Feld Aktionsart), heute.',
-  "Anrufe Woche": 'Aktivitäten vom Typ "Telefonat", diese Kalenderwoche (Mo–So).',
-  "Termine heute": "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, heute.",
-  "Termine Woche": "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, diese Kalenderwoche (Mo–So).",
-  "Aktive Objekte": 'Objekte mit status=1 (Aktiv), vermarktungsart=kauf, Betreuer (Feld "benutzer") = diese Person.',
-  Aufarbeitung: "Objekte mit status=2 (Inaktiv) UND status2=vorbereitung, vermarktungsart=kauf, Betreuer = diese Person.",
-  "Erst 30T": 'Kalendertermine der Terminart "Akquise - Ersttermin", letzte 30 Tage.',
-  "Erst Jahr": 'Kalendertermine der Terminart "Akquise - Ersttermin", laufendes Kalenderjahr.',
-  "Zweit 30T": 'Terminart "Akquise - Zweittermin", letzte 30 Tage.',
-  "Zweit Jahr": 'Terminart "Akquise - Zweittermin", laufendes Kalenderjahr.',
-  "Quote 1→2": "Akquise-Zweittermine ÷ Akquise-Ersttermine (jeweils laufendes Jahr) × 100, gerundet.",
-  "Vertrag 30T": 'Terminart "Akquise - Vertragstermin", letzte 30 Tage.',
-  "Vertrag Jahr": 'Terminart "Akquise - Vertragstermin", laufendes Kalenderjahr.',
-  "Termine 30T": "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, letzte 30 Tage.",
-  "Termine Jahr": "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, laufendes Kalenderjahr.",
-  "Besicht. 30T": 'Kalendertermine der Arten "Besichtigung" und "Folgebesichtigung", letzte 30 Tage.',
-  "Besicht. Jahr": 'Kalendertermine der Arten "Besichtigung" und "Folgebesichtigung", laufendes Kalenderjahr.',
-  "Kunden aktiv": 'Adressen mit Status2Adr="Aktiv" und Feld "Benutzer" (OnOffice-Kurzname) = diese Person — Schnappschuss ohne Zeitfenster.',
-  Verkauft: 'Objekte mit Feld "verkauft_am" im laufenden Kalenderjahr, Betreuer = diese Person.',
+const METRIK_INFO: Record<string, { felder: string[]; text: string }> = {
+  "Anrufe heute": { felder: ["Aktionsart", "Datum"], text: 'Aktivitäten vom Typ "Telefonat" (Maklerbuch), heute.' },
+  "Anrufe Woche": { felder: ["Aktionsart", "Datum"], text: 'Aktivitäten vom Typ "Telefonat", diese Kalenderwoche (Mo–So).' },
+  "Termine heute": { felder: ["art", "datestart", "dateend"], text: "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, heute." },
+  "Termine Woche": { felder: ["art", "datestart", "dateend"], text: "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, diese Kalenderwoche (Mo–So)." },
+  "Aktive Objekte": { felder: ["status", "vermarktungsart", "benutzer"], text: "status = 1 (Aktiv), vermarktungsart = kauf, Betreuer = diese Person." },
+  Aufarbeitung: { felder: ["status", "status2", "vermarktungsart", "benutzer"], text: "status = 2 (Inaktiv) UND status2 = vorbereitung, vermarktungsart = kauf, Betreuer = diese Person." },
+  "Erst 30T": { felder: ["art", "datestart", "dateend"], text: 'Terminart "Akquise - Ersttermin", letzte 30 Tage.' },
+  "Erst Jahr": { felder: ["art", "datestart", "dateend"], text: 'Terminart "Akquise - Ersttermin", laufendes Kalenderjahr.' },
+  "Zweit 30T": { felder: ["art", "datestart", "dateend"], text: 'Terminart "Akquise - Zweittermin", letzte 30 Tage.' },
+  "Zweit Jahr": { felder: ["art", "datestart", "dateend"], text: 'Terminart "Akquise - Zweittermin", laufendes Kalenderjahr.' },
+  "Quote 1→2": { felder: [], text: "Akquise-Zweittermine ÷ Akquise-Ersttermine (jeweils laufendes Jahr) × 100, gerundet." },
+  "Vertrag 30T": { felder: ["art", "datestart", "dateend"], text: 'Terminart "Akquise - Vertragstermin", letzte 30 Tage.' },
+  "Vertrag Jahr": { felder: ["art", "datestart", "dateend"], text: 'Terminart "Akquise - Vertragstermin", laufendes Kalenderjahr.' },
+  "Termine 30T": { felder: ["art", "datestart", "dateend"], text: "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, letzte 30 Tage." },
+  "Termine Jahr": { felder: ["art", "datestart", "dateend"], text: "Alle Kalendertermine außer interne/Abwesenheits-Terminarten, laufendes Kalenderjahr." },
+  "Besicht. 30T": { felder: ["art", "datestart", "dateend"], text: 'Terminarten "Besichtigung" und "Folgebesichtigung", letzte 30 Tage.' },
+  "Besicht. Jahr": { felder: ["art", "datestart", "dateend"], text: 'Terminarten "Besichtigung" und "Folgebesichtigung", laufendes Kalenderjahr.' },
+  "Kunden aktiv": { felder: ["Status2Adr", "Benutzer"], text: 'Status2Adr = "Aktiv" und Benutzer (OnOffice-Kurzname) = diese Person — Schnappschuss ohne Zeitfenster.' },
+  Verkauft: { felder: ["verkauft_am", "benutzer"], text: "Objekte im laufenden Kalenderjahr, Betreuer = diese Person." },
   // Dieselbe Bedeutung wie "Aktive Objekte"/Verkauft oben, nur unter dem abweichenden Label des
   // ObjektBalken-Segments (siehe OBJEKT_BALKEN_SEGMENTE unten).
-  "Aktive Immobilien": 'Objekte mit status=1 (Aktiv), vermarktungsart=kauf, Betreuer (Feld "benutzer") = diese Person.',
-  "Verkäufe": 'Objekte mit Feld "verkauft_am" im laufenden Kalenderjahr, Betreuer = diese Person.',
+  "Aktive Immobilien": { felder: ["status", "vermarktungsart", "benutzer"], text: "status = 1 (Aktiv), vermarktungsart = kauf, Betreuer = diese Person." },
+  "Verkäufe": { felder: ["verkauft_am", "benutzer"], text: "Objekte im laufenden Kalenderjahr, Betreuer = diese Person." },
 };
 
-// Baut den gebündelten Tooltip-Text für eine Kachel aus allen dort sichtbaren Kennzahlen-Labels
-// (siehe baueMetriken oben) — EIN (i) pro Kachel statt eines pro Zelle.
-function baueKachelInfo(metriken: { label: string; wert: string }[]): string {
-  return metriken
-    .map((m) => `${m.label}: ${METRIK_INFO[m.label] ?? "–"}`)
-    .join("\n\n");
+// Baut den gebündelten Tooltip-Inhalt für eine Kachel aus allen dort sichtbaren Kennzahlen-Labels
+// (siehe baueMetriken oben) — EIN (i) pro Kachel statt eines pro Zelle. `felder` ist die
+// deduplizierte Vereinigung aller beteiligten OnOffice-Felder (Reihenfolge = erstes Vorkommen),
+// `text` listet je Kennzahl Label + Formel/Logik als eigener Absatz.
+function baueKachelInfo(metriken: { label: string; wert: string }[]): { felder: string[]; text: string } {
+  const felder: string[] = [];
+  for (const m of metriken) {
+    for (const feld of METRIK_INFO[m.label]?.felder ?? []) {
+      if (!felder.includes(feld)) felder.push(feld);
+    }
+  }
+  const text = metriken.map((m) => `${m.label}: ${METRIK_INFO[m.label]?.text ?? "–"}`).join("\n\n");
+  return { felder, text };
 }
 
 // Die drei Objekt-Kennzahlen als EIN gemeinsamer Balken statt eigener Kacheln-Felder (Chat-
@@ -289,8 +296,7 @@ function MitarbeiterKachel({
       : [];
   const info = baueKachelInfo([...metriken, ...balkenMetriken]);
   return (
-    <div className="relative flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
-      <InfoTooltip text={info} breit className="absolute right-sm top-sm" />
+    <div className="flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
       <div className="mb-sm flex shrink-0 items-center gap-sm">
         <div className="relative h-[clamp(36px,6vh,56px)] w-[clamp(36px,6vh,56px)] shrink-0 overflow-hidden rounded-full bg-sand">
           {fotoUrl ? (
@@ -301,7 +307,8 @@ function MitarbeiterKachel({
             </div>
           )}
         </div>
-        <p className="min-w-0 truncate text-lg font-medium text-anthrazit">{mitglied.name}</p>
+        <p className="min-w-0 flex-1 truncate text-lg font-medium text-anthrazit">{mitglied.name}</p>
+        <InfoTooltip felder={info.felder} text={info.text} breit />
       </div>
       <div className="grid flex-1 grid-cols-2 content-start gap-x-sm gap-y-xs">
         {metriken.map((m) => (

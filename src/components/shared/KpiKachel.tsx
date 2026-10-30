@@ -65,11 +65,11 @@ export interface KpiKachelDaten {
   // TV-/Smartphone-Ansicht bleibt dieses Feld bewusst immer undefined: "da soll nichts klickbar
   // sein" galt schon für die ursprüngliche TV-Vorgabe und gilt genauso für die Smartphone-Ansicht.
   hinweisHref?: string;
-  // Erläuterungstext für das (i)-Hover-Symbol (siehe InfoTooltip) — welches OnOffice-Feld bzw.
-  // welche Formel hinter dem Wert steckt. NUR im Admin-Bereich gesetzt (siehe Uebersicht.tsx,
-  // interaktiv-Prop) — Nutzer-Vorgabe Oktober 2026: "bei jedem statistischen Wert ... ein kleines
-  // (i) ... nicht im TV- oder Smartphone-Bereich".
-  info?: string;
+  // Inhalt des (i)-Hover-Symbols (siehe InfoTooltip) — welche OnOffice-Felder (als Labels) und
+  // welche Formel (als Text) hinter dem Wert stecken. NUR im Admin-Bereich gesetzt (siehe
+  // Uebersicht.tsx, interaktiv-Prop) — Nutzer-Vorgabe Oktober 2026: "bei jedem statistischen Wert
+  // ... ein kleines (i) ... nicht im TV- oder Smartphone-Bereich".
+  info?: { felder: string[]; text: string };
 }
 
 // Oktober 2026 Chat-Vorgabe: "mehr Akzentfarben an den Datenpunkten ... jetzt ist es mir viel zu
@@ -81,15 +81,14 @@ export interface KpiKachelDaten {
 // Hintergrund-Tönung tragen die Akzentfarbe.
 export function KpiKachel({ label, wert, icon, akzent, hinweisAnzahl, hinweisHref, info }: KpiKachelDaten) {
   return (
-    <div className="relative min-w-0 rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
-      {info && <InfoTooltip text={info} className="absolute right-sm top-sm" />}
-      <div className="flex items-center gap-sm">
+    <div className="min-w-0 rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
+      <div className="flex items-start gap-sm">
         <span
           className={`flex h-[clamp(32px,5.5vh,48px)] w-[clamp(32px,5.5vh,48px)] shrink-0 items-center justify-center rounded-full ${AKZENT_KLASSEN[akzent]}`}
         >
           <Icon name={icon} size={20} />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="line-clamp-2 font-mono text-[10px] font-medium uppercase leading-snug tracking-[0.06em] text-anthrazit/50">
             {label}
           </p>
@@ -97,6 +96,7 @@ export function KpiKachel({ label, wert, icon, akzent, hinweisAnzahl, hinweisHre
             {wert}
           </p>
         </div>
+        {info && <InfoTooltip felder={info.felder} text={info.text} />}
       </div>
       {hinweisAnzahl !== undefined &&
         hinweisAnzahl > 0 &&
@@ -135,7 +135,7 @@ export function baueUebersichtKacheln(
   const jahr = new Date().getFullYear();
   const verkauftFehltAnzahl = gesamt?.provisionsvolumenVerkauftJahrFehltAnzahl ?? 0;
   const provisionsvorlaufFehltAnzahl = gesamt?.provisionsvorlaufFehltAnzahl ?? 0;
-  const info = (text: string) => (zeigeInfo ? text : undefined);
+  const info = (felder: string[], text: string) => (zeigeInfo ? { felder, text } : undefined);
 
   return [
     {
@@ -144,7 +144,8 @@ export function baueUebersichtKacheln(
       icon: "check",
       akzent: "chart-1",
       info: info(
-        'Anzahl Objekte mit Feld "verkauft_am" (Verkauft/Vermietet am) im laufenden Kalenderjahr, vermarktungsart=kauf. Bewusst OHNE Status-2-Filter (verkauft_am ist zuverlässiger gepflegt als Status 2), exakte Duplikate bereinigt.'
+        ["verkauft_am", "vermarktungsart"],
+        "Anzahl Objekte im laufenden Kalenderjahr. Bewusst OHNE Status-2-Filter (verkauft_am ist zuverlässiger gepflegt als Status 2), exakte Duplikate bereinigt."
       ),
     },
     {
@@ -152,7 +153,7 @@ export function baueUebersichtKacheln(
       wert: formatWert(gesamt?.aktivGesamt ?? null),
       icon: "house",
       akzent: "chart-2",
-      info: info('Anzahl Objekte mit status=1 (Aktiv) und vermarktungsart=kauf.'),
+      info: info(["status", "vermarktungsart"], "Anzahl Objekte mit status = 1 (Aktiv) und vermarktungsart = kauf."),
     },
     {
       label: `Gesamtvolumen ${jahr}`,
@@ -160,7 +161,8 @@ export function baueUebersichtKacheln(
       icon: "calculator",
       akzent: "chart-3",
       info: info(
-        'Summe des Felds "kaufpreis" über alle im laufenden Kalenderjahr verkauften Objekte (dieselbe Objektmenge wie "Verkaufte Objekte" links daneben).'
+        ["kaufpreis", "verkauft_am"],
+        'Σ kaufpreis über alle im laufenden Kalenderjahr verkauften Objekte (dieselbe Menge wie "Verkaufte Objekte" links daneben).'
       ),
     },
     {
@@ -169,7 +171,8 @@ export function baueUebersichtKacheln(
       icon: "scale",
       akzent: "chart-4",
       info: info(
-        'Summe des Felds "kaufpreis" über alle aktiven Objekte (status=1) UND Objekte in Aufarbeitung (status=2, status2=vorbereitung).'
+        ["kaufpreis", "status", "status2"],
+        "Σ kaufpreis über aktive Objekte (status = 1) UND Objekte in Aufarbeitung (status = 2, status2 = vorbereitung)."
       ),
     },
     {
@@ -180,7 +183,8 @@ export function baueUebersichtKacheln(
       hinweisAnzahl: provisionsvorlaufFehltAnzahl,
       hinweisHref: hinweisHrefs?.provisionsvorlauf,
       info: info(
-        'Je Objekt: kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19 (19% MwSt. herausgerechnet), summiert über aktive Objekte + Aufarbeitung. Objekte ohne beide Provisions-Prozentfelder fließen nicht ein (siehe "ohne Angabe").'
+        ["kaufpreis", "prozent_aussenprovision", "prozent_innenprovision"],
+        "Je Objekt: kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19 (19% MwSt. herausgerechnet). Summiert über aktive Objekte + Aufarbeitung. Fehlt eines der beiden Prozentfelder, fließt das Objekt nicht ein (siehe \"ohne Angabe\")."
       ),
     },
     {
@@ -188,7 +192,10 @@ export function baueUebersichtKacheln(
       wert: formatWert(gesamt?.aufarbeitungGesamt ?? null),
       icon: "building",
       akzent: "chart-6",
-      info: info('Anzahl Objekte mit status=2 (Inaktiv), status2=vorbereitung und vermarktungsart=kauf.'),
+      info: info(
+        ["status", "status2", "vermarktungsart"],
+        "Anzahl Objekte mit status = 2 (Inaktiv), status2 = vorbereitung und vermarktungsart = kauf."
+      ),
     },
     {
       label: `Provisionsvolumen ${jahr}`,
@@ -198,7 +205,8 @@ export function baueUebersichtKacheln(
       hinweisAnzahl: verkauftFehltAnzahl,
       hinweisHref: hinweisHrefs?.provisionsvolumenJahr,
       info: info(
-        'Gleiche Formel wie "Provisionsvorlauf gesamt", aber nur über die im laufenden Kalenderjahr verkauften Objekte (Feld verkauft_am).'
+        ["kaufpreis", "prozent_aussenprovision", "prozent_innenprovision", "verkauft_am"],
+        'Gleiche Formel wie "Provisionsvorlauf gesamt", aber nur über die im laufenden Kalenderjahr verkauften Objekte.'
       ),
     },
     {
@@ -207,7 +215,8 @@ export function baueUebersichtKacheln(
       icon: "clock",
       akzent: "chart-8",
       info: info(
-        'Durchschnitt der Tage zwischen dem Feld "auftragvon" und heute, über alle aktiven Objekte + Aufarbeitung mit gültigem auftragvon-Datum.'
+        ["auftragvon"],
+        "Durchschnitt der Tage zwischen auftragvon und heute, über aktive Objekte + Aufarbeitung mit gültigem Datum."
       ),
     },
   ];
