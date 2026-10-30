@@ -18,12 +18,14 @@ import { Icon } from "@/components/icons/Icon";
 // Zweite Korrektur: "das klappt so nicht, mach die Infobox nach oben rechts, die Infobox ist
 // nicht leserlich" — das Popup öffnete bis dahin nach UNTEN LINKS (rechtsbündig am Auslöser
 // verankert, Box wächst nach links). Für ein (i) nah am linken Bildschirmrand (z.B. die erste
-// KPI-Spalte) lief die Box dadurch über den Viewport-Rand hinaus und wurde dort abgeschnitten —
-// genau das in der Nutzer-Rückmeldung gezeigte, mitten im Wort abgeschnittene Textfragment. Jetzt
-// öffnet das Popup stattdessen nach OBEN RECHTS (linksbündig am Auslöser verankert, wächst nach
-// rechts und nach oben) — für die deutlich häufigere Icon-Position (linke/mittlere Spalten) bleibt
-// damit genug Platz nach rechts, und "nach oben" vermeidet zusätzlich eine Überlagerung der
-// Diagramme/Kacheln darunter.
+// KPI-Spalte) lief die Box dadurch über den Viewport-Rand hinaus und wurde dort abgeschnitten.
+// Ein erster Versuch mit "nach oben rechts" (wie gewünscht) zeigte live im Admin-Bereich sofort
+// ein neues Problem: die KPI-Kacheln der ERSTEN Zeile sitzen direkt unter der Navi-Leiste, ohne
+// Platz nach oben — die Box wurde dort stattdessen von oben abgeschnitten (sogar noch weniger
+// lesbar als zuvor). Deshalb stattdessen nach UNTEN RECHTS geöffnet (linksbündig am Auslöser
+// verankert, wächst nach rechts und nach unten): behält den Effekt, der das ursprüngliche Problem
+// löste (Platz nach rechts statt nach links, löst die linke Rand-Kollision), vermeidet aber die
+// neue Kollision oben, weil unter JEDER Kachel immer Inhalt/Weißraum folgt, nie der Viewport-Rand.
 export function InfoTooltip({
   felder,
   text,
@@ -48,7 +50,7 @@ export function InfoTooltip({
       </button>
       <span
         role="tooltip"
-        className={`pointer-events-none absolute bottom-[calc(100%+8px)] left-[-6px] z-30 origin-bottom-left scale-95 rounded-md bg-anthrazit p-sm text-left opacity-0 shadow-lg transition-all duration-100 group-hover/info:scale-100 group-hover/info:opacity-100 group-focus-within/info:scale-100 group-focus-within/info:opacity-100 ${
+        className={`pointer-events-none absolute left-[-6px] top-[calc(100%+8px)] z-30 origin-top-left scale-95 rounded-md bg-anthrazit p-sm text-left opacity-0 shadow-lg transition-all duration-100 group-hover/info:scale-100 group-hover/info:opacity-100 group-focus-within/info:scale-100 group-focus-within/info:opacity-100 ${
           breit ? "w-[320px]" : "w-[280px]"
         }`}
       >
