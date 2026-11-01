@@ -27,12 +27,14 @@ export const PUNKTE = {
   verkauf: 10,
 } as const;
 
-// Saison-Fenster: "gezählt wird seit Montag dieser Woche" (26.10.2026) "bis zum 31.12.26 ...
-// danach natürlich weitergehe aber dann bis zum 31.12.27" — als rollierende Formel statt
-// hartkodierter Jahreszahl gebaut, damit KEINE jährliche Code-Änderung nötig ist: Die erste
-// Saison hat einen abweichenden, festen Start (26.10.2026, nicht der 1. Januar), jede folgende
-// läuft automatisch 1. Januar bis 31. Dezember des jeweiligen Jahres.
-const ERSTE_SAISON_START = new Date(2026, 9, 26); // 26. Oktober 2026 (Monat 0-basiert: 9 = Oktober)
+// Saison-Fenster: ursprünglich "gezählt wird seit Montag dieser Woche" (26.10.2026), auf
+// Nutzer-Wunsch (November 2026: "setzte bitte die Counter auf heute zurück. als wir zählen ab
+// dem 01.11.2026") auf den 1.11.2026 verschoben — "bis zum 31.12.26 ... danach natürlich
+// weitergehe aber dann bis zum 31.12.27" — als rollierende Formel statt hartkodierter Jahreszahl
+// gebaut, damit KEINE jährliche Code-Änderung nötig ist: Die erste Saison hat einen abweichenden,
+// festen Start (1.11.2026, nicht der 1. Januar), jede folgende läuft automatisch 1. Januar bis
+// 31. Dezember des jeweiligen Jahres.
+const ERSTE_SAISON_START = new Date(2026, 10, 1); // 1. November 2026 (Monat 0-basiert: 10 = November)
 const ERSTE_SAISON_ENDE = new Date(2026, 11, 31, 23, 59, 59); // 31. Dezember 2026
 
 export function ermittleSaison(heute: Date = new Date()): { von: Date; bis: Date } {
