@@ -183,8 +183,17 @@ async function berechnePunkte(
 // components/tv/MitarbeiterLeaderboard.tsx. Jeder Teilnehmer unabhängig per .catch() abgesichert
 // (Muster wie ladeMitarbeiterKennzahlen), ein einzelner fehlgeschlagener Abruf soll nicht die
 // ganze Rangliste leeren.
+//
+// Oberes Fenster-Ende bewusst auf "heute" gedeckelt statt immer bis Saisonende zu zählen (Live-
+// Test November 2026 direkt nach dem Saisonstart-Reset auf den 1.11. zeigte: Besichtigungen
+// werden in OnOffice oft Tage/Wochen im Voraus eingetragen — ohne Deckelung zählten bereits
+// vorgebuchte, noch gar nicht stattgefundene Termine der kommenden Wochen sofort mit, ein frisch
+// zurückgesetzter Zähler stand dadurch schon am ersten Tag wieder hoch. Nutzer-Entscheidung:
+// "nur stattgefundene Termine" — ein Termin zählt erst, sobald sein Tag erreicht ist.
 export async function ladeWettkampfRangliste(): Promise<WettkampfEintrag[]> {
-  const { von, bis } = ermittleSaison();
+  const { von, bis: saisonEnde } = ermittleSaison();
+  const heute = new Date();
+  const bis = heute < saisonEnde ? heute : saisonEnde;
   const vonZeit = formatiereDatumZeit(von, "00:00:00");
   const bisZeit = formatiereDatumZeit(bis, "23:59:59");
   const vonDatum = formatiereDatumIso(von);
