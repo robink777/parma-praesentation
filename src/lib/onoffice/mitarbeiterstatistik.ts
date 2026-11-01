@@ -42,12 +42,18 @@ function formatiereDatumZeit(datum: Date, uhrzeit: string): string {
 // und "aktuelles Kalenderjahr" (1. Januar bis 31. Dezember des laufenden Jahres) — siehe
 // Chat-Vorgabe: beide Zeitfenster nebeneinander je Parameter, im Unterschied zu Parameter 1/2
 // (reine Absolut-Snapshots ohne Zeitraum).
+//
+// KORREKTUR November 2026 (Nutzer-Entscheidung, siehe ermittleJahresDatumsfenster unten und
+// ermittleHeuteWocheZeitraeume oben): "Jahr" lief bisher bis zum 31.12., auch wenn das Jahr noch
+// nicht zu Ende ist — bereits vorgebuchte Termine/Besichtigungen der restlichen Jahreshälfte
+// wären dadurch mitgezählt, bevor sie stattgefunden haben. bisJahr ist jetzt min(31.12., heute).
 function ermittleZeitraeume() {
   const heute = new Date();
   const vor30Tagen = new Date(heute);
   vor30Tagen.setDate(vor30Tagen.getDate() - 30);
   const jahresanfang = new Date(heute.getFullYear(), 0, 1);
-  const jahresende = new Date(heute.getFullYear(), 11, 31);
+  const jahresendeDatum = new Date(heute.getFullYear(), 11, 31);
+  const jahresende = heute < jahresendeDatum ? heute : jahresendeDatum;
 
   return {
     von30Tage: formatiereDatumZeit(vor30Tagen, "00:00:00"),
@@ -63,13 +69,21 @@ function ermittleZeitraeume() {
 // präzisiert auf "Anrufe heute, Anrufe Woche ... Termine pro Tag und Termine pro Woche", daher
 // "Woche" statt des zunächst gebauten Monats). "Heute" = Mitternacht bis Tagesende, "Woche" = die
 // laufende Kalenderwoche (Montag-Sonntag, montagDerWoche weiter unten — dieselbe Mo-So-Woche wie
-// im Neuzugänge-Verlauf) von Montag 00:00 bis Sonntag 23:59 (Datensätze aus der Zukunft gibt es
-// ohnehin nicht, das feste Wochenende spart eine zweite "bis heute"-Berechnung).
+// im Neuzugänge-Verlauf) von Montag 00:00 bis Sonntag 23:59.
+//
+// KORREKTUR November 2026 ("Aber bei Termine in der Woche sollen auch nur die Termine erscheinen
+// die stattgefunden haben"): Die ursprüngliche Annahme oben ("Datensätze aus der Zukunft gibt es
+// ohnehin nicht") stimmt nicht — Termine werden in OnOffice regelmäßig Tage/Wochen im Voraus
+// eingetragen (siehe dieselbe Erkenntnis bei ladeWettkampfRangliste in onoffice/wettkampf.ts,
+// live verifiziert). Das Wochenfenster-Ende ist deshalb jetzt min(Sonntag, heute) statt immer
+// Sonntag — an jedem Tag außer Sonntag selbst (letzter Wochentag) blieben sonst bereits
+// vorgebuchte Termine der restlichen Woche fälschlich mitgezählt, bevor sie stattgefunden haben.
 function ermittleHeuteWocheZeitraeume() {
   const heute = new Date();
   const montag = montagDerWoche(heute);
-  const sonntag = new Date(montag);
-  sonntag.setDate(sonntag.getDate() + 6);
+  const sonntagDerWoche = new Date(montag);
+  sonntagDerWoche.setDate(sonntagDerWoche.getDate() + 6);
+  const sonntag = heute < sonntagDerWoche ? heute : sonntagDerWoche;
 
   return {
     vonHeute: formatiereDatumZeit(heute, "00:00:00"),
@@ -92,11 +106,24 @@ function ermittleHeuteWocheZeitraeume() {
 // Exportiert (nicht mehr modul-lokal), damit auch api/admin/mitarbeiter-objekte/route.ts dasselbe
 // Jahresfenster für die neue "Verkauft {Jahr}"-Dropdown-Gruppe verwenden kann, statt das
 // Kalenderjahr dort ein zweites Mal zu bestimmen.
+//
+// KORREKTUR November 2026 (Nutzer-Entscheidung, nach demselben Fund bei "Termine Woche" und den
+// Wettkampf-Zählern: "ja, gleich mit fixen"): bisJahr war bisher immer der 31.12., auch wenn das
+// Jahr noch nicht zu Ende ist — "verkauft_am" kann vorab auf ein zukünftiges Datum gesetzt werden
+// (z.B. ein bereits terminierter, aber noch nicht vollzogener Notartermin), wodurch "Verkaufte
+// Objekte {Jahr}" schon vor dem tatsächlichen Verkauf mitgezählt worden wäre. Jetzt min(31.12.,
+// heute) — bewusst OHNE die "Folgetag"-Anpassung aus ladeNeuzugaengeVerlauf (die betraf NUR
+// datetime-Felder wie erstellt_am, deren "<="-Truncation-Bug hier nicht gilt: verkauft_am/
+// auftragvon sind reine Datumsfelder ohne Uhrzeitanteil, ein "<="-Vergleich gegen das heutige
+// Datum deckt den heutigen Tag bereits vollständig ab).
 export function ermittleJahresDatumsfenster() {
-  const jahr = new Date().getFullYear();
+  const heute = new Date();
+  const jahr = heute.getFullYear();
+  const jahresendeDatum = `${jahr}-12-31`;
+  const heuteDatum = `${jahr}-${String(heute.getMonth() + 1).padStart(2, "0")}-${String(heute.getDate()).padStart(2, "0")}`;
   return {
     vonJahr: `${jahr}-01-01`,
-    bisJahr: `${jahr}-12-31`,
+    bisJahr: heuteDatum < jahresendeDatum ? heuteDatum : jahresendeDatum,
   };
 }
 

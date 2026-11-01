@@ -47,6 +47,7 @@ function MitarbeiterZahlenKachel({
   telefonateGesamt,
   termineGesamt,
   geaenderteFelder,
+  brennt,
 }: {
   name: string;
   rang: number;
@@ -55,6 +56,7 @@ function MitarbeiterZahlenKachel({
   telefonateGesamt: number;
   termineGesamt: number;
   geaenderteFelder?: Set<string>;
+  brennt?: boolean;
 }) {
   // Nutzer-Korrektur: "ich brauche bei allen Mitarbeitern ja auch immer die Gesamtzahlen der
   // einzelnen Punkte ... noch etwas safespace ... ergänzen für Anrufe gesamt, Termine gesamt" —
@@ -74,45 +76,61 @@ function MitarbeiterZahlenKachel({
   // Akzentfarbe mit 20% Deckkraft)", solange mindestens ein Wert dieser Kachel sich seit dem
   // letzten Ladezyklus verändert hat. Erst auf 0,6/32px/10px verstärkt ("viel deutlicher"), dann
   // auf Nutzerwunsch ("ok etwas weniger") wieder etwas zurückgenommen auf 0,4/26px/8px.
+  //
+  // "brennt" (siehe oben, WettkampfEintrag.brennt) überschreibt diesen Ladezyklus-Schatten für
+  // den ganzen Tag (statt nur einen Ladegang) durch einen durchgehenden Leuchtring — Nutzer-
+  // Vorgabe November 2026: "statt des Schlagschattens der nur einen Ladegang angezeigt wird ...
+  // die Kachel des Mitarbeiters den ganzen Tag optisch brennt", nach Referenzbild präzisiert auf
+  // einen geschlossenen, weich verlaufenden Ring statt einzelner Flammen-Icons ("Mach es so im
+  // die Richtung!"). Siehe .tv-kachel-brennt in globals.css (::before-Pseudo-Element).
   const hatAenderung = (geaenderteFelder?.size ?? 0) > 0;
+  // "brennt" braucht einen eigenen äußeren Wrapper für den Leuchtring (.tv-kachel-brennt, siehe
+  // globals.css): Ein ::before-Pseudo-Element malt bei einem negativen z-index zwar VOR seinen
+  // Geschwister-Kindern, aber immer NACH dem eigenen Hintergrund des Elements, das es trägt (CSS-
+  // Malreihenfolge) — säße der Glow auf demselben Element wie "bg-reinweiss", würde er trotz
+  // z-index:-1 über die weiße Fläche gemalt statt dahinter zu verschwinden (live beobachtet: ein
+  // orangener Schleier über der ganzen Kachel statt nur am Rand). Die eigentliche, blickdichte
+  // Kachel sitzt deshalb jetzt als eigenes inneres Element darüber.
   return (
-    <div
-      className={`relative rounded-md border-t-2 bg-reinweiss px-sm py-xs transition-shadow ${
-        hatAenderung
-          ? "shadow-[0_1px_4px_rgba(80,63,61,0.08),0_0_26px_8px_rgba(203,142,73,0.4)]"
-          : "shadow-[0_1px_4px_rgba(80,63,61,0.08)]"
-      } ${rangFarbe ?? "border-t-transparent"}`}
-    >
-      <span className="absolute right-[6px] top-[4px] font-mono text-[10px] text-anthrazit/25">
-        #{rang}
-      </span>
-      <div className="mb-xs flex items-center gap-xs">
-        <div className="relative h-[clamp(20px,3.6vh,30px)] w-[clamp(20px,3.6vh,30px)] shrink-0 overflow-hidden rounded-full bg-sand">
-          {fotoUrl ? (
-            <Image src={fotoUrl} alt={name} fill className="object-cover" sizes="30px" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center font-slab text-[9px] font-bold text-walnuss">
-              {initialen(name)}
-            </div>
-          )}
-        </div>
-        <p className="min-w-0 truncate text-small font-medium leading-tight text-anthrazit">{name}</p>
-      </div>
-      <div className="grid grid-cols-2 gap-x-sm gap-y-xs">
-        {werte.map((w) => (
-          <div key={w.label} className="min-w-0">
-            <p className="truncate font-mono text-[8px] font-medium uppercase leading-tight text-anthrazit/45">
-              {w.label}
-            </p>
-            <p
-              className={`truncate font-slab text-[clamp(13px,2.2vh,18px)] font-bold leading-tight text-anthrazit ${
-                geaenderteFelder?.has(w.feld) ? "tv-wert-aktualisiert" : ""
-              }`}
-            >
-              {w.wert}
-            </p>
+    <div className={`relative rounded-md ${brennt ? "tv-kachel-brennt" : ""}`}>
+      <div
+        className={`relative rounded-md border-t-2 bg-reinweiss px-sm py-xs transition-shadow ${
+          !brennt && hatAenderung
+            ? "shadow-[0_1px_4px_rgba(80,63,61,0.08),0_0_26px_8px_rgba(203,142,73,0.4)]"
+            : "shadow-[0_1px_4px_rgba(80,63,61,0.08)]"
+        } ${rangFarbe ?? "border-t-transparent"}`}
+      >
+        <span className="absolute right-[6px] top-[4px] font-mono text-[10px] text-anthrazit/25">
+          #{rang}
+        </span>
+        <div className="mb-xs flex items-center gap-xs">
+          <div className="relative h-[clamp(20px,3.6vh,30px)] w-[clamp(20px,3.6vh,30px)] shrink-0 overflow-hidden rounded-full bg-sand">
+            {fotoUrl ? (
+              <Image src={fotoUrl} alt={name} fill className="object-cover" sizes="30px" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center font-slab text-[9px] font-bold text-walnuss">
+                {initialen(name)}
+              </div>
+            )}
           </div>
-        ))}
+          <p className="min-w-0 truncate text-small font-medium leading-tight text-anthrazit">{name}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-x-sm gap-y-xs">
+          {werte.map((w) => (
+            <div key={w.label} className="min-w-0">
+              <p className="truncate font-mono text-[8px] font-medium uppercase leading-tight text-anthrazit/45">
+                {w.label}
+              </p>
+              <p
+                className={`truncate font-slab text-[clamp(13px,2.2vh,18px)] font-bold leading-tight text-anthrazit ${
+                  geaenderteFelder?.has(w.feld) ? "tv-wert-aktualisiert" : ""
+                }`}
+              >
+                {w.wert}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -235,6 +253,7 @@ export function MitarbeiterLeaderboard({
               telefonateGesamt={eintrag.telefonateGesamt}
               termineGesamt={eintrag.termineGesamt}
               geaenderteFelder={veraenderteFelder?.[eintrag.name]}
+              brennt={eintrag.brennt}
             />
           ))}
         </div>

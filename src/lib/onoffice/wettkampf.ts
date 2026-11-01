@@ -3,6 +3,7 @@ import {
   AKQUISE_TERMINARTEN,
   FINANZIERUNG_TERMINARTEN,
   ladeNutzerNrFuerMitarbeiter,
+  pruefeUebergabeHeute,
   zaehleAuftraegeAkquiriert,
   zaehleBesichtigungen,
   zaehleTelefonate,
@@ -103,6 +104,10 @@ export interface WettkampfEintrag {
   telefonateGesamt: number;
   termineGesamt: number;
   segmente: WettkampfSegment[];
+  // Ob mindestens ein von dieser Person betreutes Objekt HEUTE in den Status "in Übergabe"
+  // gewechselt ist (siehe pruefeUebergabeHeute in estate.ts) — löst den "brennt"-Effekt auf der
+  // TV-Mitarbeiterkachel aus (Nutzer-Vorgabe November 2026, siehe MitarbeiterLeaderboard.tsx).
+  brennt: boolean;
 }
 
 // Teilnehmerkreis: siehe WETTKAMPF_NAMEN in data/unternehmen.ts — eine eigene, von den
@@ -120,7 +125,8 @@ async function berechnePunkte(
   von: string,
   bis: string,
   vonDatum: string,
-  bisDatum: string
+  bisDatum: string,
+  heuteDatum: string
 ): Promise<WettkampfEintrag> {
   const nutzerNr = ladeNutzerNrFuerMitarbeiter(mitgliedName);
   const istAkquise = AKQUISE_NAMEN.includes(mitgliedName);
@@ -136,6 +142,7 @@ async function berechnePunkte(
     finanzZweit,
     auftraege,
     verkaeufe,
+    brennt,
   ] = await Promise.all([
     nutzerNr ? zaehleTelefonate(nutzerNr, von, bis).catch(() => 0) : Promise.resolve(0),
     nutzerNr ? zaehleBesichtigungen(nutzerNr, von, bis).catch(() => 0) : Promise.resolve(0),
@@ -157,6 +164,7 @@ async function berechnePunkte(
     nutzerNr
       ? zaehleVerkaufteObjekteFuerMitarbeiter(nutzerNr, vonDatum, bisDatum).catch(() => 0)
       : Promise.resolve(0),
+    nutzerNr ? pruefeUebergabeHeute(nutzerNr, heuteDatum).catch(() => false) : Promise.resolve(false),
   ]);
 
   const segmente: WettkampfSegment[] = [
@@ -176,7 +184,7 @@ async function berechnePunkte(
   const punkte = segmente.reduce((summe, s) => summe + s.punkte, 0);
   const termineGesamt = besichtigungen + akquiseErst + akquiseZweit + finanzErst + finanzZweit;
 
-  return { name: mitgliedName, punkte, telefonateGesamt: telefonate, termineGesamt, segmente };
+  return { name: mitgliedName, punkte, telefonateGesamt: telefonate, termineGesamt, segmente, brennt };
 }
 
 // Live-Rangliste für den Büro-Wettkampf, absteigend nach Punkten — siehe
@@ -198,16 +206,18 @@ export async function ladeWettkampfRangliste(): Promise<WettkampfEintrag[]> {
   const bisZeit = formatiereDatumZeit(bis, "23:59:59");
   const vonDatum = formatiereDatumIso(von);
   const bisDatum = formatiereDatumIso(bis);
+  const heuteDatum = formatiereDatumIso(heute);
 
   const eintraege = await Promise.all(
     teilnehmerListe().map((mitglied) =>
-      berechnePunkte(mitglied.name, vonZeit, bisZeit, vonDatum, bisDatum).catch(
+      berechnePunkte(mitglied.name, vonZeit, bisZeit, vonDatum, bisDatum, heuteDatum).catch(
         (): WettkampfEintrag => ({
           name: mitglied.name,
           punkte: 0,
           telefonateGesamt: 0,
           termineGesamt: 0,
           segmente: [],
+          brennt: false,
         })
       )
     )

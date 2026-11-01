@@ -158,3 +158,48 @@
     color: #cb8e49;
   }
 }
+
+/* ----------------------------------------------------------------------------------------
+ * TV-Mitarbeiterkachel "brennt" (components/tv/MitarbeiterLeaderboard.tsx) — ganztägiger
+ * Leuchtring-Effekt für den Tag, an dem ein von dieser Person betreutes Objekt in den Status
+ * "in Übergabe" gewechselt ist (siehe pruefeUebergabeHeute in onoffice/estate.ts). Nutzer-Vorgabe
+ * November 2026: "statt des Schlagschattens der nur einen Ladegang angezeigt wird ... die Kachel
+ * des Mitarbeiters den ganzen Tag optisch brennt". Anders als .tv-wert-aktualisiert oben (löst
+ * sich nach einem Ladezyklus von selbst) bleibt dieser Zustand den ganzen Tag bestehen, weil er
+ * bei jedem Ladezyklus direkt aus den Live-Daten neu bestätigt wird statt aus einem Vorher/
+ * Nachher-Vergleich — siehe WettkampfEintrag.brennt in onoffice/wettkampf.ts.
+ *
+ * KORREKTUR November 2026: Ursprünglich einzelne Flammen-Icons (acht Stück, entlang der vier
+ * Kanten verteilt) — Nutzer schickte danach ein Referenzbild mit einem durchgehenden, weich
+ * verlaufenden Leuchtring ohne sichtbare Lücken ("Mach es so im die Richtung!"). Jetzt EIN
+ * ::before-Pseudo-Element mit demselben Rand-Radius wie die Kachel, nach außen versetzt und
+ * verwischt (blur) statt diskreter Icons — pulsiert in Unschärfe/Deckkraft für ein organisches
+ * Flackern.
+ * ---------------------------------------------------------------------------------------- */
+.tv-kachel-brennt {
+  position: relative;
+  z-index: 0;
+}
+.tv-kachel-brennt::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #fbbf24, #ea580c, #dc2626, #ea580c, #fbbf24);
+  filter: blur(8px);
+  opacity: 0.6;
+  pointer-events: none;
+  animation: tv-feuerring-flackern 2.2s ease-in-out infinite;
+}
+@keyframes tv-feuerring-flackern {
+  0%,
+  100% {
+    opacity: 0.5;
+    filter: blur(6px);
+  }
+  50% {
+    opacity: 0.85;
+    filter: blur(11px);
+  }
+}

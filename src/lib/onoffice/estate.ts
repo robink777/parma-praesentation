@@ -1123,6 +1123,44 @@ export async function zaehleObjekteInAufarbeitung(nutzerNr: string): Promise<num
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
+// Status2-Wert "in Übergabe" — live per get_field_definitions bestätigt (November 2026, 19
+// permitted_values für status2, siehe Kommentar bei ladeObjektkarteDaten oben).
+const STATUS2_IN_UEBERGABE = "ind_Schl_5925";
+
+// Prüft, ob mindestens ein von diesem Mitarbeiter betreutes Objekt HEUTE in den Status
+// "in Übergabe" gewechselt ist — Grundlage für den "brennt"-Effekt auf der TV-Mitarbeiterkachel
+// (siehe MitarbeiterLeaderboard.tsx, Nutzer-Vorgabe November 2026: "an dem Tag an dem ein
+// Mitarbeiter einen Notartermin erfolgreich absolviert hat und der Status 2 des Objektes in
+// 'in Übergabe' wechselt ... die Kachel des Mitarbeiters den ganzen Tag optisch brennt").
+// Gefiltert über das Datumsfeld "Übergabedatum" (ind_3354_Feld_ObjTech504) statt über einen
+// Notartermin-Kalendereintrag: ein Notartermin allein belegt noch nicht, dass er zum Übergang in
+// "in Übergabe" geführt hat (könnte auch ein anderer Termintyp/Grund sein), während
+// "Übergabedatum = heute" direkt den tatsächlichen, bereits erfolgten Statuswechsel abbildet —
+// und bleibt dadurch über den ganzen Tag stabil wahr (unabhängig vom 60-Sekunden-
+// Aktualisierungsrhythmus, ADMIN_REFRESH_INTERVAL_MS), ohne eine eigene "seit letztem Ladezyklus
+// geändert"-Markierung zu brauchen, und erlischt von selbst, sobald ein neuer Tag beginnt.
+export async function pruefeUebergabeHeute(nutzerNr: string, heuteDatum: string): Promise<boolean> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id"],
+        filter: {
+          benutzer: [{ op: "=", val: nutzerNr }],
+          status2: [{ op: "=", val: STATUS2_IN_UEBERGABE }],
+          ind_3354_Feld_ObjTech504: [{ op: "=", val: heuteDatum }],
+        },
+        listlimit: 1,
+      },
+    },
+  ]);
+  return (result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0) > 0;
+}
+
 // Zählt Objekte eines bestimmten Mitarbeiters innerhalb eines Datumsfensters von "verkauft_am"
 // (Feld "Verkauft/Vermietet am", siehe mapping.ts) — für die Kennzahl "Verkaufte Objekte" je
 // Mitarbeiter im aktuellen Kalenderjahr (Chat-Vorgabe Juli 2026: "die Zahl der verkauften Objekte
