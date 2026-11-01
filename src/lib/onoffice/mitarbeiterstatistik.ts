@@ -2,7 +2,7 @@ import { AKQUISE_NAMEN, TEAM } from "@/data/unternehmen";
 import {
   MitarbeiterKennzahlen,
   MitarbeiterObjekt,
-  NeuzugaengeWoche,
+  NeuzugaengeTag,
   ObjektGesamtKennzahlen,
 } from "@/types";
 import {
@@ -100,10 +100,11 @@ export function ermittleJahresDatumsfenster() {
   };
 }
 
-// Anzahl Kalenderwochen im "Neuzugänge"-Verlauf (siehe ladeNeuzugaengeVerlauf unten) — Chat-Vorgabe
-// Oktober 2026 nannte als Spanne "letzte 4-8 Wochen"; 8 gewählt, damit auch kurzfristige
-// Schwankungen (z.B. eine einzelne flaue Woche) im Gesamtbild nicht überbewertet wirken.
-const NEUZUGAENGE_WOCHEN_ANZAHL = 8;
+// Anzahl Tage im "Neuzugänge"-Verlauf (siehe ladeNeuzugaengeVerlauf unten) — Nutzer-Vorgabe
+// November 2026: "die Objekte und auch die Adressen hätte ich gerne jeweils für den Tag
+// angezeigt, immer die letzten 6 Tage und der aktuelle Tag" (ersetzt die zuvor gezeigten 8
+// Kalenderwochen).
+const NEUZUGAENGE_TAGE_ANZAHL = 7;
 
 // Montag der Kalenderwoche eines Datums (Mo-So-Woche, wie in Deutschland üblich) — Date.getDay()
 // liefert 0=So...6=Sa, bei Sonntag muss daher 6 Tage ZURÜCK statt vorwärts gerechnet werden.
@@ -122,48 +123,55 @@ function formatiereDatumIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// "20.10." für die Anzeige-Beschriftung je Wochenzeile (siehe Neuzugaenge.tsx).
+// "20.10." für die Anzeige-Beschriftung je Tageszeile (siehe Neuzugaenge.tsx).
 function formatiereDatumKurz(d: Date): string {
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`;
 }
 
-// Lädt den Neuzugänge-Verlauf (Objekte/Kunden je Kalenderwoche, neueste zuerst) für den
-// "Neuzugänge"-Navi-Punkt im Admin-Bereich (siehe NeuzugaengeWoche in types/index.ts) — Oktober
-// 2026 Chat-Vorgabe: ursprünglich zwei Kacheln auf "Auf einen Blick" (rollierende 7 Tage), auf
-// Nutzerwunsch durch einen "eigenen Reiter mit mehr Verlauf (z.B. Wochen-Trend, letzte 4-8
-// Wochen)" ersetzt — deshalb jetzt ECHTE Kalenderwochen (Montag-Sonntag) statt eines rollierenden
-// Fensters, damit Wochen vergleichbar und die Beschriftung ("20.10.–26.10.") nachvollziehbar
-// bleibt. Die aktuelle, noch nicht abgeschlossene Woche bleibt in der Liste (sonst würde "diese
-// Woche" komplett fehlen) und bekommt stattdessen den Zusatz "(laufend)" in ihrem label.
+// Lädt den Neuzugänge-Verlauf (Objekte/Kunden je Tag, neueste zuerst) für den "Neuzugänge"-
+// Baustein im Admin-Bereich (siehe NeuzugaengeTag in types/index.ts) — ursprünglich echte
+// Kalenderwochen, auf Nutzerwunsch November 2026 ("die Objekte und auch die Adressen hätte ich
+// gerne jeweils für den Tag angezeigt, immer die letzten 6 Tage und der aktuelle Tag") auf
+// NEUZUGAENGE_TAGE_ANZAHL (7) einzelne Kalendertage umgestellt — heute sowie die sechs Tage davor.
+// Der heutige, noch nicht abgeschlossene Tag bleibt in der Liste (sonst würde "heute" komplett
+// fehlen) und bekommt stattdessen den Zusatz "(laufend)" in seinem label.
 //
-// Pro Woche BEIDE Zählungen gleichzeitig (Promise.all) UND alle Wochen gleichzeitig
-// (Promise.all außen) statt nacheinander — unabhängige Abrufe, ein sequenzielles await würde die
-// Ladezeit unnötig auf 2 × NEUZUGAENGE_WOCHEN_ANZAHL Abrufe hintereinander strecken. Jede
-// Zählung einzeln per .catch(() => null) abgesichert (Muster wie ladeMitarbeiterKennzahlen oben)
-// — schlägt eine einzelne Woche/Kennzahl fehl, zeigt nur diese Zelle "–" statt der ganzen Liste.
-export async function ladeNeuzugaengeVerlauf(): Promise<NeuzugaengeWoche[]> {
-  const montagAktuelleWoche = montagDerWoche(new Date());
+// Pro Tag BEIDE Zählungen gleichzeitig (Promise.all) UND alle Tage gleichzeitig (Promise.all
+// außen) statt nacheinander — unabhängige Abrufe, ein sequenzielles await würde die Ladezeit
+// unnötig auf 2 × NEUZUGAENGE_TAGE_ANZAHL Abrufe hintereinander strecken. Jede Zählung einzeln
+// per .catch(() => null) abgesichert (Muster wie ladeMitarbeiterKennzahlen oben) — schlägt eine
+// einzelne Tages-/Kennzahl fehl, zeigt nur diese Zelle "–" statt der ganzen Liste.
+export async function ladeNeuzugaengeVerlauf(): Promise<NeuzugaengeTag[]> {
+  const heute = new Date();
+  heute.setHours(0, 0, 0, 0);
 
-  const wochen = Array.from({ length: NEUZUGAENGE_WOCHEN_ANZAHL }, (_, i) => {
-    const von = new Date(montagAktuelleWoche);
-    von.setDate(von.getDate() - 7 * i);
-    const bis = new Date(von);
-    bis.setDate(bis.getDate() + 6);
-    return { von, bis, istAktuelleWoche: i === 0 };
+  const tage = Array.from({ length: NEUZUGAENGE_TAGE_ANZAHL }, (_, i) => {
+    const datum = new Date(heute);
+    datum.setDate(datum.getDate() - i);
+    return { datum, istHeute: i === 0 };
   });
 
   return Promise.all(
-    wochen.map(async ({ von, bis, istAktuelleWoche }) => {
-      const vonStr = formatiereDatumIso(von);
-      const bisStr = formatiereDatumIso(bis);
+    tage.map(async ({ datum, istHeute }) => {
+      const datumStr = formatiereDatumIso(datum);
+      // Live gegen den Account geprüft (November 2026): Der "<="-Operator gegen ein reines Datum
+      // (ohne Uhrzeit) vergleicht bei erstellt_am/Eintragsdatum offenbar gegen Mitternacht
+      // (00:00:00) dieses Tages, nicht gegen dessen Ende — "erstellt_am <= '2026-10-30'" lieferte
+      // live 0 Treffer für einen Datensatz, der nachweislich am 30.10. um 10:43 Uhr angelegt
+      // wurde, "erstellt_am <= '2026-10-31'" fand ihn dagegen. Als oberes Fenster-Ende deshalb
+      // bewusst der FOLGETag statt des Tages selbst — deckt den ganzen Tag ab, unabhängig von der
+      // Uhrzeit der einzelnen Datensätze.
+      const folgetag = new Date(datum);
+      folgetag.setDate(folgetag.getDate() + 1);
+      const folgetagStr = formatiereDatumIso(folgetag);
       const [neueObjekte, neueKunden] = await Promise.all([
-        zaehleNeueObjekte(vonStr, bisStr).catch(() => null),
-        zaehleNeueKunden(vonStr, bisStr).catch(() => null),
+        zaehleNeueObjekte(datumStr, folgetagStr).catch(() => null),
+        zaehleNeueKunden(datumStr, folgetagStr).catch(() => null),
       ]);
       return {
-        von: vonStr,
-        bis: bisStr,
-        label: `${formatiereDatumKurz(von)}–${formatiereDatumKurz(bis)}${istAktuelleWoche ? " (laufend)" : ""}`,
+        von: datumStr,
+        bis: datumStr,
+        label: `${formatiereDatumKurz(datum)}${istHeute ? " (laufend)" : ""}`,
         neueObjekte: neueObjekte?.gesamt ?? null,
         neueObjekteVerteilung: neueObjekte?.verteilung ?? [],
         neueKunden: neueKunden?.gesamt ?? null,

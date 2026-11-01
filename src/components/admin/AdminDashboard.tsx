@@ -15,7 +15,7 @@ import {
   KontrollObjekt,
   LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
-  NeuzugaengeWoche,
+  NeuzugaengeTag,
   ObjektGesamtKennzahlen,
   ObjektkarteDaten,
 } from "@/types";
@@ -41,7 +41,7 @@ export function AdminDashboard({
   kontrollObjekte?: KontrollObjekt[];
   leadquellenKennzahlen?: LeadquellenKennzahlen;
   objektkarteDaten?: ObjektkarteDaten;
-  neuzugaengeVerlauf?: NeuzugaengeWoche[];
+  neuzugaengeVerlauf?: NeuzugaengeTag[];
   alleMitarbeiter?: Betreuer[];
 }) {
   const [abschnitt, setAbschnitt] = useState("uebersicht");

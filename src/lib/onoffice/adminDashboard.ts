@@ -6,7 +6,7 @@ import {
   KontrollObjekt,
   LeadquellenKennzahlen,
   MitarbeiterKennzahlen,
-  NeuzugaengeWoche,
+  NeuzugaengeTag,
   ObjektGesamtKennzahlen,
   ObjektkarteDaten,
 } from "@/types";
@@ -17,7 +17,7 @@ export interface AdminDashboardDaten {
   kontrollObjekte?: KontrollObjekt[];
   leadquellenKennzahlen?: LeadquellenKennzahlen;
   objektkarteDaten?: ObjektkarteDaten;
-  neuzugaengeVerlauf?: NeuzugaengeWoche[];
+  neuzugaengeVerlauf?: NeuzugaengeTag[];
   alleMitarbeiter?: Betreuer[];
 }
 

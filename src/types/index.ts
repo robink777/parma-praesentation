@@ -403,26 +403,27 @@ export interface ObjektGesamtKennzahlen {
   provisionsvolumenVerkauftJahrFehltAnzahl: number;
 }
 
-// Eine Kalenderwoche im Neuzugänge-Verlauf (siehe ladeNeuzugaengeVerlauf in
-// onoffice/mitarbeiterstatistik.ts, eigener "Neuzugänge"-Navi-Punkt im Admin-Bereich) — Oktober
-// 2026 Chat-Vorgabe: erst als zwei Kacheln auf "Auf einen Blick", dann auf Nutzerwunsch durch
-// einen "eigenen Reiter mit mehr Verlauf" ersetzt ("Statt nur 2 Kacheln ... ein eigener Reiter
-// mit mehr Verlauf (z.B. Wochen-Trend, letzte 4-8 Wochen)"). Bewusst ein eigener, schlanker Typ
-// statt einer Erweiterung von ObjektGesamtKennzahlen (das ausschließlich Objekt-Bestandsdaten
-// bündelt) — "Kunden" stammt aus dem Adress-Modul, nicht aus dem Objekt-Bestand, beides gehört
-// hier aber inhaltlich als EIN "Neuzugänge"-Block zusammen. von/bis im Format "YYYY-MM-DD"
-// (Montag-Sonntag der jeweiligen Kalenderwoche), label die fertig formatierte Anzeige
-// ("20.10.–26.10." bzw. mit Zusatz "(laufend)" für die noch nicht abgeschlossene aktuelle Woche).
-// Ein Eintrag der Status2- bzw. Herkunft-Aufschlüsselung einer Woche (siehe NeuzugaengeWoche
-// unten) — Nutzer-Vorgabe: "Neue Objekte = Status 2 anzeigen, Neue Adressen = Herkunft Kontakt,
-// jeweils bitte mit Legende", nach demselben Aufschlüsselungs-Prinzip wie die Wettkampf-Säulen auf
-// der TV-Folie (siehe WettkampfSegment in onoffice/wettkampf.ts).
+// Ein Kalendertag im Neuzugänge-Verlauf (siehe ladeNeuzugaengeVerlauf in
+// onoffice/mitarbeiterstatistik.ts, "Neuzugänge"-Baustein im Admin-Bereich) — erst als zwei
+// Kacheln auf "Auf einen Blick", dann als eigener Wochen-Trend (echte Kalenderwochen), auf
+// Nutzerwunsch November 2026 ("die Objekte und auch die Adressen hätte ich gerne jeweils für den
+// Tag angezeigt, immer die letzten 6 Tage und der aktuelle Tag") auf einzelne Kalendertage
+// umgestellt. Bewusst ein eigener, schlanker Typ statt einer Erweiterung von
+// ObjektGesamtKennzahlen (das ausschließlich Objekt-Bestandsdaten bündelt) — "Kunden" stammt aus
+// dem Adress-Modul, nicht aus dem Objekt-Bestand, beides gehört hier aber inhaltlich als EIN
+// "Neuzugänge"-Block zusammen. von/bis im Format "YYYY-MM-DD" (identisch, da ein einzelner Tag),
+// label die fertig formatierte Anzeige ("01.11." bzw. mit Zusatz "(laufend)" für den noch nicht
+// abgeschlossenen heutigen Tag).
+// Ein Eintrag der Status2- bzw. Herkunft-Aufschlüsselung eines Tages (siehe NeuzugaengeTag unten)
+// — Nutzer-Vorgabe: "Neue Objekte = Status 2 anzeigen, Neue Adressen = Herkunft Kontakt, jeweils
+// bitte mit Legende", nach demselben Aufschlüsselungs-Prinzip wie die Wettkampf-Säulen auf der
+// TV-Folie (siehe WettkampfSegment in onoffice/wettkampf.ts).
 export interface NeuzugaengeVerteilungsEintrag {
   label: string;
   anzahl: number;
 }
 
-export interface NeuzugaengeWoche {
+export interface NeuzugaengeTag {
   von: string;
   bis: string;
   label: string;

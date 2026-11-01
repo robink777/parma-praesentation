@@ -1,7 +1,7 @@
 import { KATEGORIE_BG_KLASSEN, KATEGORIE_FILL_KLASSEN } from "@/components/shared/kategorieFarben";
 import { InfoTooltip } from "@/components/shared/InfoTooltip";
-import { kategorisiere, stapelFuerWoche } from "@/lib/neuzugaengeKategorisierung";
-import { NeuzugaengeVerteilungsEintrag, NeuzugaengeWoche } from "@/types";
+import { kategorisiere, stapelFuerTag } from "@/lib/neuzugaengeKategorisierung";
+import { NeuzugaengeTag, NeuzugaengeVerteilungsEintrag } from "@/types";
 
 // Deutsches Tausendertrennzeichen, analog zu Leadquellen.tsx/Kontrolle.tsx.
 const zahlenformat = new Intl.NumberFormat("de-DE");
@@ -40,23 +40,23 @@ function Legende({ kategorien }: { kategorien: { label: string; farbe: string }[
 
 // Ein einzelnes Balkendiagramm (Objekte ODER Kunden, siehe Uebersicht.tsx, das beide
 // nebeneinander einbindet) — bewusst ZWEI getrennte Ein-Serien-Diagramme statt EINES
-// gruppierten Zwei-Serien-Diagramms mit gemeinsamer Skala: Kunden-Zahlen liegen pro Woche
-// typischerweise 3-5× über den Objekte-Zahlen (live beobachtet), eine gemeinsame Achse würde die
-// Objekte-Balken fast unsichtbar neben den Kunden-Balken flachdrücken UND wäre im Kern eine
+// gruppierten Zwei-Serien-Diagramms mit gemeinsamer Skala: Kunden-Zahlen liegen pro Tag
+// typischerweise deutlich über den Objekte-Zahlen (live beobachtet), eine gemeinsame Achse würde
+// die Objekte-Balken fast unsichtbar neben den Kunden-Balken flachdrücken UND wäre im Kern eine
 // Dual-Achsen-Darstellung mit nur einer sichtbaren Skala — genau das Muster, von dem die
 // dataviz-Referenz ausdrücklich abrät ("zwei Diagramme ... statt einer Doppelachse"). Jede der
 // beiden Karten bekommt stattdessen ihre EIGENE, ehrliche Skala. Innerhalb jedes Balkens jetzt
 // gestapelt nach Kategorie (siehe kategorisiere() oben).
 //
 // Referenzlinie (Oktober 2026 Chat-Vorgabe: "mehr in Referenzen"): eine gestrichelte
-// Durchschnittslinie über die abgeschlossenen Wochen (OHNE die noch laufende aktuelle Woche, die
-// sonst den Schnitt künstlich drücken würde) — zeigt auf einen Blick, ob die aktuelle/letzte Woche
-// über oder unter dem jüngeren Normalniveau liegt, ohne eine irreführende Wochenvergleich-Prozent-
-// angabe gegen eine noch unvollständige Woche zu bilden.
+// Durchschnittslinie über die abgeschlossenen Tage (OHNE den noch laufenden heutigen Tag, der
+// sonst den Schnitt künstlich drücken würde) — zeigt auf einen Blick, ob der aktuelle/letzte Tag
+// über oder unter dem jüngeren Normalniveau liegt, ohne eine irreführende Vergleichs-Prozentangabe
+// gegen einen noch unvollständigen Tag zu bilden.
 function Balkendiagramm({
   titel,
   einheit,
-  wochen,
+  tage,
   wert,
   verteilungVon,
   maxKategorien,
@@ -64,22 +64,22 @@ function Balkendiagramm({
 }: {
   titel: string;
   einheit: string;
-  wochen: NeuzugaengeWoche[];
-  wert: (woche: NeuzugaengeWoche) => number | null;
-  verteilungVon: (woche: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[];
+  tage: NeuzugaengeTag[];
+  wert: (tag: NeuzugaengeTag) => number | null;
+  verteilungVon: (tag: NeuzugaengeTag) => NeuzugaengeVerteilungsEintrag[];
   maxKategorien: number;
   info?: { felder: string[]; text: string };
 }) {
   // Chronologisch (älteste zuerst) für die Lesrichtung links→rechts — ladeNeuzugaengeVerlauf
   // liefert bewusst neueste zuerst (siehe mitarbeiterstatistik.ts), hier fürs Diagramm umgedreht.
-  const chronologisch = [...wochen].reverse();
-  const werte = chronologisch.map((w) => wert(w) ?? 0);
+  const chronologisch = [...tage].reverse();
+  const werte = chronologisch.map((t) => wert(t) ?? 0);
   const maxWert = Math.max(1, ...werte);
   const kategorisierung = kategorisiere(chronologisch, verteilungVon, maxKategorien);
 
   const abgeschlosseneWerte = chronologisch
-    .filter((w) => !w.label.includes("(laufend)"))
-    .map((w) => wert(w))
+    .filter((t) => !t.label.includes("(laufend)"))
+    .map((t) => wert(t))
     .filter((w): w is number => w !== null);
   const durchschnitt =
     abgeschlosseneWerte.length === 0
@@ -124,17 +124,17 @@ function Balkendiagramm({
             </text>
           </>
         )}
-        {chronologisch.map((woche, i) => {
-          const w = wert(woche) ?? 0;
-          const laeuft = woche.label.includes("(laufend)");
+        {chronologisch.map((tag, i) => {
+          const w = wert(tag) ?? 0;
+          const laeuft = tag.label.includes("(laufend)");
           const balkenhoehe = maxWert === 0 ? 0 : (w / maxWert) * PLOT_HOEHE;
           const x = i * gruppenbreite + (gruppenbreite - balkenbreite) / 2;
           const yOben = OBEN_PADDING + (PLOT_HOEHE - balkenhoehe);
-          // Kurzform des Datums für die Achsenbeschriftung — woche.label trägt zusätzlich das
-          // Enddatum und ggf. "(laufend)" (siehe NeuzugaengeWoche in types/index.ts), hier reicht
-          // das Startdatum; "laufend" wird stattdessen über reduzierte Deckkraft + "*" codiert.
-          const kurzDatum = woche.label.split("–")[0];
-          const stapel = stapelFuerWoche(woche, verteilungVon, kategorisierung);
+          // Kurzform des Datums für die Achsenbeschriftung — tag.label trägt zusätzlich ggf. den
+          // Zusatz "(laufend)" (siehe NeuzugaengeTag in types/index.ts); "laufend" wird
+          // stattdessen über reduzierte Deckkraft + "*" codiert, deshalb hier entfernt.
+          const kurzDatum = tag.label.replace(" (laufend)", "");
+          const stapel = stapelFuerTag(tag, verteilungVon, kategorisierung);
 
           // Segmente von UNTEN nach OBEN in fixer Kategorie-Reihenfolge (gleiche Reihenfolge wie
           // die Legende) — rückwärts durchlaufen, damit y mit jedem Segment nach oben wandert.
@@ -148,7 +148,7 @@ function Balkendiagramm({
           });
 
           return (
-            <g key={woche.von}>
+            <g key={tag.von}>
               {segmente
                 .filter((s) => s.hoehe > 0)
                 .map((s) => (
@@ -186,7 +186,7 @@ function Balkendiagramm({
       </svg>
       </div>
       <p className="mt-[2px] shrink-0 text-small text-anthrazit/40">
-        {einheit} je Kalenderwoche · * aktuelle Woche, noch nicht abgeschlossen
+        {einheit} je Tag · * heute, noch nicht abgeschlossen
       </p>
       <Legende kategorien={kategorisierung.kategorien} />
     </div>
@@ -194,17 +194,19 @@ function Balkendiagramm({
 }
 
 // "Neuzugänge"-Baustein der Übersicht (siehe Uebersicht.tsx) — zwei Balkendiagramme (Objekte/
-// Kunden) nebeneinander, je Kalenderwoche der letzten `verlauf.length` Wochen. Ersetzt die
-// frühere eigene "Neuzugänge"-Navi-Seite mit Text-Balken (siehe adminNav.ts) — Oktober 2026
-// Chat-Vorgabe wollte die Statistik-Seite als EINEN auf-einen-Blick-lesbaren TV-Dashboard-
-// Landingscreen mit echten Diagrammen statt eines weiteren Klickschritts. Balken seit der
-// Status2-/Herkunft-Aufschlüsselung (Nutzer-Vorgabe: "Neue Objekte = Status 2 anzeigen, Neue
-// Adressen = Herkunft Kontakt, jeweils mit Legende") gestapelt statt einfarbig.
+// Kunden) nebeneinander, je Kalendertag der letzten `verlauf.length` Tage (Nutzer-Vorgabe
+// November 2026: "die Objekte und auch die Adressen hätte ich gerne jeweils für den Tag
+// angezeigt, immer die letzten 6 Tage und der aktuelle Tag" — ersetzt die zuvor gezeigten
+// Kalenderwochen). Ersetzt die frühere eigene "Neuzugänge"-Navi-Seite mit Text-Balken (siehe
+// adminNav.ts) — Oktober 2026 Chat-Vorgabe wollte die Statistik-Seite als EINEN auf-einen-Blick-
+// lesbaren TV-Dashboard-Landingscreen mit echten Diagrammen statt eines weiteren Klickschritts.
+// Balken seit der Status2-/Herkunft-Aufschlüsselung (Nutzer-Vorgabe: "Neue Objekte = Status 2
+// anzeigen, Neue Adressen = Herkunft Kontakt, jeweils mit Legende") gestapelt statt einfarbig.
 export function Neuzugaenge({
   verlauf,
   interaktiv = false,
 }: {
-  verlauf?: NeuzugaengeWoche[];
+  verlauf?: NeuzugaengeTag[];
   // Siehe Uebersicht.tsx — dieselbe Komponente läuft auch auf der öffentlichen TV-Folie, die
   // (i)-Erläuterungen erscheinen deshalb nur, wenn der Admin-Aufrufer das explizit anfordert.
   interaktiv?: boolean;
@@ -220,15 +222,15 @@ export function Neuzugaenge({
       <Balkendiagramm
         titel="Neue Objekte"
         einheit="Objekte"
-        wochen={verlauf}
-        wert={(w) => w.neueObjekte}
-        verteilungVon={(w) => w.neueObjekteVerteilung}
+        tage={verlauf}
+        wert={(t) => t.neueObjekte}
+        verteilungVon={(t) => t.neueObjekteVerteilung}
         maxKategorien={Infinity}
         info={
           interaktiv
             ? {
                 felder: ["erstellt_am", "status2"],
-                text: "Objekte in dieser Kalenderwoche, aufgeschlüsselt nach Status 2. Zählt ALLE angelegten Datensätze, auch Marktbeobachtung/Fremdobjekte.",
+                text: "Objekte an diesem Tag, aufgeschlüsselt nach Status 2. Zählt ALLE angelegten Datensätze, auch Marktbeobachtung/Fremdobjekte.",
               }
             : undefined
         }
@@ -236,15 +238,15 @@ export function Neuzugaenge({
       <Balkendiagramm
         titel="Neue Kunden"
         einheit="Kunden"
-        wochen={verlauf}
-        wert={(w) => w.neueKunden}
-        verteilungVon={(w) => w.neueKundenVerteilung}
+        tage={verlauf}
+        wert={(t) => t.neueKunden}
+        verteilungVon={(t) => t.neueKundenVerteilung}
         maxKategorien={KUNDEN_MAX_KATEGORIEN}
         info={
           interaktiv
             ? {
                 felder: ["Eintragsdatum", "HerkunftKontakt"],
-                text: "Adressen in dieser Kalenderwoche, aufgeschlüsselt nach dem ersten Wert im Mehrfachauswahlfeld Herkunft Kontakt.",
+                text: "Adressen an diesem Tag, aufgeschlüsselt nach dem ersten Wert im Mehrfachauswahlfeld Herkunft Kontakt.",
               }
             : undefined
         }

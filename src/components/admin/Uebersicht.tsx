@@ -1,5 +1,5 @@
 import { baueUebersichtKacheln, KpiKachel } from "@/components/shared/KpiKachel";
-import { NeuzugaengeWoche, ObjektGesamtKennzahlen } from "@/types";
+import { NeuzugaengeTag, ObjektGesamtKennzahlen } from "@/types";
 import { Neuzugaenge } from "./Neuzugaenge";
 
 // Landing-Screen des Admin-Dashboards (siehe AdminDashboard.tsx) — fusioniert die
@@ -24,7 +24,7 @@ export function Uebersicht({
   interaktiv = false,
 }: {
   gesamt?: ObjektGesamtKennzahlen;
-  neuzugaengeVerlauf?: NeuzugaengeWoche[];
+  neuzugaengeVerlauf?: NeuzugaengeTag[];
   interaktiv?: boolean;
 }) {
   const kacheln = baueUebersichtKacheln(

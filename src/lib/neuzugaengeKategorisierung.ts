@@ -1,4 +1,4 @@
-import { NeuzugaengeVerteilungsEintrag, NeuzugaengeWoche } from "@/types";
+import { NeuzugaengeTag, NeuzugaengeVerteilungsEintrag } from "@/types";
 
 // Gemeinsame Kategorisierungs-Logik für die "Neuzugänge"-Balken (Status2 bei "Neue Objekte",
 // Herkunft Kontakt bei "Neue Kunden") — ursprünglich nur in components/admin/Neuzugaenge.tsx
@@ -21,7 +21,7 @@ export const SONSTIGE_FARBE = "asche";
 
 export interface Kategorisierung {
   // Reihenfolge = Stapel-Reihenfolge (von unten nach oben) UND Legenden-Reihenfolge, nach
-  // absteigender Gesamtanzahl über alle Wochen hinweg. "farbe" ist der reine Tailwind-Farbname
+  // absteigender Gesamtanzahl über alle Tage hinweg. "farbe" ist der reine Tailwind-Farbname
   // (z.B. "chart-1"), ohne "bg-"/"fill-"-Präfix — der jeweilige Aufrufer (SVG vs. HTML) hängt das
   // für sein Element passende Präfix selbst an.
   kategorien: { label: string; farbe: string }[];
@@ -34,13 +34,13 @@ export interface Kategorisierung {
 // liefert dann einfach alle vorkommenden Kategorien (siehe "Neue Objekte"/Status2, ein
 // geschlossenes Feld mit nur 19 möglichen Werten — anders als "Herkunft Kontakt" mit über 30).
 export function kategorisiere(
-  wochen: NeuzugaengeWoche[],
-  verteilungVon: (w: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[],
+  tage: NeuzugaengeTag[],
+  verteilungVon: (t: NeuzugaengeTag) => NeuzugaengeVerteilungsEintrag[],
   maxKategorien: number
 ): Kategorisierung {
   const gesamtJeLabel = new Map<string, number>();
-  for (const woche of wochen) {
-    for (const eintrag of verteilungVon(woche)) {
+  for (const tag of tage) {
+    for (const eintrag of verteilungVon(tag)) {
       gesamtJeLabel.set(eintrag.label, (gesamtJeLabel.get(eintrag.label) ?? 0) + eintrag.anzahl);
     }
   }
@@ -58,15 +58,15 @@ export function kategorisiere(
   return { kategorien, zuordnen: (label) => (topSet.has(label) ? label : SONSTIGE_LABEL) };
 }
 
-// Fasst die Verteilung einer einzelnen Woche auf die (ggf. mit "Sonstige" gefalteten)
+// Fasst die Verteilung eines einzelnen Tages auf die (ggf. mit "Sonstige" gefalteten)
 // Stapel-Kategorien zusammen.
-export function stapelFuerWoche(
-  woche: NeuzugaengeWoche,
-  verteilungVon: (w: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[],
+export function stapelFuerTag(
+  tag: NeuzugaengeTag,
+  verteilungVon: (t: NeuzugaengeTag) => NeuzugaengeVerteilungsEintrag[],
   kategorisierung: Kategorisierung
 ): Map<string, number> {
   const stapel = new Map<string, number>();
-  for (const eintrag of verteilungVon(woche)) {
+  for (const eintrag of verteilungVon(tag)) {
     const kategorie = kategorisierung.zuordnen(eintrag.label);
     stapel.set(kategorie, (stapel.get(kategorie) ?? 0) + eintrag.anzahl);
   }

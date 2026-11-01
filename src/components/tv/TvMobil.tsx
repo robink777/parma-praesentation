@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
 import { baueUebersichtKacheln, KpiKachel } from "@/components/shared/KpiKachel";
-import { kategorisiere, stapelFuerWoche } from "@/lib/neuzugaengeKategorisierung";
+import { kategorisiere, stapelFuerTag } from "@/lib/neuzugaengeKategorisierung";
 import { KATEGORIE_BG_KLASSEN } from "@/components/shared/kategorieFarben";
 import {
   SEGMENT_FARBEN,
@@ -14,7 +14,7 @@ import {
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import { AdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
 import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
-import { Betreuer, MitarbeiterKennzahlen, NeuzugaengeVerteilungsEintrag, NeuzugaengeWoche } from "@/types";
+import { Betreuer, MitarbeiterKennzahlen, NeuzugaengeTag, NeuzugaengeVerteilungsEintrag } from "@/types";
 
 // Smartphone-Ansicht der TV-Vorführung (siehe TvSlideshow.tsx für die Fernseher-Variante) —
 // Oktober 2026 Chat-Vorgabe: "eine Smartphone-Version ... darf scrollbar sein, soll auf dem
@@ -58,33 +58,33 @@ function KategorieLegende({ kategorien }: { kategorien: { label: string; farbe: 
   );
 }
 
-// Eine Woche als horizontale Zeile: Datum links, gestapelter Balken (Breite statt Höhe, damit er
-// im normalen Dokumentenfluss einer scrollenden Seite funktioniert — keine SVG-viewBox/h-full-
-// Kette wie im Desktop-Pendant Neuzugaenge.tsx nötig), Gesamtzahl rechts. ladeNeuzugaengeVerlauf
-// liefert bereits neueste Woche zuerst — genau die Reihenfolge, die auf einer scrollenden Seite
+// Ein Tag als horizontale Zeile: Datum links, gestapelter Balken (Breite statt Höhe, damit er im
+// normalen Dokumentenfluss einer scrollenden Seite funktioniert — keine SVG-viewBox/h-full-Kette
+// wie im Desktop-Pendant Neuzugaenge.tsx nötig), Gesamtzahl rechts. ladeNeuzugaengeVerlauf liefert
+// bereits den neuesten Tag zuerst — genau die Reihenfolge, die auf einer scrollenden Seite
 // gewünscht ist (aktuellste/relevanteste Information zuerst, kein Umdrehen wie im Desktop-
 // Zeitstrahl nötig).
-function WochenZeile({
-  woche,
+function TagesZeile({
+  tag,
   maxWert,
   wert,
   verteilungVon,
   kategorisierung,
 }: {
-  woche: NeuzugaengeWoche;
+  tag: NeuzugaengeTag;
   maxWert: number;
-  wert: (w: NeuzugaengeWoche) => number | null;
-  verteilungVon: (w: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[];
+  wert: (t: NeuzugaengeTag) => number | null;
+  verteilungVon: (t: NeuzugaengeTag) => NeuzugaengeVerteilungsEintrag[];
   kategorisierung: ReturnType<typeof kategorisiere>;
 }) {
-  const w = wert(woche) ?? 0;
-  const laeuft = woche.label.includes("(laufend)");
-  const stapel = stapelFuerWoche(woche, verteilungVon, kategorisierung);
+  const w = wert(tag) ?? 0;
+  const laeuft = tag.label.includes("(laufend)");
+  const stapel = stapelFuerTag(tag, verteilungVon, kategorisierung);
 
   return (
     <div className={`flex items-center gap-sm ${laeuft ? "opacity-60" : ""}`}>
       <span className="w-[76px] shrink-0 font-mono text-[11px] text-anthrazit/50">
-        {woche.label.split("–")[0]}
+        {tag.label.replace(" (laufend)", "")}
         {laeuft ? "*" : ""}
       </span>
       <div className="h-[14px] flex-1 overflow-hidden rounded-sm bg-stein">
@@ -113,29 +113,29 @@ function WochenZeile({
 function NeuzugaengeAbschnitt({
   titel,
   einheit,
-  wochen,
+  tage,
   wert,
   verteilungVon,
   maxKategorien,
 }: {
   titel: string;
   einheit: string;
-  wochen: NeuzugaengeWoche[];
-  wert: (woche: NeuzugaengeWoche) => number | null;
-  verteilungVon: (woche: NeuzugaengeWoche) => NeuzugaengeVerteilungsEintrag[];
+  tage: NeuzugaengeTag[];
+  wert: (tag: NeuzugaengeTag) => number | null;
+  verteilungVon: (tag: NeuzugaengeTag) => NeuzugaengeVerteilungsEintrag[];
   maxKategorien: number;
 }) {
-  const maxWert = Math.max(1, ...wochen.map((w) => wert(w) ?? 0));
-  const kategorisierung = kategorisiere(wochen, verteilungVon, maxKategorien);
+  const maxWert = Math.max(1, ...tage.map((t) => wert(t) ?? 0));
+  const kategorisierung = kategorisiere(tage, verteilungVon, maxKategorien);
 
   return (
     <div>
       <p className="mb-sm font-slab text-base font-bold text-anthrazit">{titel}</p>
       <div className="space-y-xs">
-        {wochen.map((woche) => (
-          <WochenZeile
-            key={woche.von}
-            woche={woche}
+        {tage.map((tag) => (
+          <TagesZeile
+            key={tag.von}
+            tag={tag}
             maxWert={maxWert}
             wert={wert}
             verteilungVon={verteilungVon}
@@ -144,7 +144,7 @@ function NeuzugaengeAbschnitt({
         ))}
       </div>
       <p className="mt-xs text-[11px] text-anthrazit/40">
-        {einheit} je Kalenderwoche · * aktuelle Woche, noch nicht abgeschlossen
+        {einheit} je Tag · * heute, noch nicht abgeschlossen
       </p>
       <KategorieLegende kategorien={kategorisierung.kategorien} />
     </div>
@@ -273,17 +273,17 @@ export function TvMobil(
               <NeuzugaengeAbschnitt
                 titel="Neue Objekte"
                 einheit="Objekte"
-                wochen={verlauf}
-                wert={(w) => w.neueObjekte}
-                verteilungVon={(w) => w.neueObjekteVerteilung}
+                tage={verlauf}
+                wert={(t) => t.neueObjekte}
+                verteilungVon={(t) => t.neueObjekteVerteilung}
                 maxKategorien={Infinity}
               />
               <NeuzugaengeAbschnitt
                 titel="Neue Kunden"
                 einheit="Kunden"
-                wochen={verlauf}
-                wert={(w) => w.neueKunden}
-                verteilungVon={(w) => w.neueKundenVerteilung}
+                tage={verlauf}
+                wert={(t) => t.neueKunden}
+                verteilungVon={(t) => t.neueKundenVerteilung}
                 maxKategorien={KUNDEN_MAX_KATEGORIEN}
               />
             </div>
