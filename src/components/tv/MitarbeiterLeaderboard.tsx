@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { MitarbeiterFoto } from "@/components/shared/MitarbeiterFoto";
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
 import {
@@ -105,13 +105,7 @@ function MitarbeiterZahlenKachel({
         </span>
         <div className="mb-xs flex items-center gap-xs">
           <div className="relative h-[clamp(20px,3.6vh,30px)] w-[clamp(20px,3.6vh,30px)] shrink-0 overflow-hidden rounded-full bg-sand">
-            {fotoUrl ? (
-              <Image src={fotoUrl} alt={name} fill className="object-cover" sizes="30px" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center font-slab text-[9px] font-bold text-walnuss">
-                {initialen(name)}
-              </div>
-            )}
+            <MitarbeiterFoto fotoUrl={fotoUrl} name={name} groesseText="30px" />
           </div>
           <p className="min-w-0 truncate text-small font-medium leading-tight text-anthrazit">{name}</p>
         </div>

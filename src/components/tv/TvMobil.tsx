@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
 import { baueUebersichtKacheln, KpiKachel } from "@/components/shared/KpiKachel";
+import { MitarbeiterFoto } from "@/components/shared/MitarbeiterFoto";
 import { kategorisiere, stapelFuerTag } from "@/lib/neuzugaengeKategorisierung";
 import { KATEGORIE_BG_KLASSEN } from "@/components/shared/kategorieFarben";
 import {
@@ -11,7 +12,7 @@ import {
   SEGMENT_PUNKTE_TEXT,
   SEGMENT_REIHENFOLGE,
 } from "@/components/shared/wettkampfDarstellung";
-import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
+import { fotoLookup } from "@/lib/mitarbeiterFotos";
 import { AdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
 import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
 import { Betreuer, MitarbeiterKennzahlen, NeuzugaengeTag, NeuzugaengeVerteilungsEintrag } from "@/types";
@@ -192,13 +193,7 @@ function WettkampfKarte({
           #{rang}
         </span>
         <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-sand">
-          {fotoUrl ? (
-            <Image src={fotoUrl} alt={eintrag.name} fill className="object-cover" sizes="36px" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center font-slab text-xs font-bold text-walnuss">
-              {initialen(eintrag.name)}
-            </div>
-          )}
+          <MitarbeiterFoto fotoUrl={fotoUrl} name={eintrag.name} groesseText="36px" schriftKlasse="text-xs" />
         </div>
         <p className="min-w-0 flex-1 truncate font-medium text-anthrazit">{eintrag.name}</p>
         <p className="shrink-0 font-slab text-lg font-bold text-anthrazit">
