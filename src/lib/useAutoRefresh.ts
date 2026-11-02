@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // Für den Dauerbetrieb am Büro-/TV-Bildschirm (Oktober 2026 Chat-Vorgabe): Die Admin-Seiten
@@ -18,11 +18,46 @@ import { useRouter } from "next/navigation";
 // OnOffice-Fehlern/Drosselung im Dauerbetrieb diesen Wert als Ersten Verdächtigen prüfen.
 export const ADMIN_REFRESH_INTERVAL_MS = 60 * 1000;
 
-export function useAutoRefresh(intervalMs: number) {
+// KORREKTUR November 2026 (Nutzer-Meldung: "ich habe gerade bei kira einen testanruf gemacht.
+// Dieser wieder nicht eingetragen auch nach der aktuallisereung von 1 minute ... Vielleicht
+// brauchen wir noch ein optisches feedback wann aktuallisert wird"). Live-Diagnose direkt gegen
+// onOffice bestätigte: Der Testanruf WAR korrekt in onOffice erfasst und wurde von unserer
+// Zählfunktion auch korrekt mitgezählt (zaehleTelefonate lieferte live 6 Treffer für Kira,
+// inklusive "Testanruf für Counter") — die Daten-/Zähllogik war also nicht das Problem. Ohne
+// sichtbaren Hinweis, WANN zuletzt erfolgreich aktualisiert wurde, lässt sich ein echter Fehler
+// (Refresh bleibt aus) aber nicht von normaler Latenz (bis zu 60s bis zum nächsten Zyklus)
+// unterscheiden — genau das hat der Nutzer richtig erkannt und vorgeschlagen.
+//
+// Gibt deshalb jetzt zusätzlich zurück, OB gerade aktualisiert wird und WANN der letzte
+// erfolgreiche Abruf eintraf. `aenderungsSignal` ist ein beliebiger Wert aus den vom Server
+// gelieferten Props (z.B. das gesamte Daten-Objekt) — React vergleicht ihn per Referenz, und ein
+// frischer Server-Render liefert bei JEDEM Aufruf neue Objekt-Referenzen, auch wenn sich die
+// Werte inhaltlich nicht geändert haben. Der Effekt unten reagiert deshalb zuverlässig auf JEDEN
+// abgeschlossenen Refresh, nicht nur auf Refreshs mit tatsächlich geänderten Werten.
+export function useAutoRefresh(
+  intervalMs: number,
+  aenderungsSignal: unknown
+): { wirdAktualisiert: boolean; zuletztAktualisiert: Date | null } {
   const router = useRouter();
+  const [wirdAktualisiert, setWirdAktualisiert] = useState(false);
+  const [zuletztAktualisiert, setZuletztAktualisiert] = useState<Date | null>(null);
 
   useEffect(() => {
-    const intervall = setInterval(() => router.refresh(), intervalMs);
+    const intervall = setInterval(() => {
+      setWirdAktualisiert(true);
+      router.refresh();
+    }, intervalMs);
     return () => clearInterval(intervall);
   }, [router, intervalMs]);
+
+  // Läuft bei JEDER Änderung von aenderungsSignal — das schließt den allerersten Render mit ein
+  // (zuletztAktualisiert zeigt dadurch von Anfang an einen Zeitpunkt, statt zunächst leer zu
+  // bleiben, bis der erste Refresh-Zyklus nach bis zu 60s eintrifft).
+  useEffect(() => {
+    setWirdAktualisiert(false);
+    setZuletztAktualisiert(new Date());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aenderungsSignal]);
+
+  return { wirdAktualisiert, zuletztAktualisiert };
 }

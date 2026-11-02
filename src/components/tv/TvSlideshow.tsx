@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Uebersicht } from "@/components/admin/Uebersicht";
+import { AktualisierungsAnzeige } from "@/components/shared/AktualisierungsAnzeige";
 import { MitarbeiterLeaderboard } from "./MitarbeiterLeaderboard";
 import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
 import { AdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
@@ -50,7 +51,7 @@ export function TvSlideshow(
   daten: AdminDashboardDaten & { rangliste: WettkampfEintrag[]; saisonBisIso: string }
 ) {
   const [index, setIndex] = useState(0);
-  useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS);
+  const { wirdAktualisiert, zuletztAktualisiert } = useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS, daten);
 
   useEffect(() => {
     const intervall = setInterval(() => {
@@ -109,22 +110,25 @@ export function TvSlideshow(
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-stein">
       <header className="flex shrink-0 items-center justify-between px-lg py-md">
         <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={132} height={33} priority />
-        {/* Fortschrittsanzeige, NICHT klickbar (Chat-Vorgabe: "da soll nichts klickbar sein") —
-            ein Balken-Track pro Folie; der aktive schrumpft über SLIDE_DAUER_MS und zeigt so an,
-            wann die nächste Folie kommt (Nutzer-Vorgabe: "ein Balken der kleiner wird und wenn er
-            ganz klein ist wechselt die Seite ... kann auch dieses Element [die bisherigen Punkte]
-            dafür nutzen"). */}
-        <div className="flex items-center gap-xs" aria-hidden="true">
-          {SLIDES.map((s) => (
-            <div key={s} className="h-[4px] w-[34px] overflow-hidden rounded-full bg-anthrazit/10">
-              {s === slide && (
-                <div
-                  className="tv-fortschritt-balken h-full origin-left rounded-full bg-messing"
-                  style={{ animationDuration: `${SLIDE_DAUER_MS}ms` }}
-                />
-              )}
-            </div>
-          ))}
+        <div className="flex items-center gap-md">
+          <AktualisierungsAnzeige wirdAktualisiert={wirdAktualisiert} zuletztAktualisiert={zuletztAktualisiert} />
+          {/* Fortschrittsanzeige, NICHT klickbar (Chat-Vorgabe: "da soll nichts klickbar sein") —
+              ein Balken-Track pro Folie; der aktive schrumpft über SLIDE_DAUER_MS und zeigt so an,
+              wann die nächste Folie kommt (Nutzer-Vorgabe: "ein Balken der kleiner wird und wenn er
+              ganz klein ist wechselt die Seite ... kann auch dieses Element [die bisherigen Punkte]
+              dafür nutzen"). */}
+          <div className="flex items-center gap-xs" aria-hidden="true">
+            {SLIDES.map((s) => (
+              <div key={s} className="h-[4px] w-[34px] overflow-hidden rounded-full bg-anthrazit/10">
+                {s === slide && (
+                  <div
+                    className="tv-fortschritt-balken h-full origin-left rounded-full bg-messing"
+                    style={{ animationDuration: `${SLIDE_DAUER_MS}ms` }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </header>
       <main className="min-h-0 flex-1 px-lg pb-lg">

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
+import { AktualisierungsAnzeige } from "@/components/shared/AktualisierungsAnzeige";
 import { baueUebersichtKacheln, KpiKachel } from "@/components/shared/KpiKachel";
 import { MitarbeiterFoto } from "@/components/shared/MitarbeiterFoto";
 import { kategorisiere, stapelFuerTag } from "@/lib/neuzugaengeKategorisierung";
@@ -238,7 +239,7 @@ function WettkampfKarte({
 export function TvMobil(
   daten: AdminDashboardDaten & { rangliste: WettkampfEintrag[]; saisonBisIso: string }
 ) {
-  useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS);
+  const { wirdAktualisiert, zuletztAktualisiert } = useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS, daten);
 
   const kacheln = baueUebersichtKacheln(daten.gesamtKennzahlen);
   const fotos = fotoLookup(daten.alleMitarbeiter ?? []);
@@ -248,8 +249,9 @@ export function TvMobil(
 
   return (
     <div className="min-h-screen bg-stein pb-xl">
-      <header className="sticky top-0 z-10 flex items-center bg-stein/95 px-md py-sm backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between bg-stein/95 px-md py-sm backdrop-blur">
         <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={120} height={30} priority />
+        <AktualisierungsAnzeige wirdAktualisiert={wirdAktualisiert} zuletztAktualisiert={zuletztAktualisiert} />
       </header>
       <main className="flex flex-col gap-lg px-md pt-sm">
         <section>

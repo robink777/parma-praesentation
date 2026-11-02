@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { AktualisierungsAnzeige } from "@/components/shared/AktualisierungsAnzeige";
 import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { StatistikNav } from "./StatistikNav";
 import { Uebersicht } from "./Uebersicht";
@@ -46,7 +47,7 @@ export function AdminDashboard({
 }) {
   const [abschnitt, setAbschnitt] = useState("uebersicht");
   const [gewaehltePlz, setGewaehltePlz] = useState<{ plz: string; ort: string } | null>(null);
-  useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS);
+  const { wirdAktualisiert, zuletztAktualisiert } = useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS, kennzahlen);
 
   // "Übersicht", "Karte" und "Mitarbeiter" sind die drei TV-Dashboard-Landing-Screens (Oktober
   // 2026 Chat-Vorgabe: "Ich will dass sie den ersten beiden Seiten gleicht ... auch in dem Navi
@@ -58,10 +59,13 @@ export function AdminDashboard({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-stein">
-      <header className="flex shrink-0 items-center gap-sm px-lg py-sm">
-        <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={104} height={26} priority />
-        <div className="h-5 w-px bg-walnuss/15" />
-        <p className="label">Admin-Bereich</p>
+      <header className="flex shrink-0 items-center justify-between gap-sm px-lg py-sm">
+        <div className="flex items-center gap-sm">
+          <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={104} height={26} priority />
+          <div className="h-5 w-px bg-walnuss/15" />
+          <p className="label">Admin-Bereich</p>
+        </div>
+        <AktualisierungsAnzeige wirdAktualisiert={wirdAktualisiert} zuletztAktualisiert={zuletztAktualisiert} />
       </header>
       <StatistikNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
       <main
