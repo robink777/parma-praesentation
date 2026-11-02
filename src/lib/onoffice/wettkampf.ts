@@ -1,4 +1,5 @@
 import { AKQUISE_NAMEN, FINANZ_NAMEN, TEAM, WETTKAMPF_NAMEN } from "@/data/unternehmen";
+import { berlinDatumIso, berlinDatumZeit, berlinMitternachtVon } from "@/lib/zeitzone";
 import {
   AKQUISE_TERMINARTEN,
   FINANZIERUNG_TERMINARTEN,
@@ -35,51 +36,26 @@ export const PUNKTE = {
 // gebaut, damit KEINE jährliche Code-Änderung nötig ist: Die erste Saison hat einen abweichenden,
 // festen Start (1.11.2026, nicht der 1. Januar), jede folgende läuft automatisch 1. Januar bis
 // 31. Dezember des jeweiligen Jahres.
-const ERSTE_SAISON_START = new Date(2026, 10, 1); // 1. November 2026 (Monat 0-basiert: 10 = November)
-const ERSTE_SAISON_ENDE = new Date(2026, 11, 31, 23, 59, 59); // 31. Dezember 2026
+// KORREKTUR November 2026 (Nutzer-Meldung: "Die zahlen scheinen nicht richtig erkannt zu werden
+// ... Kann es ein Cache Problem oder so sein?" — live als Zeitzonen-Bug identifiziert, siehe
+// ausführliche Begründung in lib/zeitzone.ts): Saisonstart/-ende sowie "heute"/"jetzt" wurden
+// bisher über Date.getFullYear()/getHours() & Co. ermittelt, die IMMER die Zeitzone des
+// ausführenden PROZESSES liefern (auf Vercel standardmäßig UTC, nicht Europe/Berlin) — jetzt über
+// die explizit Berlin-sicheren Helfer aus lib/zeitzone.ts, analog zur selben Korrektur in
+// onoffice/mitarbeiterstatistik.ts und onoffice/estate.ts.
+function berlinTagesende(jahr: number, monatIndex0: number, tag: number): Date {
+  return new Date(berlinMitternachtVon(jahr, monatIndex0, tag + 1).getTime() - 1000);
+}
+
+const ERSTE_SAISON_START = berlinMitternachtVon(2026, 10, 1); // 1. November 2026 (Monat 0-basiert: 10 = November)
+const ERSTE_SAISON_ENDE = berlinTagesende(2026, 11, 31); // 31. Dezember 2026, 23:59:59 Berlin
 
 export function ermittleSaison(heute: Date = new Date()): { von: Date; bis: Date } {
   if (heute <= ERSTE_SAISON_ENDE) {
     return { von: ERSTE_SAISON_START, bis: ERSTE_SAISON_ENDE };
   }
-  const jahr = heute.getFullYear();
-  return { von: new Date(jahr, 0, 1), bis: new Date(jahr, 11, 31, 23, 59, 59) };
-}
-
-function formatiereDatumZeit(datum: Date, uhrzeit: string): string {
-  const jahr = datum.getFullYear();
-  const monat = String(datum.getMonth() + 1).padStart(2, "0");
-  const tag = String(datum.getDate()).padStart(2, "0");
-  return `${jahr}-${monat}-${tag} ${uhrzeit}`;
-}
-
-function formatiereDatumIso(datum: Date): string {
-  const jahr = datum.getFullYear();
-  const monat = String(datum.getMonth() + 1).padStart(2, "0");
-  const tag = String(datum.getDate()).padStart(2, "0");
-  return `${jahr}-${monat}-${tag}`;
-}
-
-// Formatiert ein Datum MIT seiner eigenen echten Uhrzeit statt einer fest hartkodierten
-// "23:59:59" — Nutzer-Vorgabe November 2026: "Termine zählen generell erst wenn Sie
-// stattgefunden haben". Die reine Tages-Deckelung (bis = min(saisonEnde, heute)) reichte allein
-// NICHT aus: Live-Check direkt nach dem Saisonstart zeigte z.B. Axel Wehmeier bereits mit 7
-// Punkten am Vormittag, obwohl sein einziger punktender Termin ("Lothar Wirtz", Akquise-
-// Zweittermin) laut OnOffice erst um 17 Uhr desselben Tages beginnt — "bis heute 23:59:59" zählt
-// ihn sofort mit, obwohl er noch gar nicht stattgefunden hat. Diese Funktion übernimmt daher die
-// tatsächliche Uhrzeit des übergebenen Date-Objekts: Ist "bis" gleich "jetzt" (Saison noch nicht
-// vorbei), ergibt das den aktuellen Zeitpunkt; ist "bis" ein bereits abgeschlossenes, in der
-// Vergangenheit liegendes Saisonende (ERSTE_SAISON_ENDE bzw. die rollierende Jahresende-Variante
-// in ermittleSaison), trägt dieses Date-Objekt bereits "23:59:59" als Uhrzeit — dieselbe Funktion
-// deckt daher beide Fälle korrekt ab.
-function formatiereDatumZeitVoll(datum: Date): string {
-  const jahr = datum.getFullYear();
-  const monat = String(datum.getMonth() + 1).padStart(2, "0");
-  const tag = String(datum.getDate()).padStart(2, "0");
-  const stunde = String(datum.getHours()).padStart(2, "0");
-  const minute = String(datum.getMinutes()).padStart(2, "0");
-  const sekunde = String(datum.getSeconds()).padStart(2, "0");
-  return `${jahr}-${monat}-${tag} ${stunde}:${minute}:${sekunde}`;
+  const jahr = Number(berlinDatumIso(heute).slice(0, 4));
+  return { von: berlinMitternachtVon(jahr, 0, 1), bis: berlinTagesende(jahr, 11, 31) };
 }
 
 // Auswahlfeld "Akquisiteur" in OnOffice (ind_2964_Feld_ObjVerwaltung384) — live geprüft, Oktober
@@ -224,17 +200,19 @@ async function berechnePunkte(
 // KORREKTUR November 2026 (Folgefund, Nutzer: "Termine zählen generell erst wenn Sie
 // stattgefunden haben"): Die reine Tages-Deckelung allein reichte nicht — "bis heute 23:59:59"
 // zählte auch heute noch bevorstehende Termine sofort mit (live bestätigt: ein Akquise-Termin um
-// 17 Uhr zählte bereits um 7:28 Uhr morgens). bisZeit nutzt daher jetzt formatiereDatumZeitVoll,
-// die die ECHTE aktuelle Uhrzeit trägt statt immer Tagesende, siehe deren Kommentar oben.
+// 17 Uhr zählte bereits um 7:28 Uhr morgens). bisZeit trägt daher die ECHTE aktuelle
+// Berlin-Uhrzeit statt immer Tagesende (siehe berlinDatumZeit in lib/zeitzone.ts: ohne zweites
+// Argument liefert sie die tatsächliche Uhrzeit von `bis`, die bei einem bereits abgeschlossenen
+// Saisonende wie ERSTE_SAISON_ENDE schon "23:59:59" trägt).
 export async function ladeWettkampfRangliste(): Promise<WettkampfEintrag[]> {
   const { von, bis: saisonEnde } = ermittleSaison();
   const heute = new Date();
   const bis = heute < saisonEnde ? heute : saisonEnde;
-  const vonZeit = formatiereDatumZeit(von, "00:00:00");
-  const bisZeit = formatiereDatumZeitVoll(bis);
-  const vonDatum = formatiereDatumIso(von);
-  const bisDatum = formatiereDatumIso(bis);
-  const heuteDatum = formatiereDatumIso(heute);
+  const vonZeit = berlinDatumZeit(von, "00:00:00");
+  const bisZeit = berlinDatumZeit(bis);
+  const vonDatum = berlinDatumIso(von);
+  const bisDatum = berlinDatumIso(bis);
+  const heuteDatum = berlinDatumIso(heute);
 
   const eintraege = await Promise.all(
     teilnehmerListe().map((mitglied) =>
