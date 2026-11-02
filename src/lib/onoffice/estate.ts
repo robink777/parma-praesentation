@@ -16,6 +16,7 @@ import {
 } from "@/types";
 import { TEAM } from "@/data/unternehmen";
 import { distanzZwischenPlzKm } from "@/lib/geo";
+import { berlinDatumIso, berlinDatumZeit, berlinMitternacht } from "@/lib/zeitzone";
 import { callOnOfficeApi } from "./client";
 import { PRAESENTATIONSDATEI_NAME } from "./praesentationsdatei";
 import {
@@ -2229,9 +2230,14 @@ const AUSGESCHLOSSENE_TERMINARTEN = ["Urlaub", "Privattermin", "Teammeeting"];
 // als eine Handvoll Termine pro Mitarbeiter — unproblematisch fürs harte 500er-Listlimit der
 // onOffice-API (siehe Kommentar bei GESAMT_OBJEKT_LISTLIMIT weiter oben in dieser Datei), anders
 // als bei einer Jahres- oder 30-Tage-Abfrage mit mehreren hundert Terminen.
-function formatiereKalenderTagesDatum(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+//
+// KORREKTUR November 2026 (Nutzer-Meldung: "Die zahlen scheinen nicht richtig erkannt zu werden
+// ... es sind speziell die telefonate bei den mitarbeitern"): "jetzt"/"heute" wurden hier bisher
+// über Date.getHours()/getFullYear() & Co. ermittelt — die liefern IMMER die Zeitzone des
+// ausführenden PROZESSES. Live-Diagnose auf Produktion zeigte dadurch systematisch zu NIEDRIGE
+// "heute"-Werte (Vercel führt Serverless Functions standardmäßig in UTC aus, diese lokale
+// Entwicklungsumgebung dagegen in Europe/Berlin — der Fehler war dadurch nur live sichtbar). Jetzt
+// über lib/zeitzone.ts, das explizit immer Europe/Berlin verwendet statt der Prozess-Zeitzone.
 
 async function zaehleKalenderCntAbsolute(
   nutzerNr: string,
@@ -2294,7 +2300,7 @@ async function zaehleKalenderHeutePraezise(
   // dagegen korrekt die tägliche Startzeit — ein reiner Uhrzeitvergleich funktioniert daher für
   // normale UND wiederkehrende Termine gleichermaßen (bei normalen Terminen ist das Datum in
   // start_dt ohnehin "heute", der Datumsanteil ist für den Vergleich also redundant).
-  const jetztUhrzeit = `${String(jetzt.getHours()).padStart(2, "0")}:${String(jetzt.getMinutes()).padStart(2, "0")}:${String(jetzt.getSeconds()).padStart(2, "0")}`;
+  const jetztUhrzeit = berlinDatumZeit(jetzt).slice(11);
   return records.filter((r) => {
     const start = r.elements.start_dt;
     return typeof start === "string" && start.slice(11) <= jetztUhrzeit;
@@ -2308,7 +2314,7 @@ async function zaehleKalenderPraezise(
   artFilter: { op: string; val: string | string[] }
 ): Promise<number> {
   const jetzt = new Date();
-  const heuteDatum = formatiereKalenderTagesDatum(jetzt);
+  const heuteDatum = berlinDatumIso(jetzt);
   const bisDatum = bis.slice(0, 10);
 
   // Zeitraum liegt komplett vor heute (z.B. ein bereits abgeschlossenes früheres Saisonende) —
@@ -2318,9 +2324,7 @@ async function zaehleKalenderPraezise(
   }
 
   const vonDatum = von.slice(0, 10);
-  const gestern = new Date(jetzt);
-  gestern.setDate(gestern.getDate() - 1);
-  const gesternDatum = formatiereKalenderTagesDatum(gestern);
+  const gesternDatum = berlinDatumIso(berlinMitternacht(jetzt, -1));
 
   const [vollerAnteil, heutigerAnteil] = await Promise.all([
     vonDatum <= gesternDatum

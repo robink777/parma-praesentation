@@ -6,6 +6,13 @@ import {
   ObjektGesamtKennzahlen,
 } from "@/types";
 import {
+  berlinDatumIso,
+  berlinDatumZeit,
+  berlinMitternacht,
+  berlinMitternachtVon,
+  berlinMontagDerWoche,
+} from "@/lib/zeitzone";
+import {
   AKQUISE_TERMINARTEN,
   ladeAlleAktivenObjekte,
   ladeAlleObjekteInAufarbeitung,
@@ -24,39 +31,16 @@ import {
   zaehleVerkaufteObjekteFuerMitarbeiter,
 } from "./estate";
 
-// Formatiert ein Datum als "YYYY-MM-DD HH:mm:ss", wie von den datestart/dateend-Parametern des
-// "calendar"-Resourcetype erwartet (siehe zaehleTermine in estate.ts). Bewusst mit lokalen
-// Date-Methoden (getFullYear/getMonth/getDate) statt einer Zeitzonen-Bibliothek — bei einem
-// reinen Tages-Fenster (30 Tage / Kalenderjahr, keine Uhrzeit-genaue Abfrage) ist die maximal
-// ein- bis zweistündige Abweichung zwischen Serverzeit und Europe/Berlin für diese Kennzahl ohne
-// praktische Relevanz.
-function formatiereDatumZeit(datum: Date, uhrzeit: string): string {
-  const jahr = datum.getFullYear();
-  const monat = String(datum.getMonth() + 1).padStart(2, "0");
-  const tag = String(datum.getDate()).padStart(2, "0");
-  return `${jahr}-${monat}-${tag} ${uhrzeit}`;
-}
-
-// Formatiert ein Datum MIT seiner eigenen echten Uhrzeit statt einer fest hartkodierten
-// "23:59:59" — Nutzer-Vorgabe November 2026: "Termine zählen generell erst wenn Sie
-// stattgefunden haben". Die reine Tages-Deckelung (bisWoche/bisJahr = min(Periodenende, heute))
-// reichte allein NICHT aus: Live-Check zeigte z.B. "Termine Woche" bereits mit heute noch
-// bevorstehenden (nicht stattgefundenen) Terminen, weil "bis heute 23:59:59" den ganzen
-// restlichen Tag sofort mitzählte, nicht nur bis zum aktuellen Zeitpunkt. Diese Funktion
-// übernimmt daher die tatsächliche Uhrzeit des übergebenen Date-Objekts: Ist die obere Grenze
-// gleich "jetzt" (Periode noch nicht vorbei), ergibt das den aktuellen Zeitpunkt; ist sie ein
-// bereits abgeschlossenes, in der Vergangenheit liegendes Periodenende, trägt dieses Date-Objekt
-// bereits "23:59:59" als Uhrzeit (siehe jahresendeDatum unten) — dieselbe Funktion deckt daher
-// beide Fälle korrekt ab. Analog zu formatiereDatumZeitVoll in onoffice/wettkampf.ts.
-function formatiereDatumZeitVoll(datum: Date): string {
-  const jahr = datum.getFullYear();
-  const monat = String(datum.getMonth() + 1).padStart(2, "0");
-  const tag = String(datum.getDate()).padStart(2, "0");
-  const stunde = String(datum.getHours()).padStart(2, "0");
-  const minute = String(datum.getMinutes()).padStart(2, "0");
-  const sekunde = String(datum.getSeconds()).padStart(2, "0");
-  return `${jahr}-${monat}-${tag} ${stunde}:${minute}:${sekunde}`;
-}
+// KORREKTUR November 2026 (Nutzer-Meldung: "Die zahlen scheinen nicht richtig erkannt zu werden
+// ... es sind speziell die telefonate bei den mitarbeitern ... Kann es ein Cache Problem oder so
+// sein?"): War KEIN Cache-Problem, sondern ein Zeitzonen-Bug — die bisherigen lokalen Helfer
+// (Date.getHours/getFullYear & Co.) lieferten IMMER die Zeitzone des ausführenden PROZESSES.
+// Vercel führt Serverless Functions standardmäßig in UTC aus, wodurch "heute"/"jetzt" live auf
+// Produktion rund eine Stunde zu früh lagen (aktuell, CET) — neuere Anrufe/Termine fehlten dadurch
+// systematisch, obwohl sie in onOffice längst erfasst waren (live gegengeprüft). Lokal unsichtbar,
+// weil diese Entwicklungsumgebung zufällig in Europe/Berlin läuft. formatiereDatumZeit/
+// formatiereDatumZeitVoll/montagDerWoche/formatiereDatumIso sind deshalb durch die explizit
+// Europe/Berlin-sicheren Helfer aus lib/zeitzone.ts ersetzt (siehe dort für die volle Begründung).
 
 // Liefert die beiden Zeitfenster, die für Parameter 3-5 (Termine, Besichtigungen, siehe
 // Mitarbeiterstatistik.tsx) gebraucht werden: "letzte 30 Tage" (heute minus 30 Tage bis heute)
@@ -78,17 +62,17 @@ function formatiereDatumZeitVoll(datum: Date): string {
 // statt "Tagesbeginn" liefert.
 function ermittleZeitraeume() {
   const heute = new Date();
-  const vor30Tagen = new Date(heute);
-  vor30Tagen.setDate(vor30Tagen.getDate() - 30);
-  const jahresanfang = new Date(heute.getFullYear(), 0, 1);
-  const jahresendeDatum = new Date(heute.getFullYear(), 11, 31, 23, 59, 59);
-  const jahresende = heute < jahresendeDatum ? heute : jahresendeDatum;
+  const vor30Tagen = new Date(heute.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const jahr = Number(berlinDatumIso(heute).slice(0, 4));
+  const jahresanfang = berlinMitternachtVon(jahr, 0, 1);
+  const jahresendeTag = berlinMitternachtVon(jahr, 11, 31);
+  const istJahresende = heute >= jahresendeTag;
 
   return {
-    von30Tage: formatiereDatumZeit(vor30Tagen, "00:00:00"),
-    bis30Tage: formatiereDatumZeitVoll(heute),
-    vonJahr: formatiereDatumZeit(jahresanfang, "00:00:00"),
-    bisJahr: formatiereDatumZeitVoll(jahresende),
+    von30Tage: berlinDatumZeit(vor30Tagen, "00:00:00"),
+    bis30Tage: berlinDatumZeit(heute),
+    vonJahr: berlinDatumZeit(jahresanfang, "00:00:00"),
+    bisJahr: istJahresende ? berlinDatumZeit(jahresendeTag, "23:59:59") : berlinDatumZeit(heute),
   };
 }
 
@@ -115,16 +99,16 @@ function ermittleZeitraeume() {
 // statt immer Tagesende) statt formatiereDatumZeit(..., "23:59:59").
 function ermittleHeuteWocheZeitraeume() {
   const heute = new Date();
-  const montag = montagDerWoche(heute);
-  const sonntagDerWoche = new Date(montag);
-  sonntagDerWoche.setDate(sonntagDerWoche.getDate() + 6);
-  const sonntag = heute < sonntagDerWoche ? heute : sonntagDerWoche;
+  const heuteMitternacht = berlinMitternacht(heute);
+  const montag = berlinMontagDerWoche(heute);
+  const sonntagDerWoche = berlinMitternacht(montag, 6);
+  const istWochenende = heute >= berlinMitternacht(sonntagDerWoche, 1);
 
   return {
-    vonHeute: formatiereDatumZeit(heute, "00:00:00"),
-    bisHeute: formatiereDatumZeitVoll(heute),
-    vonWoche: formatiereDatumZeit(montag, "00:00:00"),
-    bisWoche: formatiereDatumZeitVoll(sonntag),
+    vonHeute: berlinDatumZeit(heuteMitternacht, "00:00:00"),
+    bisHeute: berlinDatumZeit(heute),
+    vonWoche: berlinDatumZeit(montag, "00:00:00"),
+    bisWoche: istWochenende ? berlinDatumZeit(sonntagDerWoche, "23:59:59") : berlinDatumZeit(heute),
   };
 }
 
@@ -153,9 +137,9 @@ function ermittleHeuteWocheZeitraeume() {
 // Datum deckt den heutigen Tag bereits vollständig ab).
 export function ermittleJahresDatumsfenster() {
   const heute = new Date();
-  const jahr = heute.getFullYear();
+  const heuteDatum = berlinDatumIso(heute);
+  const jahr = heuteDatum.slice(0, 4);
   const jahresendeDatum = `${jahr}-12-31`;
-  const heuteDatum = `${jahr}-${String(heute.getMonth() + 1).padStart(2, "0")}-${String(heute.getDate()).padStart(2, "0")}`;
   return {
     vonJahr: `${jahr}-01-01`,
     bisJahr: heuteDatum < jahresendeDatum ? heuteDatum : jahresendeDatum,
@@ -168,26 +152,12 @@ export function ermittleJahresDatumsfenster() {
 // Kalenderwochen).
 const NEUZUGAENGE_TAGE_ANZAHL = 7;
 
-// Montag der Kalenderwoche eines Datums (Mo-So-Woche, wie in Deutschland üblich) — Date.getDay()
-// liefert 0=So...6=Sa, bei Sonntag muss daher 6 Tage ZURÜCK statt vorwärts gerechnet werden.
-function montagDerWoche(datum: Date): Date {
-  const montag = new Date(datum);
-  montag.setHours(0, 0, 0, 0);
-  const wochentag = montag.getDay();
-  const differenzZuMontag = wochentag === 0 ? -6 : 1 - wochentag;
-  montag.setDate(montag.getDate() + differenzZuMontag);
-  return montag;
-}
-
-// "YYYY-MM-DD" für den OnOffice-Datumsfilter (siehe zaehleNeueObjekte/zaehleNeueKunden in
-// estate.ts) — ohne Uhrzeitanteil, analog zu ermittleJahresDatumsfenster oben.
-function formatiereDatumIso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-// "20.10." für die Anzeige-Beschriftung je Tageszeile (siehe Neuzugaenge.tsx).
-function formatiereDatumKurz(d: Date): string {
-  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`;
+// "20.10." für die Anzeige-Beschriftung je Tageszeile (siehe Neuzugaenge.tsx) — aus den
+// Berlin-ISO-Komponenten (nicht d.getDate()/getMonth(), die die Prozess-Zeitzone verwenden
+// würden) zusammengesetzt, damit die Beschriftung zum tatsächlichen Berlin-Kalendertag passt.
+function formatiereDatumKurz(iso: string): string {
+  const [, monat, tag] = iso.split("-");
+  return `${tag}.${monat}.`;
 }
 
 // Liefert das GESAMTE Zeitfenster, das der Neuzugänge-Verlauf oben über alle
@@ -201,12 +171,9 @@ function formatiereDatumKurz(d: Date): string {
 // erstellt_am/Eintragsdatum).
 export function ermittleNeuzugaengeZeitraum(): { von: string; bis: string } {
   const heute = new Date();
-  heute.setHours(0, 0, 0, 0);
-  const vonDatum = new Date(heute);
-  vonDatum.setDate(vonDatum.getDate() - (NEUZUGAENGE_TAGE_ANZAHL - 1));
-  const folgetag = new Date(heute);
-  folgetag.setDate(folgetag.getDate() + 1);
-  return { von: formatiereDatumIso(vonDatum), bis: formatiereDatumIso(folgetag) };
+  const vonDatum = berlinMitternacht(heute, -(NEUZUGAENGE_TAGE_ANZAHL - 1));
+  const folgetag = berlinMitternacht(heute, 1);
+  return { von: berlinDatumIso(vonDatum), bis: berlinDatumIso(folgetag) };
 }
 
 // Lädt den Neuzugänge-Verlauf (Objekte/Kunden je Tag, neueste zuerst) für den "Neuzugänge"-
@@ -223,18 +190,17 @@ export function ermittleNeuzugaengeZeitraum(): { von: string; bis: string } {
 // per .catch(() => null) abgesichert (Muster wie ladeMitarbeiterKennzahlen oben) — schlägt eine
 // einzelne Tages-/Kennzahl fehl, zeigt nur diese Zelle "–" statt der ganzen Liste.
 export async function ladeNeuzugaengeVerlauf(): Promise<NeuzugaengeTag[]> {
-  const heute = new Date();
-  heute.setHours(0, 0, 0, 0);
+  const jetzt = new Date();
+  const heute = berlinMitternacht(jetzt);
 
   const tage = Array.from({ length: NEUZUGAENGE_TAGE_ANZAHL }, (_, i) => {
-    const datum = new Date(heute);
-    datum.setDate(datum.getDate() - i);
+    const datum = berlinMitternacht(heute, -i);
     return { datum, istHeute: i === 0 };
   });
 
   return Promise.all(
     tage.map(async ({ datum, istHeute }) => {
-      const datumStr = formatiereDatumIso(datum);
+      const datumStr = berlinDatumIso(datum);
       // Live gegen den Account geprüft (November 2026): Der "<="-Operator gegen ein reines Datum
       // (ohne Uhrzeit) vergleicht bei erstellt_am/Eintragsdatum offenbar gegen Mitternacht
       // (00:00:00) dieses Tages, nicht gegen dessen Ende — "erstellt_am <= '2026-10-30'" lieferte
@@ -242,9 +208,7 @@ export async function ladeNeuzugaengeVerlauf(): Promise<NeuzugaengeTag[]> {
       // wurde, "erstellt_am <= '2026-10-31'" fand ihn dagegen. Als oberes Fenster-Ende deshalb
       // bewusst der FOLGETag statt des Tages selbst — deckt den ganzen Tag ab, unabhängig von der
       // Uhrzeit der einzelnen Datensätze.
-      const folgetag = new Date(datum);
-      folgetag.setDate(folgetag.getDate() + 1);
-      const folgetagStr = formatiereDatumIso(folgetag);
+      const folgetagStr = berlinDatumIso(berlinMitternacht(datum, 1));
       const [neueObjekte, neueKunden] = await Promise.all([
         zaehleNeueObjekte(datumStr, folgetagStr).catch(() => null),
         zaehleNeueKunden(datumStr, folgetagStr).catch(() => null),
@@ -252,7 +216,7 @@ export async function ladeNeuzugaengeVerlauf(): Promise<NeuzugaengeTag[]> {
       return {
         von: datumStr,
         bis: datumStr,
-        label: `${formatiereDatumKurz(datum)}${istHeute ? " (laufend)" : ""}`,
+        label: `${formatiereDatumKurz(datumStr)}${istHeute ? " (laufend)" : ""}`,
         neueObjekte: neueObjekte?.gesamt ?? null,
         neueObjekteVerteilung: neueObjekte?.verteilung ?? [],
         neueKunden: neueKunden?.gesamt ?? null,
