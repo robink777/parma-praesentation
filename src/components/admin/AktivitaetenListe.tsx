@@ -104,8 +104,16 @@ function Hinweis({ text }: { text: string }) {
 
 function AktivitaetZeile({ aktivitaet }: { aktivitaet: MitarbeiterAktivitaet }) {
   const bemerkung = eigeneBemerkung(aktivitaet);
+  // Nutzer-Vorgabe November 2026: Nicht erreichte Anrufe zählen weiter mit, sollen sich aber optisch
+  // unterscheiden. Bewusst nur diese Seite markiert: Ein "Erreicht" ließe sich aus dem Text nicht
+  // belegen und sähe in einer Kontrollliste wie eine Bestätigung aus.
+  const nichtErreicht = aktivitaet.aktionsart === TELEFONAT && istNichtErreicht(aktivitaet);
   return (
-    <div className="grid gap-x-md gap-y-xs border-b border-anthrazit/5 py-sm last:border-b-0 md:grid-cols-[170px_220px_1fr]">
+    <div
+      className={`grid gap-x-md gap-y-xs border-b border-l-[3px] border-b-anthrazit/5 py-sm pl-sm last:border-b-0 md:grid-cols-[170px_220px_1fr] ${
+        nichtErreicht ? "border-l-status-warnung bg-status-warnung/5" : "border-l-transparent"
+      }`}
+    >
       <p className="font-mono text-small text-anthrazit/60">{formatiereZeitpunkt(aktivitaet.datum)}</p>
       <div className="min-w-0">
         <p className="font-medium text-anthrazit">
@@ -117,6 +125,11 @@ function AktivitaetZeile({ aktivitaet }: { aktivitaet: MitarbeiterAktivitaet }) 
         <p className="mt-[2px] text-small text-anthrazit/60">
           {aktivitaet.kontakte.length > 0 ? aktivitaet.kontakte.join(", ") : "Kein Kontakt verknüpft"}
         </p>
+        {nichtErreicht && (
+          <span className="mt-[4px] inline-block rounded-sm bg-status-warnung/10 px-xs text-small font-medium text-status-warnung">
+            Nicht erreicht
+          </span>
+        )}
       </div>
       <div className="min-w-0">
         {bemerkung ? (
