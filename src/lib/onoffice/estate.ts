@@ -1136,13 +1136,19 @@ const STATUS2_IN_UEBERGABE = "ind_Schl_5925";
 // (siehe MitarbeiterLeaderboard.tsx, Nutzer-Vorgabe November 2026: "an dem Tag an dem ein
 // Mitarbeiter einen Notartermin erfolgreich absolviert hat und der Status 2 des Objektes in
 // 'in Übergabe' wechselt ... die Kachel des Mitarbeiters den ganzen Tag optisch brennt").
-// Gefiltert über das Datumsfeld "Übergabedatum" (ind_3354_Feld_ObjTech504) statt über einen
-// Notartermin-Kalendereintrag: ein Notartermin allein belegt noch nicht, dass er zum Übergang in
-// "in Übergabe" geführt hat (könnte auch ein anderer Termintyp/Grund sein), während
-// "Übergabedatum = heute" direkt den tatsächlichen, bereits erfolgten Statuswechsel abbildet —
-// und bleibt dadurch über den ganzen Tag stabil wahr (unabhängig vom 60-Sekunden-
-// Aktualisierungsrhythmus, ADMIN_REFRESH_INTERVAL_MS), ohne eine eigene "seit letztem Ladezyklus
-// geändert"-Markierung zu brauchen, und erlischt von selbst, sobald ein neuer Tag beginnt.
+// Gefiltert über "Verkauft/Vermietet am" (verkauft_am) statt über einen Notartermin-
+// Kalendereintrag: ein Notartermin allein belegt noch nicht, dass er zum Übergang in "in Übergabe"
+// geführt hat (könnte auch ein anderer Termintyp/Grund sein), während "status2 = in Übergabe" plus
+// "verkauft_am = heute" den tatsächlichen Abschluss abbildet — und dadurch über den ganzen Tag
+// stabil wahr bleibt (unabhängig vom 60-Sekunden-Aktualisierungsrhythmus,
+// ADMIN_REFRESH_INTERVAL_MS), ohne eine eigene "seit letztem Ladezyklus geändert"-Markierung zu
+// brauchen, und von selbst erlischt, sobald ein neuer Tag beginnt.
+//
+// KORREKTUR November 2026 (Nutzer: Jacqueline hatte Notartermin, Kachel brannte nicht): Bis dahin
+// wurde hier "Übergabedatum" (ind_3354_Feld_ObjTech504) geprüft. Das ist aber die spätere
+// Schlüsselübergabe, nicht der Notartag (JH861: verkauft_am 30.03., Übergabedatum 30.06.) und am
+// Notartag meist noch leer (so bei JH1311) — die Kachel konnte dadurch gar nicht brennen.
+// Einschränkung: Wird der Status erst an einem Folgetag umgestellt, trifft der Filter nicht mehr.
 export async function pruefeUebergabeHeute(nutzerNr: string, heuteDatum: string): Promise<boolean> {
   const result = await callOnOfficeApi([
     {
@@ -1156,7 +1162,7 @@ export async function pruefeUebergabeHeute(nutzerNr: string, heuteDatum: string)
         filter: {
           benutzer: [{ op: "=", val: nutzerNr }],
           status2: [{ op: "=", val: STATUS2_IN_UEBERGABE }],
-          ind_3354_Feld_ObjTech504: [{ op: "=", val: heuteDatum }],
+          verkauft_am: [{ op: "=", val: heuteDatum }],
         },
         listlimit: 1,
       },
