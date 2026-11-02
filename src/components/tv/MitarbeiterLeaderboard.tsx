@@ -74,7 +74,7 @@ function MitarbeiterZahlenKachel({
   const rangFarbe = RANG_FARBEN[rang - 1];
   // Nutzer-Vorgabe: "ein kleines Leuchten der Mitarbeiterkachel (vielleicht Schlagschatten mit
   // Akzentfarbe mit 20% Deckkraft)", solange mindestens ein Wert dieser Kachel sich seit dem
-  // letzten Ladezyklus verändert hat. Erst auf 0,6/32px/10px verstärkt ("viel deutlicher"), dann
+  // letzten Auftritt dieser Folie verändert hat. Erst auf 0,6/32px/10px verstärkt ("viel deutlicher"), dann
   // auf Nutzerwunsch ("ok etwas weniger") wieder etwas zurückgenommen auf 0,4/26px/8px.
   //
   // "brennt" (siehe oben, WettkampfEintrag.brennt) überschreibt diesen Ladezyklus-Schatten für
@@ -195,8 +195,8 @@ export function MitarbeiterLeaderboard({
   rangliste: WettkampfEintrag[];
   alleMitarbeiter?: Betreuer[];
   saisonBisIso: string;
-  // Welche Kachel-Felder sich seit dem letzten Ladezyklus je Mitarbeiter verändert haben (Nutzer-
-  // Vorgabe: "wenn ein Mitarbeiter aktiv ist und eine Aktivität speichert, ein optisches Feedback
+  // Welche Kachel-Felder sich seit dem letzten Auftritt dieser Folie je Mitarbeiter verändert haben
+  // (Nutzer-Vorgabe: "wenn ein Mitarbeiter aktiv ist und eine Aktivität speichert, ein optisches Feedback
   // ... Leuchten der Kachel ... Wert der sich verändert hat pulsierend"). Wird in TvSlideshow.tsx
   // berechnet statt hier: Diese Folie wird beim Folienwechsel aus- und wieder eingehängt (siehe
   // {slide === "mitarbeiter" && ...}), ein hier gehaltener Vergleichs-State ginge bei jedem

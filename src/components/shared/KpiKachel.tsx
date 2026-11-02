@@ -38,6 +38,19 @@ function formatBetrag(n: number | null): string {
   return n === null ? "–" : betragKompaktFormat.format(n);
 }
 
+// Volle Euro-Beträge ohne Cent für die Provisions-Kacheln — Nutzer-Vorgabe November 2026:
+// "Provisiovolumen und Provisionsvorlauf als komplette zahl ... beispiel 1.738.938€".
+const betragVollFormat = new Intl.NumberFormat("de-DE", {
+  style: "currency",
+  currency: "EUR",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+function formatBetragVoll(n: number | null): string {
+  return n === null ? "–" : betragVollFormat.format(n);
+}
+
 // Volle, literale Klassennamen je Akzentfarbe statt Zusammensetzung zur Laufzeit
 // (`` `bg-${akzent}/15` ``) — Tailwinds Build-Scanner erkennt nur Klassennamen, die irgendwo im
 // Quelltext WÖRTLICH stehen, keine zur Laufzeit zusammengesetzten Strings (sonst würden die
@@ -217,7 +230,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
     },
     {
       label: "Provisionsvorlauf gesamt",
-      wert: formatBetrag(gesamt?.provisionsvorlaufGesamt ?? null),
+      wert: formatBetragVoll(gesamt?.provisionsvorlaufGesamt ?? null),
       icon: "handshake",
       akzent: "chart-5",
       hinweisAnzahl: provisionsvorlaufFehltAnzahl,
@@ -241,7 +254,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
     },
     {
       label: `Provisionsvolumen ${jahr}`,
-      wert: formatBetrag(gesamt?.provisionsvolumenVerkauftJahr ?? null),
+      wert: formatBetragVoll(gesamt?.provisionsvolumenVerkauftJahr ?? null),
       icon: "handshake",
       akzent: "chart-7",
       hinweisAnzahl: verkauftFehltAnzahl,

@@ -47,7 +47,7 @@ export function AdminDashboard({
 }) {
   const [abschnitt, setAbschnitt] = useState("uebersicht");
   const [gewaehltePlz, setGewaehltePlz] = useState<{ plz: string; ort: string } | null>(null);
-  const { wirdAktualisiert, zuletztAktualisiert } = useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS, kennzahlen);
+  const aktualisierung = useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS, kennzahlen);
 
   // "Übersicht", "Karte" und "Mitarbeiter" sind die drei TV-Dashboard-Landing-Screens (Oktober
   // 2026 Chat-Vorgabe: "Ich will dass sie den ersten beiden Seiten gleicht ... auch in dem Navi
@@ -65,7 +65,7 @@ export function AdminDashboard({
           <div className="h-5 w-px bg-walnuss/15" />
           <p className="label">Admin-Bereich</p>
         </div>
-        <AktualisierungsAnzeige wirdAktualisiert={wirdAktualisiert} zuletztAktualisiert={zuletztAktualisiert} />
+        <AktualisierungsAnzeige {...aktualisierung} />
       </header>
       <StatistikNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
       <main

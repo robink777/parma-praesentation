@@ -239,7 +239,7 @@ function WettkampfKarte({
 export function TvMobil(
   daten: AdminDashboardDaten & { rangliste: WettkampfEintrag[]; saisonBisIso: string }
 ) {
-  const { wirdAktualisiert, zuletztAktualisiert } = useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS, daten);
+  const aktualisierung = useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS, daten);
 
   const kacheln = baueUebersichtKacheln(daten.gesamtKennzahlen);
   const fotos = fotoLookup(daten.alleMitarbeiter ?? []);
@@ -251,7 +251,7 @@ export function TvMobil(
     <div className="min-h-screen bg-stein pb-xl">
       <header className="sticky top-0 z-10 flex items-center justify-between bg-stein/95 px-md py-sm backdrop-blur">
         <Image src="/logos/immobilien-quer.svg" alt="Parma Immobilien" width={120} height={30} priority />
-        <AktualisierungsAnzeige wirdAktualisiert={wirdAktualisiert} zuletztAktualisiert={zuletztAktualisiert} />
+        <AktualisierungsAnzeige {...aktualisierung} />
       </header>
       <main className="flex flex-col gap-lg px-md pt-sm">
         <section>

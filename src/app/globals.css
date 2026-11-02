@@ -141,10 +141,10 @@
 
 /* ----------------------------------------------------------------------------------------
  * TV-Mitarbeiterkachel (components/tv/MitarbeiterLeaderboard.tsx) — pulsierende Akzentfarbe für
- * eine einzelne Kennzahl, deren Wert sich seit dem letzten Datenabruf verändert hat (Nutzer-
- * Vorgabe: "der Wert der sich verändert hat optisch dargestellt ... pulsierend in der
- * Akzentfarbe"). Läuft "infinite", weil die auslösende React-Markierung ohnehin nach spätestens
- * einem Ladezyklus (60s, siehe ADMIN_REFRESH_INTERVAL_MS) automatisch wieder entfernt wird.
+ * eine einzelne Kennzahl, deren Wert sich seit dem letzten Auftritt der Mitarbeiter-Folie
+ * verändert hat (Nutzer-Vorgabe: "der Wert der sich verändert hat optisch dargestellt ...
+ * pulsierend in der Akzentfarbe"). Läuft "infinite", weil die Markierung genau eine Foliendauer
+ * besteht und mit der Folie verschwindet (siehe components/tv/TvSlideshow.tsx).
  * ---------------------------------------------------------------------------------------- */
 .tv-wert-aktualisiert {
   animation: tv-wert-pulsieren 1.6s ease-in-out infinite;
@@ -165,7 +165,7 @@
  * "in Übergabe" gewechselt ist (siehe pruefeUebergabeHeute in onoffice/estate.ts). Nutzer-Vorgabe
  * November 2026: "statt des Schlagschattens der nur einen Ladegang angezeigt wird ... die Kachel
  * des Mitarbeiters den ganzen Tag optisch brennt". Anders als .tv-wert-aktualisiert oben (löst
- * sich nach einem Ladezyklus von selbst) bleibt dieser Zustand den ganzen Tag bestehen, weil er
+ * sich nach einer Foliendauer von selbst) bleibt dieser Zustand den ganzen Tag bestehen, weil er
  * bei jedem Ladezyklus direkt aus den Live-Daten neu bestätigt wird statt aus einem Vorher/
  * Nachher-Vergleich — siehe WettkampfEintrag.brennt in onoffice/wettkampf.ts.
  *

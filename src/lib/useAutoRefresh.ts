@@ -20,13 +20,10 @@ export const ADMIN_REFRESH_INTERVAL_MS = 60 * 1000;
 
 // KORREKTUR November 2026 (Nutzer-Meldung: "ich habe gerade bei kira einen testanruf gemacht.
 // Dieser wieder nicht eingetragen auch nach der aktuallisereung von 1 minute ... Vielleicht
-// brauchen wir noch ein optisches feedback wann aktuallisert wird"). Live-Diagnose direkt gegen
-// onOffice bestätigte: Der Testanruf WAR korrekt in onOffice erfasst und wurde von unserer
-// Zählfunktion auch korrekt mitgezählt (zaehleTelefonate lieferte live 6 Treffer für Kira,
-// inklusive "Testanruf für Counter") — die Daten-/Zähllogik war also nicht das Problem. Ohne
-// sichtbaren Hinweis, WANN zuletzt erfolgreich aktualisiert wurde, lässt sich ein echter Fehler
-// (Refresh bleibt aus) aber nicht von normaler Latenz (bis zu 60s bis zum nächsten Zyklus)
-// unterscheiden — genau das hat der Nutzer richtig erkannt und vorgeschlagen.
+// brauchen wir noch ein optisches feedback wann aktuallisert wird"). Der fehlende Anruf lag am
+// Zeitzonen-Fehler, siehe lib/zeitzone.ts. Die Anzeige bleibt trotzdem sinnvoll: Ohne sichtbaren
+// Hinweis lässt sich ein ausbleibender Refresh nicht von normaler Wartezeit bis zum nächsten
+// Zyklus unterscheiden.
 //
 // Gibt deshalb jetzt zusätzlich zurück, OB gerade aktualisiert wird und WANN der letzte
 // erfolgreiche Abruf eintraf. `aenderungsSignal` ist ein beliebiger Wert aus den vom Server
@@ -37,13 +34,20 @@ export const ADMIN_REFRESH_INTERVAL_MS = 60 * 1000;
 export function useAutoRefresh(
   intervalMs: number,
   aenderungsSignal: unknown
-): { wirdAktualisiert: boolean; zuletztAktualisiert: Date | null } {
+): {
+  wirdAktualisiert: boolean;
+  zuletztAktualisiert: Date | null;
+  naechsteAktualisierungUm: number | null;
+} {
   const router = useRouter();
   const [wirdAktualisiert, setWirdAktualisiert] = useState(false);
   const [zuletztAktualisiert, setZuletztAktualisiert] = useState<Date | null>(null);
+  const [naechsteAktualisierungUm, setNaechsteAktualisierungUm] = useState<number | null>(null);
 
   useEffect(() => {
+    setNaechsteAktualisierungUm(Date.now() + intervalMs);
     const intervall = setInterval(() => {
+      setNaechsteAktualisierungUm(Date.now() + intervalMs);
       setWirdAktualisiert(true);
       router.refresh();
     }, intervalMs);
@@ -59,5 +63,5 @@ export function useAutoRefresh(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aenderungsSignal]);
 
-  return { wirdAktualisiert, zuletztAktualisiert };
+  return { wirdAktualisiert, zuletztAktualisiert, naechsteAktualisierungUm };
 }
