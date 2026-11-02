@@ -433,6 +433,32 @@ export interface NeuzugaengeTag {
   neueKundenVerteilung: NeuzugaengeVerteilungsEintrag[];
 }
 
+// Ein einzelnes neu angelegtes Objekt bzw. eine neu angelegte Adresse, für die Admin-Detailseite
+// app/admin/neuzugaenge/page.tsx hinter den "Neue Objekte"/"Neue Kunden"-Diagrammen (siehe
+// Neuzugaenge.tsx) — Nutzer-Vorgabe November 2026: "Ich hätte gerne irgendwie Zugriff auf die
+// Objekte und Adressen die neu rein kommen, gerne als neue Liste wie bei den anderen Feldern"
+// (gleiches Muster wie die KPI-Kacheln-Listen, siehe ladeObjektlisteFuerKategorie in
+// onoffice/mitarbeiterstatistik.ts). Eigene, schlanke Typen statt einer Wiederverwendung von
+// MitarbeiterObjekt — hier zählt vor allem WANN und mit welchem Status2/welcher Herkunft ein
+// Datensatz angelegt wurde, nicht Provision/Vermarktungsdauer wie bei MitarbeiterObjekt.
+export interface NeuesObjekt {
+  id: string;
+  titel: string;
+  objektnr: string;
+  preis: number;
+  status2Label: string;
+  // "YYYY-MM-DD HH:mm:ss" (Feld "erstellt_am", siehe ladeNeueObjekteListe in onoffice/estate.ts).
+  erstelltAm: string;
+}
+
+export interface NeuerKunde {
+  id: string;
+  name: string;
+  herkunft: string;
+  // "YYYY-MM-DD HH:mm:ss" (Feld "Eintragsdatum", siehe ladeNeueKundenListe in onoffice/estate.ts).
+  eintragsdatum: string;
+}
+
 // Ein Objekt mit mindestens einer erkannten Dateninkonsistenz in OnOffice, für die "Kontrolle"-
 // Seite im Admin-Bereich (siehe ladeKontrollObjekte in onoffice/estate.ts, Chat-Vorgabe August
 // 2026: "eine Kontrollseite einrichten wo in jedem Status nachgeschaut werden soll ob alles

@@ -190,6 +190,25 @@ function formatiereDatumKurz(d: Date): string {
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`;
 }
 
+// Liefert das GESAMTE Zeitfenster, das der Neuzugänge-Verlauf oben über alle
+// NEUZUGAENGE_TAGE_ANZAHL Tage hinweg abdeckt (heute minus 6 Tage bis einschließlich heute) — für
+// die Admin-Detailseite app/admin/neuzugaenge/page.tsx (Nutzer-Vorgabe November 2026: "Zugriff
+// auf die Objekte und Adressen die neu rein kommen, gerne als neue Liste wie bei den anderen
+// Feldern"). Exakt dasselbe Fenster wie die Summe der einzelnen Tages-Aufrufe in
+// ladeNeuzugaengeVerlauf unten, nur als EIN von/bis-Paar statt sieben Einzeltage — die Liste
+// zeigt dadurch garantiert dieselben Datensätze, die auch in den Diagramm-Balken stecken. Gleicher
+// "Folgetag als oberes Fenster-Ende"-Kommentar wie dort (Mitternacht-Truncation-Bug bei
+// erstellt_am/Eintragsdatum).
+export function ermittleNeuzugaengeZeitraum(): { von: string; bis: string } {
+  const heute = new Date();
+  heute.setHours(0, 0, 0, 0);
+  const vonDatum = new Date(heute);
+  vonDatum.setDate(vonDatum.getDate() - (NEUZUGAENGE_TAGE_ANZAHL - 1));
+  const folgetag = new Date(heute);
+  folgetag.setDate(folgetag.getDate() + 1);
+  return { von: formatiereDatumIso(vonDatum), bis: formatiereDatumIso(folgetag) };
+}
+
 // Lädt den Neuzugänge-Verlauf (Objekte/Kunden je Tag, neueste zuerst) für den "Neuzugänge"-
 // Baustein im Admin-Bereich (siehe NeuzugaengeTag in types/index.ts) — ursprünglich echte
 // Kalenderwochen, auf Nutzerwunsch November 2026 ("die Objekte und auch die Adressen hätte ich

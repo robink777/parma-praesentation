@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { KATEGORIE_BG_KLASSEN, KATEGORIE_FILL_KLASSEN } from "@/components/shared/kategorieFarben";
 import { InfoTooltip } from "@/components/shared/InfoTooltip";
 import { kategorisiere, stapelFuerTag } from "@/lib/neuzugaengeKategorisierung";
@@ -61,6 +62,7 @@ function Balkendiagramm({
   verteilungVon,
   maxKategorien,
   info,
+  href,
 }: {
   titel: string;
   einheit: string;
@@ -69,6 +71,11 @@ function Balkendiagramm({
   verteilungVon: (tag: NeuzugaengeTag) => NeuzugaengeVerteilungsEintrag[];
   maxKategorien: number;
   info?: { felder: string[]; text: string };
+  // Ziel der vollständigen Liste hinter diesem Diagramm (siehe app/admin/neuzugaenge/page.tsx) —
+  // NUR im Admin-Bereich gesetzt, analog zu href bei KpiKachelDaten (components/shared/
+  // KpiKachel.tsx). Nutzer-Vorgabe November 2026: "Zugriff auf die Objekte und Adressen die neu
+  // rein kommen, gerne als neue Liste wie bei den anderen Feldern".
+  href?: string;
 }) {
   // Chronologisch (älteste zuerst) für die Lesrichtung links→rechts — ladeNeuzugaengeVerlauf
   // liefert bewusst neueste zuerst (siehe mitarbeiterstatistik.ts), hier fürs Diagramm umgedreht.
@@ -92,7 +99,13 @@ function Balkendiagramm({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <p className="mb-xs flex shrink-0 items-center gap-xs font-slab text-lg font-bold text-anthrazit">
-        {titel}
+        {href ? (
+          <Link href={href} className="rounded-sm underline decoration-dotted underline-offset-4 hover:text-messing">
+            {titel}
+          </Link>
+        ) : (
+          titel
+        )}
         {info && <InfoTooltip felder={info.felder} text={info.text} />}
       </p>
       <div className="min-h-0 flex-1">
@@ -226,6 +239,7 @@ export function Neuzugaenge({
         wert={(t) => t.neueObjekte}
         verteilungVon={(t) => t.neueObjekteVerteilung}
         maxKategorien={Infinity}
+        href={interaktiv ? "/admin/neuzugaenge?art=objekte" : undefined}
         info={
           interaktiv
             ? {
@@ -242,6 +256,7 @@ export function Neuzugaenge({
         wert={(t) => t.neueKunden}
         verteilungVon={(t) => t.neueKundenVerteilung}
         maxKategorien={KUNDEN_MAX_KATEGORIEN}
+        href={interaktiv ? "/admin/neuzugaenge?art=kunden" : undefined}
         info={
           interaktiv
             ? {

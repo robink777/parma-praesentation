@@ -6,6 +6,8 @@ import {
   Kunde,
   LeadquellenKennzahlen,
   MitarbeiterObjekt,
+  NeuerKunde,
+  NeuesObjekt,
   NeuzugaengeVerteilungsEintrag,
   ObjektDokument,
   ObjektkarteDaten,
@@ -2590,7 +2592,43 @@ export async function zaehleNeueObjekte(
   von: string,
   bis?: string
 ): Promise<{ gesamt: number; verteilung: NeuzugaengeVerteilungsEintrag[] }> {
-  const result = await callOnOfficeApi<RawEstateRecord>([
+  const objekte = await ladeNeueObjekteListe(von, bis);
+  return {
+    gesamt: objekte.length,
+    verteilung: baueVerteilung(objekte.map((o) => o.status2Label)),
+  };
+}
+
+interface RawNeuesObjektRecord {
+  id: string;
+  elements: {
+    objekttitel?: string;
+    objektnr_extern?: string;
+    kaufpreis?: string | number;
+    status2?: string;
+    erstellt_am?: string;
+  };
+}
+
+const NEUE_OBJEKTE_LISTE_FIELDS = [
+  "Id",
+  "objekttitel",
+  "objektnr_extern",
+  "kaufpreis",
+  "status2",
+  "erstellt_am",
+];
+
+// Liefert dieselbe Menge wie zaehleNeueObjekte oben, aber als VOLLSTÄNDIGE Liste statt nur
+// Anzahl+Aufschlüsselung — für die Admin-Detailseite app/admin/neuzugaenge/page.tsx (Nutzer-
+// Vorgabe November 2026: "Zugriff auf die Objekte und Adressen die neu rein kommen, gerne als
+// neue Liste wie bei den anderen Feldern"). zaehleNeueObjekte baut jetzt umgekehrt auf DIESER
+// Funktion auf (statt beide getrennt dieselbe Abfrage zu wiederholen), analog zur bestehenden
+// ladeObjektlisteFuerKategorie/ladeObjekteOhneProvisionsangabe-Aufteilung. Neueste zuerst
+// (sortby erstellt_am DESC) — sortby funktioniert für resourcetype "estate" zuverlässig (anders
+// als bei "address", siehe Kommentar bei ladeNeueKundenListe unten).
+export async function ladeNeueObjekteListe(von: string, bis?: string): Promise<NeuesObjekt[]> {
+  const result = await callOnOfficeApi<RawNeuesObjektRecord>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
       resourcetype: "estate",
@@ -2598,21 +2636,29 @@ export async function zaehleNeueObjekte(
       identifier: "",
       cacheable: false,
       parameters: {
-        data: ["Id", "status2"],
+        data: NEUE_OBJEKTE_LISTE_FIELDS,
         filter: {
           erstellt_am: bis
             ? [{ op: ">=", val: von }, { op: "<=", val: bis }]
             : [{ op: ">=", val: von }],
         },
         listlimit: NEUE_OBJEKTE_LISTLIMIT,
+        sortby: { erstellt_am: "DESC" },
       },
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records ?? [];
-  return {
-    gesamt: records.length,
-    verteilung: baueVerteilung(records.map((r) => status2Label(r.elements.status2 ?? ""))),
-  };
+  return records.map((r) => {
+    const el = r.elements;
+    return {
+      id: String(r.id),
+      titel: el.objekttitel || `Immobilie ${r.id}`,
+      objektnr: el.objektnr_extern || String(r.id),
+      preis: Number(el.kaufpreis) || 0,
+      status2Label: status2Label(el.status2 ?? ""),
+      erstelltAm: el.erstellt_am ?? "",
+    };
+  });
 }
 
 // Oberste sinnvolle Obergrenze für eine einzelne Kalenderwoche neu angelegter Adressen — live
@@ -2634,7 +2680,28 @@ export async function zaehleNeueKunden(
   von: string,
   bis?: string
 ): Promise<{ gesamt: number; verteilung: NeuzugaengeVerteilungsEintrag[] }> {
-  const result = await callOnOfficeApi<{ elements: { HerkunftKontakt?: string } }>([
+  const kunden = await ladeNeueKundenListe(von, bis);
+  return { gesamt: kunden.length, verteilung: baueVerteilung(kunden.map((k) => k.herkunft)) };
+}
+
+interface RawNeuerKundeRecord {
+  id: string;
+  elements: {
+    Name?: string;
+    HerkunftKontakt?: string;
+    Eintragsdatum?: string;
+  };
+}
+
+// Liefert dieselbe Menge wie zaehleNeueKunden oben, aber als VOLLSTÄNDIGE Liste statt nur
+// Anzahl+Aufschlüsselung — für die Admin-Detailseite app/admin/neuzugaenge/page.tsx, analog zu
+// ladeNeueObjekteListe oben. zaehleNeueKunden baut jetzt umgekehrt auf DIESER Funktion auf.
+// Client-seitig nach Eintragsdatum sortiert (neueste zuerst) statt über sortby: Der
+// sortby-Parameter wird von der onOffice-API für resourcetype "address" in diesem Account
+// nachweislich ignoriert (live getestet, Juli 2026 — siehe Kommentar bei ladeLetzteKundennummer
+// unten), ein serverseitiges sortby wie bei ladeNeueObjekteListe würde hier also nichts bewirken.
+export async function ladeNeueKundenListe(von: string, bis?: string): Promise<NeuerKunde[]> {
+  const result = await callOnOfficeApi<RawNeuerKundeRecord>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
       resourcetype: "address",
@@ -2642,7 +2709,11 @@ export async function zaehleNeueKunden(
       identifier: "",
       cacheable: false,
       parameters: {
-        data: ["Name", "HerkunftKontakt"],
+        // KEIN "Id" im data-Array — anders als bei resourcetype "estate" ist "Id" für "address"
+        // kein gültiges Datenfeld (live geprüft: "Unknown field:  (Code 145)"); die Datensatz-ID
+        // steht wie bei jedem OnOffice-Record ohnehin automatisch in record.id, unabhängig vom
+        // data-Array (siehe r.id unten).
+        data: ["Name", "HerkunftKontakt", "Eintragsdatum"],
         filter: {
           Eintragsdatum: bis
             ? [{ op: ">=", val: von }, { op: "<=", val: bis }]
@@ -2653,11 +2724,17 @@ export async function zaehleNeueKunden(
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records ?? [];
-  const labels = records.map((r) => {
-    const erster = (r.elements.HerkunftKontakt || "").split("|").map((s) => s.trim()).filter(Boolean)[0];
-    return erster ? herkunftLabel(erster) : "Ohne Herkunft";
+  const kunden = records.map((r) => {
+    const el = r.elements;
+    const erster = (el.HerkunftKontakt || "").split("|").map((s) => s.trim()).filter(Boolean)[0];
+    return {
+      id: String(r.id),
+      name: el.Name || "Ohne Namen",
+      herkunft: erster ? herkunftLabel(erster) : "Ohne Herkunft",
+      eintragsdatum: el.Eintragsdatum ?? "",
+    };
   });
-  return { gesamt: records.length, verteilung: baueVerteilung(labels) };
+  return kunden.sort((a, b) => b.eintragsdatum.localeCompare(a.eintragsdatum));
 }
 
 // Ermittelt die zuletzt vergebene Kundennummer (KdNr, Feld im address-Modul) für die
