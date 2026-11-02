@@ -211,7 +211,10 @@ export const SETTING_NAMEN = ["Sarah Barth", "Katharina Becker"];
 // Vertrieb/Akquise/Setting: andere Kennzahlen (Finanzierungstermine statt Besichtigungen/
 // Akquise-Termine), Oktober 2026 Chat-Vorgabe: "Hier will ich auch Punkte vergeben um zu sehen
 // wie viel sie telefoniert".
-export const FINANZ_NAMEN = ["Stefanie Scalone"];
+// November 2026 ergänzt um Axel Wehmeier, der eigene Finanzierungstermine führt (Nutzer:
+// "finanzierungstermine zählen auch für axel"). Die Liste steuert nur den Wettkampf, nicht die
+// Admin-Reiter.
+export const FINANZ_NAMEN = ["Stefanie Scalone", "Axel Wehmeier"];
 
 // Teilnehmerkreis des Büro-Wettkampfs (TV-Folie, siehe onoffice/wettkampf.ts) — ABSICHTLICH eine
 // eigene, von VERTRIEB_NAMEN/AKQUISE_NAMEN/FINANZ_NAMEN entkoppelte Liste statt deren Vereinigung

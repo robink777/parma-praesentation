@@ -2703,8 +2703,8 @@ export async function zaehleTermineNachArt(
 // "Finanzierung 1 Termin = 6 Punkte, Finanzierung 2 Termin = 7 Punkte" — ersetzt eine zunächst
 // angedachte "Finanzvermittlung"-Kategorie, die sich nicht sauber als "erfolgreich vermittelt"
 // messen ließ). Existieren bereits live im Account (siehe get_activity_action_kinds, actionkind
-// "Termin"), analog zu AKQUISE_TERMINARTEN oben — hier nur für FINANZ_NAMEN (Stefanie Scalone)
-// abgerufen, siehe lib/onoffice/wettkampf.ts.
+// "Termin"), analog zu AKQUISE_TERMINARTEN oben — hier nur für FINANZ_NAMEN abgerufen, siehe
+// lib/onoffice/wettkampf.ts.
 export const FINANZIERUNG_TERMINARTEN = {
   ersttermin: "Finanzierungstermin - Ersttermin",
   zweittermin: "Finanzierungstermin - Zweittermin",
