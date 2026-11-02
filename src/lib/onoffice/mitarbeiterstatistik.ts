@@ -456,9 +456,45 @@ export async function ladeObjektGesamtKennzahlen(): Promise<ObjektGesamtKennzahl
   };
 }
 
+// Die vier Objekt-Mengen, aus denen sich SÄMTLICHE acht KPI-Kacheln der Übersicht speisen (siehe
+// baueUebersichtKacheln in components/shared/KpiKachel.tsx): "aktiv" (Aktive Vermarktung gesamt),
+// "aufarbeitung" (In Aufarbeitung gesamt), "alle" (= aktiv+aufarbeitung — Objektvolumen gesamt,
+// Provisionsvorlauf gesamt, Ø Vermarktungsdauer) und "verkauftJahr" (Verkaufte Objekte/
+// Gesamtvolumen/Provisionsvolumen {Jahr}) — siehe ladeObjektGesamtKennzahlen oben, das dieselben
+// drei Ladefunktionen für die SUMMEN nutzt. Eigene Funktion statt Inline-Code in der Admin-
+// Detailseite (app/admin/objektliste/page.tsx), damit beide Seiten (Summen UND Einzelliste) exakt
+// dieselbe Objektmenge sehen und nie auseinanderlaufen können.
+//
+// KORREKTUR November 2026 (Nutzer-Vorgabe: "Ich hätte gerne dass man aus der Gesamtübersicht in
+// die jeweiligen Listen navigieren kann. Ähnlich wie bei den Fehlermeldungen ... aber überall"):
+// Vorher gab es nur ladeObjekteOhneProvisionsangabe (einen gefilterten Spezialfall für die
+// "N ohne Angabe"-Hinweise). Diese Funktion liefert jetzt die VOLLSTÄNDIGE, ungefilterte Menge je
+// Kategorie — ladeObjekteOhneProvisionsangabe unten baut darauf auf, statt die
+// aktiv+aufarbeitung-Kombination ein zweites Mal selbst zu laden.
+export async function ladeObjektlisteFuerKategorie(
+  kategorie: "aktiv" | "aufarbeitung" | "alle" | "verkauftJahr"
+): Promise<MitarbeiterObjekt[]> {
+  if (kategorie === "verkauftJahr") {
+    const { vonJahr, bisJahr } = ermittleJahresDatumsfenster();
+    return ladeAlleVerkauftenObjekte(vonJahr, bisJahr);
+  }
+  if (kategorie === "aktiv") {
+    return ladeAlleAktivenObjekte();
+  }
+  if (kategorie === "aufarbeitung") {
+    return ladeAlleObjekteInAufarbeitung();
+  }
+
+  const [aktiv, aufarbeitung] = await Promise.all([
+    ladeAlleAktivenObjekte(),
+    ladeAlleObjekteInAufarbeitung(),
+  ]);
+  return [...aktiv, ...aufarbeitung];
+}
+
 // Liefert die EINZELNEN Objekte hinter provisionsvorlaufFehltAnzahl/
 // provisionsvolumenVerkauftJahrFehltAnzahl oben (gleicher Filter: provisionsvorlaufFehlt) — für
-// die neue Admin-Detailseite app/admin/provisionsfehler/page.tsx (Oktober 2026 Chat-Vorgabe: "beim
+// die Admin-Detailseite app/admin/provisionsfehler/page.tsx (Oktober 2026 Chat-Vorgabe: "beim
 // Hovern über die ... Objekte ohne Provisionseintrag eine neue Seite öffnen wo genau diese Objekte
 // angezeigt werden, damit man die Fehler direkt in OnOffice suchen kann"). Lädt bewusst NICHT aus
 // derselben Promise.all wie ladeObjektGesamtKennzahlen (die nur die Summen zurückgibt, nicht die
@@ -467,15 +503,6 @@ export async function ladeObjektGesamtKennzahlen(): Promise<ObjektGesamtKennzahl
 export async function ladeObjekteOhneProvisionsangabe(
   quelle: "gesamt" | "verkauftJahr"
 ): Promise<MitarbeiterObjekt[]> {
-  if (quelle === "verkauftJahr") {
-    const { vonJahr, bisJahr } = ermittleJahresDatumsfenster();
-    const verkauftJahr = await ladeAlleVerkauftenObjekte(vonJahr, bisJahr);
-    return verkauftJahr.filter((objekt) => objekt.provisionsvorlaufFehlt);
-  }
-
-  const [aktiv, aufarbeitung] = await Promise.all([
-    ladeAlleAktivenObjekte(),
-    ladeAlleObjekteInAufarbeitung(),
-  ]);
-  return [...aktiv, ...aufarbeitung].filter((objekt) => objekt.provisionsvorlaufFehlt);
+  const objekte = await ladeObjektlisteFuerKategorie(quelle === "verkauftJahr" ? "verkauftJahr" : "alle");
+  return objekte.filter((objekt) => objekt.provisionsvorlaufFehlt);
 }

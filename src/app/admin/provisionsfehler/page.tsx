@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Card } from "@/components/layout/SectionShell";
-import { formatiereBetrag } from "@/lib/berechnung";
+import { ObjektlisteKarte } from "@/components/admin/ObjektlisteKarte";
 import { ladeObjekteOhneProvisionsangabe } from "@/lib/onoffice/mitarbeiterstatistik";
 
 // Kein Caching — Live-Abruf bei jedem Aufruf, analog zum restlichen Admin-Bereich (siehe
@@ -59,41 +58,10 @@ export default async function ProvisionsfehlerPage({
         <h1 className="mb-xs font-slab text-2xl font-bold text-anthrazit">{text.titel}</h1>
         <p className="mb-lg max-w-[65ch] text-body text-anthrazit/60">{text.beschreibung}</p>
 
-        {objekte === undefined ? (
-          <Card compact className="text-center">
-            <p className="text-body text-anthrazit/50">Objekte konnten nicht geladen werden.</p>
-          </Card>
-        ) : objekte.length === 0 ? (
-          <Card compact className="py-xl text-center">
-            <p className="text-body text-anthrazit/70">
-              Keine Objekte ohne Provisionsangabe gefunden — die Liste ist leer.
-            </p>
-          </Card>
-        ) : (
-          <Card compact>
-            <div className="flex flex-col">
-              {objekte.map((objekt) => (
-                <div
-                  key={objekt.id}
-                  className="flex items-center gap-sm border-b border-anthrazit/5 py-sm last:border-b-0"
-                >
-                  <div className="relative h-12 w-16 shrink-0 overflow-hidden rounded-sm bg-sand">
-                    {objekt.titelbildUrl && (
-                      <Image src={objekt.titelbildUrl} alt="" fill className="object-cover" sizes="64px" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-anthrazit">{objekt.titel || "Ohne Titel"}</p>
-                    <p className="mt-[2px] font-mono text-small text-anthrazit/50">{objekt.objektnr}</p>
-                  </div>
-                  <p className="shrink-0 text-body font-medium text-anthrazit">
-                    {formatiereBetrag(objekt.preis)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+        <ObjektlisteKarte
+          objekte={objekte}
+          leerText="Keine Objekte ohne Provisionsangabe gefunden — die Liste ist leer."
+        />
       </main>
     </div>
   );

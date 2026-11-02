@@ -70,6 +70,13 @@ export interface KpiKachelDaten {
   // Uebersicht.tsx, interaktiv-Prop) — Nutzer-Vorgabe Oktober 2026: "bei jedem statistischen Wert
   // ... ein kleines (i) ... nicht im TV- oder Smartphone-Bereich".
   info?: { felder: string[]; text: string };
+  // Ziel der Objektliste hinter DIESER Kennzahl (siehe app/admin/objektliste/page.tsx) — macht die
+  // ganze Kachel klickbar, NUR im Admin-Bereich gesetzt (siehe baueUebersichtKacheln unten, analog
+  // zu hinweisHref). Nutzer-Vorgabe November 2026: "Ich hätte gerne dass man aus der
+  // Gesamtübersicht in die jeweiligen Listen navigieren kann. Ähnlich wie bei den Fehlermeldungen
+  // ... aber überall". Bewusst getrennt von hinweisHref (eigener, spezifischerer Link zu den
+  // "ohne Angabe"-Objekten) statt diesen zu ersetzen — beide können nebeneinander bestehen.
+  href?: string;
 }
 
 // Oktober 2026 Chat-Vorgabe: "mehr Akzentfarben an den Datenpunkten ... jetzt ist es mir viel zu
@@ -79,23 +86,43 @@ export interface KpiKachelDaten {
 // konsistent (Wiedererkennung statt zufälliger Buntheit). Zahl selbst bleibt bewusst in Anthrazit
 // (Text trägt Text-Farbe, nie die Akzentfarbe — dataviz-Richtlinie), nur Icon-Kreis und
 // Hintergrund-Tönung tragen die Akzentfarbe.
-export function KpiKachel({ label, wert, icon, akzent, hinweisAnzahl, hinweisHref, info }: KpiKachelDaten) {
+export function KpiKachel({ label, wert, icon, akzent, hinweisAnzahl, hinweisHref, info, href }: KpiKachelDaten) {
+  // Icon + Label/Wert als EIGENES Link-Element, info (ein echter <button>, siehe InfoTooltip)
+  // bewusst AUSSERHALB davon als Geschwister-Element im selben Flex-Container — ein <button>
+  // innerhalb eines <a> würde dessen Klick/Fokus an die Navigation weiterreichen und das Tooltip-
+  // Öffnen per Klick/Tastatur sabotieren. Die Flex-Reihenfolge (Icon, Text, Info) bleibt dadurch
+  // optisch identisch zu vorher, nur Icon+Text sind jetzt gemeinsam klickbar statt die ganze Zeile.
+  const iconUndText = (
+    <>
+      <span
+        className={`flex h-[clamp(32px,5.5vh,48px)] w-[clamp(32px,5.5vh,48px)] shrink-0 items-center justify-center rounded-full ${AKZENT_KLASSEN[akzent]}`}
+      >
+        <Icon name={icon} size={20} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 font-mono text-[10px] font-medium uppercase leading-snug tracking-[0.06em] text-anthrazit/50">
+          {label}
+        </p>
+        <p className="truncate font-slab text-[clamp(16px,3vh,28px)] font-bold leading-tight text-anthrazit">
+          {wert}
+        </p>
+      </div>
+    </>
+  );
+
   return (
     <div className="min-w-0 rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
       <div className="flex items-start gap-sm">
-        <span
-          className={`flex h-[clamp(32px,5.5vh,48px)] w-[clamp(32px,5.5vh,48px)] shrink-0 items-center justify-center rounded-full ${AKZENT_KLASSEN[akzent]}`}
-        >
-          <Icon name={icon} size={20} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 font-mono text-[10px] font-medium uppercase leading-snug tracking-[0.06em] text-anthrazit/50">
-            {label}
-          </p>
-          <p className="truncate font-slab text-[clamp(16px,3vh,28px)] font-bold leading-tight text-anthrazit">
-            {wert}
-          </p>
-        </div>
+        {href ? (
+          <Link
+            href={href}
+            className="-m-[2px] flex min-w-0 flex-1 items-start gap-sm rounded-sm p-[2px] transition-colors hover:bg-anthrazit/[0.04]"
+          >
+            {iconUndText}
+          </Link>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-start gap-sm">{iconUndText}</div>
+        )}
         {info && <InfoTooltip felder={info.felder} text={info.text} />}
       </div>
       {hinweisAnzahl !== undefined &&
@@ -120,22 +147,31 @@ export function KpiKachel({ label, wert, icon, akzent, hinweisAnzahl, hinweisHre
 
 // Die acht KPI-Kacheln-Definitionen (Reihenfolge + feste Akzentfarbe je Kennzahl) — einzige
 // Quelle der Wahrheit, damit TV/Admin-Desktop und Smartphone-Ansicht nie auseinanderlaufen.
-// `hinweisHrefs`/`zeigeInfo` bleiben leer/false auf TV und Smartphone (siehe Uebersicht.tsx/
-// TvMobil.tsx) — nur der Admin-Aufrufer übergibt die beiden Detailseiten-Links und schaltet die
-// (i)-Erläuterungen frei (Nutzer-Vorgabe: "bei jedem statistischen Wert ... ein kleines (i) ...
-// nicht im TV- oder Smartphone-Bereich"). Formeln/Felder in den info-Texten 1:1 aus den
-// Kommentaren bei ladeObjektGesamtKennzahlen (onoffice/mitarbeiterstatistik.ts) und
+// `interaktiv` bleibt false auf TV und Smartphone (siehe Uebersicht.tsx/TvMobil.tsx) — nur der
+// Admin-Aufrufer setzt es, wodurch sowohl die Detailseiten-Links (href/hinweisHref) als auch die
+// (i)-Erläuterungen freigeschaltet werden (Nutzer-Vorgabe Oktober 2026: "bei jedem statistischen
+// Wert ... ein kleines (i) ... nicht im TV- oder Smartphone-Bereich", identisches Prinzip für die
+// Links, siehe href-Kommentar in KpiKachelDaten oben). Formeln/Felder in den info-Texten 1:1 aus
+// den Kommentaren bei ladeObjektGesamtKennzahlen (onoffice/mitarbeiterstatistik.ts) und
 // mapMitarbeiterObjekt/ladeAlleAktivenObjekte/ladeAlleObjekteInAufarbeitung/
 // ladeAlleVerkauftenObjekte (onoffice/estate.ts) übernommen.
-export function baueUebersichtKacheln(
-  gesamt?: ObjektGesamtKennzahlen,
-  hinweisHrefs?: { provisionsvorlauf?: string; provisionsvolumenJahr?: string },
-  zeigeInfo?: boolean
-): KpiKachelDaten[] {
+//
+// KORREKTUR November 2026 (Nutzer-Vorgabe: "Ich hätte gerne dass man aus der Gesamtübersicht in
+// die jeweiligen Listen navigieren kann. Ähnlich wie bei den Fehlermeldungen ... aber überall").
+// Alle acht Kacheln verlinken jetzt auf app/admin/objektliste/page.tsx (Query-Parameter
+// "kategorie"), auf dieselbe Objektmenge, aus der sich ihr Wert auch tatsächlich errechnet (siehe
+// ladeObjektlisteFuerKategorie in onoffice/mitarbeiterstatistik.ts) — mehrere Kacheln teilen sich
+// dieselbe zugrundeliegende Menge (z.B. "Verkaufte Objekte", "Gesamtvolumen" UND
+// "Provisionsvolumen {Jahr}" alle "verkauftJahr") und landen deshalb bewusst auf derselben Liste.
+// Der bisherige externe hinweisHrefs-Parameter fällt weg: Da auch dieser Link rein von
+// `interaktiv` abhängt, baut diese Funktion ihn jetzt selbst, statt ihn vom Aufrufer entgegenzunehmen.
+export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interaktiv?: boolean): KpiKachelDaten[] {
   const jahr = new Date().getFullYear();
   const verkauftFehltAnzahl = gesamt?.provisionsvolumenVerkauftJahrFehltAnzahl ?? 0;
   const provisionsvorlaufFehltAnzahl = gesamt?.provisionsvorlaufFehltAnzahl ?? 0;
-  const info = (felder: string[], text: string) => (zeigeInfo ? { felder, text } : undefined);
+  const info = (felder: string[], text: string) => (interaktiv ? { felder, text } : undefined);
+  const href = (kategorie: "aktiv" | "aufarbeitung" | "alle" | "verkauftJahr") =>
+    interaktiv ? `/admin/objektliste?kategorie=${kategorie}` : undefined;
 
   return [
     {
@@ -143,6 +179,7 @@ export function baueUebersichtKacheln(
       wert: formatWert(gesamt?.verkaufteObjekteJahrGesamt ?? null),
       icon: "check",
       akzent: "chart-1",
+      href: href("verkauftJahr"),
       info: info(
         ["verkauft_am", "vermarktungsart"],
         "Anzahl Objekte im laufenden Kalenderjahr. Bewusst OHNE Status-2-Filter (verkauft_am ist zuverlässiger gepflegt als Status 2), exakte Duplikate bereinigt."
@@ -153,6 +190,7 @@ export function baueUebersichtKacheln(
       wert: formatWert(gesamt?.aktivGesamt ?? null),
       icon: "house",
       akzent: "chart-2",
+      href: href("aktiv"),
       info: info(["status", "vermarktungsart"], "Anzahl Objekte mit status = 1 (Aktiv) und vermarktungsart = kauf."),
     },
     {
@@ -160,6 +198,7 @@ export function baueUebersichtKacheln(
       wert: formatBetrag(gesamt?.objektvolumenVerkauftJahr ?? null),
       icon: "calculator",
       akzent: "chart-3",
+      href: href("verkauftJahr"),
       info: info(
         ["kaufpreis", "verkauft_am"],
         'Σ kaufpreis über alle im laufenden Kalenderjahr verkauften Objekte (dieselbe Menge wie "Verkaufte Objekte" links daneben).'
@@ -170,6 +209,7 @@ export function baueUebersichtKacheln(
       wert: formatBetrag(gesamt?.objektvolumenGesamt ?? null),
       icon: "scale",
       akzent: "chart-4",
+      href: href("alle"),
       info: info(
         ["kaufpreis", "status", "status2"],
         "Σ kaufpreis über aktive Objekte (status = 1) UND Objekte in Aufarbeitung (status = 2, status2 = vorbereitung)."
@@ -181,7 +221,8 @@ export function baueUebersichtKacheln(
       icon: "handshake",
       akzent: "chart-5",
       hinweisAnzahl: provisionsvorlaufFehltAnzahl,
-      hinweisHref: hinweisHrefs?.provisionsvorlauf,
+      hinweisHref: interaktiv ? "/admin/provisionsfehler?quelle=gesamt" : undefined,
+      href: href("alle"),
       info: info(
         ["kaufpreis", "prozent_aussenprovision", "prozent_innenprovision"],
         "Je Objekt: kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19 (19% MwSt. herausgerechnet). Summiert über aktive Objekte + Aufarbeitung. Fehlt eines der beiden Prozentfelder, fließt das Objekt nicht ein (siehe \"ohne Angabe\")."
@@ -192,6 +233,7 @@ export function baueUebersichtKacheln(
       wert: formatWert(gesamt?.aufarbeitungGesamt ?? null),
       icon: "building",
       akzent: "chart-6",
+      href: href("aufarbeitung"),
       info: info(
         ["status", "status2", "vermarktungsart"],
         "Anzahl Objekte mit status = 2 (Inaktiv), status2 = vorbereitung und vermarktungsart = kauf."
@@ -203,7 +245,8 @@ export function baueUebersichtKacheln(
       icon: "handshake",
       akzent: "chart-7",
       hinweisAnzahl: verkauftFehltAnzahl,
-      hinweisHref: hinweisHrefs?.provisionsvolumenJahr,
+      hinweisHref: interaktiv ? "/admin/provisionsfehler?quelle=verkauft" : undefined,
+      href: href("verkauftJahr"),
       info: info(
         ["kaufpreis", "prozent_aussenprovision", "prozent_innenprovision", "verkauft_am"],
         'Gleiche Formel wie "Provisionsvorlauf gesamt", aber nur über die im laufenden Kalenderjahr verkauften Objekte.'
@@ -214,6 +257,7 @@ export function baueUebersichtKacheln(
       wert: formatTage(gesamt?.durchschnittVermarktungsdauerTage ?? null),
       icon: "clock",
       akzent: "chart-8",
+      href: href("alle"),
       info: info(
         ["auftragvon"],
         "Durchschnitt der Tage zwischen auftragvon und heute, über aktive Objekte + Aufarbeitung mit gültigem Datum."

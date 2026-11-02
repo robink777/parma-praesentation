@@ -27,16 +27,7 @@ export function Uebersicht({
   neuzugaengeVerlauf?: NeuzugaengeTag[];
   interaktiv?: boolean;
 }) {
-  const kacheln = baueUebersichtKacheln(
-    gesamt,
-    interaktiv
-      ? {
-          provisionsvorlauf: "/admin/provisionsfehler?quelle=gesamt",
-          provisionsvolumenJahr: "/admin/provisionsfehler?quelle=verkauft",
-        }
-      : undefined,
-    interaktiv
-  );
+  const kacheln = baueUebersichtKacheln(gesamt, interaktiv);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-sm">
