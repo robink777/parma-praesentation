@@ -7,7 +7,7 @@ import { ADMIN_NAV_ITEMS } from "./adminNav";
 import { StatistikNav } from "./StatistikNav";
 import { Uebersicht } from "./Uebersicht";
 import { KarteBereich } from "./KarteBereich";
-import { MitarbeiterBereich } from "./MitarbeiterBereich";
+import { MitarbeiterBereich, MitarbeiterReiter } from "./MitarbeiterBereich";
 import { Leadquellen } from "./Leadquellen";
 import { Kontrolle } from "./Kontrolle";
 import { ADMIN_REFRESH_INTERVAL_MS, useAutoRefresh } from "@/lib/useAutoRefresh";
@@ -36,6 +36,8 @@ export function AdminDashboard({
   objektkarteDaten,
   neuzugaengeVerlauf,
   alleMitarbeiter,
+  startAbschnitt = "uebersicht",
+  startReiter,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
@@ -44,8 +46,10 @@ export function AdminDashboard({
   objektkarteDaten?: ObjektkarteDaten;
   neuzugaengeVerlauf?: NeuzugaengeTag[];
   alleMitarbeiter?: Betreuer[];
+  startAbschnitt?: string;
+  startReiter?: MitarbeiterReiter;
 }) {
-  const [abschnitt, setAbschnitt] = useState("uebersicht");
+  const [abschnitt, setAbschnitt] = useState(startAbschnitt);
   const [gewaehltePlz, setGewaehltePlz] = useState<{ plz: string; ort: string } | null>(null);
   const aktualisierung = useAutoRefresh(ADMIN_REFRESH_INTERVAL_MS, kennzahlen);
 
@@ -84,7 +88,7 @@ export function AdminDashboard({
           />
         )}
         {abschnitt === "mitarbeiter" && (
-          <MitarbeiterBereich kennzahlen={kennzahlen} alleMitarbeiter={alleMitarbeiter} />
+          <MitarbeiterBereich kennzahlen={kennzahlen} alleMitarbeiter={alleMitarbeiter} startReiter={startReiter} />
         )}
         {!istVollflaechig && (
           <>

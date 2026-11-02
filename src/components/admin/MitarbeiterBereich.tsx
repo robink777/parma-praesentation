@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { AKQUISE_NAMEN, SETTING_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unternehmen";
 import { InfoTooltip } from "@/components/shared/InfoTooltip";
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
@@ -282,12 +283,14 @@ function MitarbeiterKachel({
   kennzahlen,
   modus,
   zeitraum,
+  reiter,
 }: {
   mitglied: TeamMitglied;
   fotoUrl?: string;
   kennzahlen: MitarbeiterKennzahlen;
   modus: KennzahlenModus;
   zeitraum?: Zeitraum;
+  reiter: MitarbeiterReiter;
 }) {
   const metriken = baueMetriken(kennzahlen, modus, zeitraum);
   const balkenMetriken =
@@ -295,8 +298,13 @@ function MitarbeiterKachel({
       ? OBJEKT_BALKEN_SEGMENTE.map((segment) => ({ label: segment.label, wert: "" }))
       : [];
   const info = baueKachelInfo([...metriken, ...balkenMetriken]);
+  // Die ganze Kachel führt zur Aktivitätenliste (Nutzer-Vorgabe November 2026: "beim Klicken auf
+  // den Mitarbeiter eine liste aller aktivitäten"). Der Link liegt am Namen und spannt sich per
+  // ::after über die Kachel auf, das (i) sitzt mit z-10 darüber und bleibt eigenständig bedienbar.
+  // prefetch={false}, damit nicht jede sichtbare Kachel vorab Live-Daten aus onOffice abruft.
+  const aktivitaetenHref = `/admin/aktivitaeten?name=${encodeURIComponent(mitglied.name)}&reiter=${reiter}`;
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
+    <div className="relative flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] transition-shadow hover:shadow-[0_2px_10px_rgba(80,63,61,0.16)] md:p-md">
       <div className="mb-sm flex shrink-0 items-center gap-sm">
         <div className="relative h-[clamp(36px,6vh,56px)] w-[clamp(36px,6vh,56px)] shrink-0 overflow-hidden rounded-full bg-sand">
           {fotoUrl ? (
@@ -307,8 +315,16 @@ function MitarbeiterKachel({
             </div>
           )}
         </div>
-        <p className="min-w-0 flex-1 truncate text-lg font-medium text-anthrazit">{mitglied.name}</p>
-        <InfoTooltip felder={info.felder} text={info.text} breit />
+        <Link
+          href={aktivitaetenHref}
+          prefetch={false}
+          className="min-w-0 flex-1 truncate text-lg font-medium text-anthrazit after:absolute after:inset-0 after:rounded-lg after:content-['']"
+        >
+          {mitglied.name}
+        </Link>
+        <div className="relative z-10">
+          <InfoTooltip felder={info.felder} text={info.text} breit />
+        </div>
       </div>
       <div className="grid flex-1 grid-cols-2 content-start gap-x-sm gap-y-xs">
         {metriken.map((m) => (
@@ -336,12 +352,14 @@ function MitarbeiterRaster({
   fotos,
   modus,
   zeitraum,
+  reiter,
 }: {
   mitglieder: TeamMitglied[];
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   fotos: Record<string, string>;
   modus: KennzahlenModus;
   zeitraum?: Zeitraum;
+  reiter: MitarbeiterReiter;
 }) {
   const spalten = mitglieder.length >= 4 ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-2";
   return (
@@ -354,6 +372,7 @@ function MitarbeiterRaster({
           kennzahlen={kennzahlen?.[mitglied.name] ?? LEERE_KENNZAHLEN}
           modus={modus}
           zeitraum={zeitraum}
+          reiter={reiter}
         />
       ))}
     </div>
@@ -363,7 +382,7 @@ function MitarbeiterRaster({
 // Die vier Reiter innerhalb des "Mitarbeiter"-Bereichs (August 2026 Chat-Vorgabe: "ich brauche
 // bei Mitarbeiter neben Vertrieb noch zwei weitere Reiter ... Akquise ... und Setting ... Alle
 // anderen Mitarbeiter können als 'weitere Mitarbeiter' gelistet bleiben").
-type MitarbeiterReiter = "vertrieb" | "akquise" | "setting" | "weitere";
+export type MitarbeiterReiter = "vertrieb" | "akquise" | "setting" | "weitere";
 
 const MITARBEITER_REITER: { id: MitarbeiterReiter; label: string }[] = [
   { id: "vertrieb", label: "Vertrieb" },
@@ -440,13 +459,15 @@ function ZeitraumSchalter({
 export function MitarbeiterBereich({
   kennzahlen,
   alleMitarbeiter,
+  startReiter = "vertrieb",
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   alleMitarbeiter?: Betreuer[];
+  startReiter?: MitarbeiterReiter;
 }) {
   const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
   const fotos = fotoLookup(alleMitarbeiter ?? []);
-  const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>("vertrieb");
+  const [mitarbeiterReiter, setMitarbeiterReiter] = useState<MitarbeiterReiter>(startReiter);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("Jahr");
 
   return (
@@ -460,7 +481,7 @@ export function MitarbeiterBereich({
       </div>
       <div className="min-h-0 flex-1">
         {mitarbeiterReiter === "vertrieb" && (
-          <MitarbeiterRaster mitglieder={vertrieb} kennzahlen={kennzahlen} fotos={fotos} modus="vertrieb" />
+          <MitarbeiterRaster mitglieder={vertrieb} kennzahlen={kennzahlen} fotos={fotos} modus="vertrieb" reiter="vertrieb" />
         )}
         {mitarbeiterReiter === "akquise" && (
           <MitarbeiterRaster
@@ -469,6 +490,7 @@ export function MitarbeiterBereich({
             fotos={fotos}
             modus="akquise"
             zeitraum={zeitraum}
+            reiter="akquise"
           />
         )}
         {mitarbeiterReiter === "setting" && (
@@ -478,10 +500,11 @@ export function MitarbeiterBereich({
             fotos={fotos}
             modus="standard"
             zeitraum={zeitraum}
+            reiter="setting"
           />
         )}
         {mitarbeiterReiter === "weitere" && (
-          <MitarbeiterRaster mitglieder={weitere} kennzahlen={kennzahlen} fotos={fotos} modus="standard" />
+          <MitarbeiterRaster mitglieder={weitere} kennzahlen={kennzahlen} fotos={fotos} modus="standard" reiter="weitere" />
         )}
       </div>
     </div>

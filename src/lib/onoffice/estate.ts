@@ -5,6 +5,7 @@ import {
   KontrollObjekt,
   Kunde,
   LeadquellenKennzahlen,
+  MitarbeiterAktivitaet,
   MitarbeiterObjekt,
   NeuerKunde,
   NeuesObjekt,
@@ -2412,6 +2413,138 @@ export async function zaehleTelefonate(nutzerNr: string, von: string, bis: strin
     },
   ]);
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
+interface RawAktivitaetRecord {
+  id: string | number;
+  elements: {
+    Datum?: string;
+    Datum_bearb?: string;
+    Aktionsart?: string;
+    Aktionstyp?: string;
+    Bemerkung?: string;
+    Adress_nr?: string | number | (string | number)[];
+  };
+}
+
+interface RawKontaktRecord {
+  id: string | number;
+  elements: { Vorname?: string; Name?: string; Zusatz1?: string };
+}
+
+const AKTIVITAETEN_SEITENGROESSE = 500;
+const AKTIVITAETEN_MAX_SEITEN = 4;
+const AKTIVITAETEN_LIMIT_ALLE_ARTEN = 200;
+
+function ladeAktivitaetenSeite(
+  nutzerNr: string,
+  von: string,
+  bis: string,
+  offset: number,
+  listlimit: number,
+  aktionsart?: string
+) {
+  return callOnOfficeApi<RawAktivitaetRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "agentslog",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Datum", "Datum_bearb", "Aktionsart", "Aktionstyp", "Bemerkung", "Adress_nr"],
+        filter: {
+          Benutzer_nr: [{ op: "=", val: nutzerNr }],
+          Datum: [{ op: ">=", val: von }, { op: "<=", val: bis }],
+          ...(aktionsart ? { Aktionsart: [{ op: "=", val: aktionsart }] } : {}),
+        },
+        listlimit,
+        listoffset: offset,
+        sortby: { Datum: "DESC" },
+      },
+    },
+  ]);
+}
+
+// Löst Adress-Nummern in lesbare Kontaktnamen auf. Ein Fehler hier darf die Liste nicht kippen —
+// Bemerkung und Zeitpunkt sind das Wichtigere, die Zeile fällt dann auf die Nummer zurück.
+async function ladeKontaktnamen(adressNummern: string[]): Promise<Record<string, string>> {
+  const namen: Record<string, string> = {};
+  for (let i = 0; i < adressNummern.length; i += AKTIVITAETEN_SEITENGROESSE) {
+    const chunk = adressNummern.slice(i, i + AKTIVITAETEN_SEITENGROESSE);
+    const result = await callOnOfficeApi<RawKontaktRecord>([
+      {
+        actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+        resourcetype: "address",
+        resourceid: "",
+        identifier: "",
+        cacheable: false,
+        parameters: {
+          data: ["Vorname", "Name", "Zusatz1"],
+          recordids: chunk,
+          listlimit: AKTIVITAETEN_SEITENGROESSE,
+        },
+      },
+    ]).catch((error) => {
+      console.error("Kontaktnamen der Aktivitäten konnten nicht geladen werden:", error);
+      return null;
+    });
+    for (const r of result?.response?.results?.[0]?.data?.records ?? []) {
+      const { Vorname, Name, Zusatz1 } = r.elements;
+      const name = [Vorname, Name].filter(Boolean).join(" ") || Zusatz1;
+      if (name) namen[String(r.id)] = name;
+    }
+  }
+  return namen;
+}
+
+// Alle Maklerbuch-Einträge eines Mitarbeiters im Zeitraum [von, bis], neueste zuerst — für die
+// Kontrollliste app/admin/aktivitaeten/page.tsx (Nutzer-Vorgabe November 2026: "eine liste aller
+// aktivitäten ... Ich will die Kommentar, also die Bemerkung sehen können damit die nicht einfach
+// willkührlich telefonate eintragen"). Gleiche Filter wie zaehleTelefonate oben, damit Zahl und
+// Liste für denselben Zeitraum zusammenpassen. Ohne `aktionsart` kommen alle Arten, aber nur die
+// neuesten AKTIVITAETEN_LIMIT_ALLE_ARTEN Einträge: Diese Abfrage ist bei onOffice langsam (live
+// 10-14 s für 500 Einträge, mehr als 20 s für die volle Menge über 30 Tage). Das Feld Datum_bearb
+// verrät nachträgliche Einträge: Es trägt den Zeitpunkt der letzten Speicherung, Datum dagegen
+// den frei wählbaren Zeitpunkt der Aktivität. `abgeschnitten` meldet, wenn das Seitenlimit vor dem
+// Listenende griff.
+export async function ladeAktivitaetenFuerMitarbeiter(
+  nutzerNr: string,
+  von: string,
+  bis: string,
+  aktionsart?: string
+): Promise<{ aktivitaeten: MitarbeiterAktivitaet[]; abgeschnitten: boolean }> {
+  const records: RawAktivitaetRecord[] = [];
+  let abgeschnitten = false;
+  const maxSeiten = aktionsart ? AKTIVITAETEN_MAX_SEITEN : 1;
+  const listlimit = aktionsart ? AKTIVITAETEN_SEITENGROESSE : AKTIVITAETEN_LIMIT_ALLE_ARTEN;
+
+  for (let seite = 0; seite < maxSeiten; seite++) {
+    const result = await ladeAktivitaetenSeite(nutzerNr, von, bis, seite * listlimit, listlimit, aktionsart);
+    const daten = result?.response?.results?.[0]?.data;
+    records.push(...(daten?.records ?? []));
+    const gesamt = daten?.meta?.cntabsolute ?? records.length;
+    if (records.length >= gesamt) break;
+    if (seite === maxSeiten - 1) abgeschnitten = true;
+  }
+
+  const adressNummernJe = records.map((r) => {
+    const roh = r.elements.Adress_nr;
+    const liste = Array.isArray(roh) ? roh : roh ? [roh] : [];
+    return liste.map(String).filter((nr) => /^[1-9]\d*$/.test(nr));
+  });
+  const namen = await ladeKontaktnamen([...new Set(adressNummernJe.flat())]);
+
+  const aktivitaeten = records.map((r, i) => ({
+    id: String(r.id),
+    datum: r.elements.Datum ?? "",
+    geaendertAm: r.elements.Datum_bearb ?? "",
+    aktionsart: r.elements.Aktionsart ?? "",
+    aktionstyp: r.elements.Aktionstyp ?? "",
+    bemerkung: (r.elements.Bemerkung ?? "").trim(),
+    kontakte: adressNummernJe[i].map((nr) => namen[nr] ?? `Adresse ${nr}`),
+  }));
+  return { aktivitaeten, abgeschnitten };
 }
 
 // Bildet die drei vom Nutzer gewünschten Akquise-Kennzahlen ("Anzahl Akquise - Ersttermin/

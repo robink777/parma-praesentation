@@ -242,6 +242,18 @@ export interface WertermittlungsDaten {
   haftungsausschluss: string;
 }
 
+// Ein Eintrag aus dem Maklerbuch (agentslog) für die Aktivitätenliste je Mitarbeiter, siehe
+// ladeAktivitaetenFuerMitarbeiter in onoffice/estate.ts und app/admin/aktivitaeten/page.tsx.
+export interface MitarbeiterAktivitaet {
+  id: string;
+  datum: string;
+  geaendertAm: string;
+  aktionsart: string;
+  aktionstyp: string;
+  bemerkung: string;
+  kontakte: string[];
+}
+
 export interface TeamMitglied {
   name: string;
   rolle: string;

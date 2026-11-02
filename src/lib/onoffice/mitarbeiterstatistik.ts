@@ -112,6 +112,18 @@ function ermittleHeuteWocheZeitraeume() {
   };
 }
 
+// Zeitfenster der Aktivitätenliste (app/admin/aktivitaeten/page.tsx) — "heute" und "woche" sind
+// exakt die Fenster der Kacheln "Anrufe heute"/"Anrufe Woche", damit Zahl und Liste übereinstimmen.
+export type AktivitaetenZeitraum = "heute" | "woche" | "30t";
+
+export function ermittleAktivitaetenZeitraum(zeitraum: AktivitaetenZeitraum): { von: string; bis: string } {
+  const { vonHeute, bisHeute, vonWoche, bisWoche } = ermittleHeuteWocheZeitraeume();
+  if (zeitraum === "heute") return { von: vonHeute, bis: bisHeute };
+  if (zeitraum === "woche") return { von: vonWoche, bis: bisWoche };
+  const heute = new Date();
+  return { von: berlinDatumZeit(berlinMitternacht(heute, -30), "00:00:00"), bis: berlinDatumZeit(heute) };
+}
+
 // Datumsfenster (ohne Uhrzeitanteil) für das aktuelle Kalenderjahr, für die neue Kennzahl
 // "Verkaufte Objekte" je Mitarbeiter (siehe zaehleVerkaufteObjekteFuerMitarbeiter in estate.ts,
 // Juli 2026 Chat-Vorgabe: "die Zahl der verkauften Objekte pro Mitarbeiter in diesem Jahr ...
