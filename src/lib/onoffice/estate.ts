@@ -1203,7 +1203,19 @@ export async function zaehleVerkaufteObjekteFuerMitarbeiter(
   von: string,
   bis: string
 ): Promise<number> {
-  const result = await callOnOfficeApi<{ elements: { objekttitel?: string; verkauft_am?: string; status2?: string } }>([
+  return (await ladeVerkaufteRecords(nutzerNr, von, bis)).length;
+}
+
+async function ladeVerkaufteRecords(nutzerNr: string, von: string, bis: string) {
+  const result = await callOnOfficeApi<{
+    id: string | number;
+    elements: {
+      objekttitel?: string;
+      verkauft_am?: string;
+      status2?: string;
+      ind_3402_Feld_ObjTech528?: string;
+    };
+  }>([
     {
       actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
       resourcetype: "estate",
@@ -1211,7 +1223,7 @@ export async function zaehleVerkaufteObjekteFuerMitarbeiter(
       identifier: "",
       cacheable: false,
       parameters: {
-        data: ["Id", "objekttitel", "verkauft_am", "status2"],
+        data: ["Id", "objekttitel", "verkauft_am", "status2", "ind_3402_Feld_ObjTech528"],
         filter: {
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
@@ -1225,7 +1237,113 @@ export async function zaehleVerkaufteObjekteFuerMitarbeiter(
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records || [];
-  return dedupliziereVerkaufteObjekte(records).length;
+  return dedupliziereVerkaufteObjekte(records);
+}
+
+// Rückfall-Status nach geplatztem Notartermin (Nutzer-Vorgabe November 2026): Aktiv / Reserviert,
+// Aktiv / Aktive Vermarktung, Archiviert / Auftrag verloren.
+const STATUS2_VERKAUF_GEPLATZT = ["reserviert", "aktive_vermarktung", "auftrag_entzogen"];
+
+// Maklerbuch-Einträge lassen sich nicht nach Objekt filtern ("Objekt_nr" liefert live den Fehler
+// "Unknown field", Code 141), deshalb seitenweise über den Zeitraum.
+const NACHWEIS_SEITENGROESSE = 500;
+
+// Notartermin darf vor dem Saisonstart liegen, verkauft_am danach (live bis zu zehn Tage Abstand).
+const NACHWEIS_VORLAUF_TAGE = 60;
+
+// Bemerkungen von Terminen stapeln sich mit dem neuesten Ereignis oben, deshalb entscheidet der
+// Textanfang: Ein abgesagter und später neu angesetzter Termin beginnt nicht mehr mit "abgesagt".
+const TERMIN_AUSGEFALLEN = /^\s*(\(Termin abgesagt|ACHTUNG! TERMIN GELÖSCHT)/;
+
+export interface VerkaufsNachweise {
+  mitUebergabe: Set<string>;
+  mitNotartermin: Set<string>;
+}
+
+async function ladeMaklerbuchSeiten(filter: Record<string, { op: string; val: string }[]>) {
+  const zeilen: { Objekt_nr?: string | number | (string | number)[]; Bemerkung?: string }[] = [];
+  for (let offset = 0; ; offset += NACHWEIS_SEITENGROESSE) {
+    const result = await callOnOfficeApi<{ elements: (typeof zeilen)[number] }>([
+      {
+        actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+        resourcetype: "agentslog",
+        resourceid: "",
+        identifier: "",
+        cacheable: false,
+        parameters: {
+          data: ["Nr", "Objekt_nr", "Bemerkung"],
+          filter,
+          listlimit: NACHWEIS_SEITENGROESSE,
+          listoffset: offset,
+        },
+      },
+    ]);
+    const records = result?.response?.results?.[0]?.data?.records || [];
+    zeilen.push(...records.map((r) => r.elements));
+    if (records.length < NACHWEIS_SEITENGROESSE) return zeilen;
+  }
+}
+
+function objektNummern(zeilen: Awaited<ReturnType<typeof ladeMaklerbuchSeiten>>): Set<string> {
+  return new Set(zeilen.flatMap((z) => [z.Objekt_nr ?? []].flat().map(String)));
+}
+
+// Dauerhafte Nachweise aus dem Maklerbuch für zaehleVollstaendigeVerkaeufe: Sie bleiben bestehen,
+// wenn das Objekt später weiterzieht. Einmal je Aktualisierung für alle Teilnehmer geladen, nicht
+// je Person, damit die Zahl der Abrufe auch bei einer Jahressaison nicht wächst.
+export async function ladeVerkaufsNachweise(von: string): Promise<VerkaufsNachweise> {
+  const jetzt = new Date();
+  const start = new Date(Date.parse(`${von}T00:00:00Z`) - NACHWEIS_VORLAUF_TAGE * 24 * 60 * 60 * 1000);
+  const ab = { op: ">=", val: `${start.toISOString().slice(0, 10)} 00:00:00` };
+  const [uebergaben, notartermine] = await Promise.all([
+    ladeMaklerbuchSeiten({
+      Aktionsart: [{ op: "=", val: "Statusänderung" }],
+      Bemerkung: [{ op: "like", val: '%-> "in Übergabe"%' }],
+      Datum: [ab],
+    }),
+    ladeMaklerbuchSeiten({
+      Aktionsart: [{ op: "=", val: "Termin" }],
+      Aktionstyp: [{ op: "=", val: "Notartermin" }],
+      Datum: [ab, { op: "<=", val: berlinDatumZeit(jetzt) }],
+    }),
+  ]);
+  return {
+    mitUebergabe: objektNummern(uebergaben),
+    mitNotartermin: objektNummern(notartermine.filter((t) => !TERMIN_AUSGEFALLEN.test(t.Bemerkung ?? ""))),
+  };
+}
+
+// Zählt Verkäufe für die Wettkampf-Punkte. Nutzer-Vorgabe November 2026, ein Verkauf braucht:
+// 1. einen stattgefundenen Notartermin am Objekt, 2. Status 1 Aktiv / Status 2 in Übergabe,
+// 3. verkauft_am, 4. Betreuer und Akquisiteur. Punkte bekommt nur der Betreuer, der Akquisiteur
+// ist eine indirekte Kontrolle der Datenpflege.
+//
+// Punkt 1 und 2 kommen aus dem Maklerbuch statt aus dem aktuellen Status (siehe
+// ladeVerkaufsNachweise): Live laufen Objekte danach auch ohne Status 2 ins Archiv (VK1319) oder
+// werden später umgestellt (LO 1269 nach Notartermin und Verkauft auf Akquise - Absage). Punkte
+// entfallen deshalb nur bei den drei Rückfall-Status nach einem geplatzten Termin.
+//
+// Die Admin-Statistik (zaehleVerkaufteObjekteFuerMitarbeiter oben) bleibt bewusst ohne diese
+// Prüfung: Sie enthält auch Verkäufe von vor Einführung des Status "in Übergabe".
+export async function zaehleVollstaendigeVerkaeufe(
+  nutzerNr: string,
+  von: string,
+  bis: string,
+  nachweise: Promise<VerkaufsNachweise>
+): Promise<number> {
+  const [records, { mitUebergabe, mitNotartermin }] = await Promise.all([
+    ladeVerkaufteRecords(nutzerNr, von, bis),
+    nachweise,
+  ]);
+  return records.filter((r) => {
+    const objekt = String(r.id);
+    return (
+      mitUebergabe.has(objekt) &&
+      mitNotartermin.has(objekt) &&
+      Number(r.elements.ind_3402_Feld_ObjTech528 ?? 0) > 0 &&
+      !STATUS2_VERKAUF_GEPLATZT.includes(r.elements.status2 ?? "")
+    );
+  }).length;
 }
 
 // Leichte Objekt-Kennung für die aufklappbare Objektliste je Mitarbeiter (Admin-Bereich, siehe
@@ -2592,10 +2710,14 @@ export const FINANZIERUNG_TERMINARTEN = {
   zweittermin: "Finanzierungstermin - Zweittermin",
 } as const;
 
-// Zählt Objekte, bei denen EIN bestimmter Akquisiteur (Auswahlfeld "Akquisiteur",
-// ind_2964_Feld_ObjVerwaltung384 — live geprüft, Oktober 2026: nur drei mögliche Werte, Daniel/
-// Robin/Axel) im Zeitraum [von, bis] den Auftrag akquiriert hat — Grundlage für die
-// "Auftrag Akquiriert"-Punkte im Wettkampf-Punktesystem (siehe onoffice/wettkampf.ts).
+// Zählt Objekte, bei denen EIN bestimmter Akquisiteur im Zeitraum [von, bis] den Auftrag
+// akquiriert hat — Grundlage für die "Auftrag Akquiriert"-Punkte im Wettkampf-Punktesystem (siehe
+// onoffice/wettkampf.ts).
+//
+// KORREKTUR November 2026 (Nutzer: "Nimm bitte den Wert bei technische Daten - Allgemein -
+// Akquisiteur"): Das Benutzerfeld "Akquisiteur." (ind_3402_Feld_ObjTech528, enthält die Nutzer-Nr)
+// ersetzt das Auswahlfeld ind_2964_Feld_ObjVerwaltung384, das nur Daniel/Robin/Axel anbot und in
+// der Stichprobe seit September 2026 nur bei einem von 38 Objekten gefüllt war.
 //
 // WICHTIG: Gefiltert wird über das Datumsfeld "Auftrag von" (auftragvon), NICHT über den
 // aktuellen Status2 ("Akquise – Auftrag") — Nutzer-Vorgabe Oktober 2026: "Objekte durchlaufen
@@ -2607,7 +2729,7 @@ export const FINANZIERUNG_TERMINARTEN = {
 // in Kauf genommen (Nutzer-Entscheidung: "es geht ja auch darum, dass die Mitarbeiter ihre Daten
 // richtig pflegen ... die werden es zwangsläufig machen um Punkte zu sammeln").
 export async function zaehleAuftraegeAkquiriert(
-  akquisiteurSchluessel: string,
+  nutzerNr: string,
   von: string,
   bis: string
 ): Promise<number> {
@@ -2621,7 +2743,7 @@ export async function zaehleAuftraegeAkquiriert(
       parameters: {
         data: ["Id"],
         filter: {
-          ind_2964_Feld_ObjVerwaltung384: [{ op: "=", val: akquisiteurSchluessel }],
+          ind_3402_Feld_ObjTech528: [{ op: "=", val: nutzerNr }],
           auftragvon: [
             { op: ">=", val: von },
             { op: "<=", val: bis },
@@ -2632,6 +2754,51 @@ export async function zaehleAuftraegeAkquiriert(
     },
   ]);
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
+// status2-Werte "Akquise - In Akquise" und "Akquise – Auftrag", siehe zaehleGesetzteAuftraege.
+const STATUS2_NOCH_IN_AKQUISE = ["in_akquise", "ind_Schl_5461"];
+
+// Zählt Aufträge, die ein Mitarbeiter als Setter (Technische Daten, ind_3356_Feld_ObjTech505)
+// gelegt hat und die im Zeitraum [von, bis] in "Vorbereitung" gesetzt wurden — Grundlage für die
+// Setting-Punkte im Wettkampf-Punktesystem (Nutzer-Vorgabe November 2026, die Punkte sollen auch
+// bei ganzjährigen oder dauerhaften Wettbewerben stabil bleiben, obwohl das Objekt danach weiter
+// durch Aktive Vermarktung, In Übergabe und Verkauft wandert).
+//
+// Deshalb zählt "Auftrag von" (auftragvon) als Datum des Wechsels statt des aktuellen Status: Live
+// geprüft traf es bei 14 von 14 Setting-Objekten seit September 2026 exakt den Tag des letzten
+// Wechsels auf "Vorbereitung" und blieb danach bis "Verkauft"/"Archiviert" stehen. Bewusst nicht
+// über die "Statusänderung"-Einträge im Maklerbuch gezählt: Dort taucht derselbe Auftrag mehrfach
+// auf (z.B. dreimal bei DAP1364), ein Objekt mit einem Datumsfeld zählt dagegen nur einmal.
+//
+// Die einzige Status-Prüfung ist die Sperre für zurückgefallene Objekte: SG1435 stand nur eine
+// Minute auf "Vorbereitung" und wurde sofort zurückgesetzt, "Auftrag von" blieb aber gefüllt. Der
+// Vergleich läuft hier im Code statt als NOT-IN-Filter, damit archivierte Objekte ohne status2
+// nicht herausfallen. "Akquise – ReAkquise" und "Absage" sind absichtlich nicht gesperrt: Sie
+// können auch Monate später kommen und dürfen keine Punkte kosten.
+export async function zaehleGesetzteAuftraege(nutzerNr: string, von: string, bis: string): Promise<number> {
+  const result = await callOnOfficeApi<{ elements: { status2?: string } }>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "estate",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id", "status2"],
+        filter: {
+          ind_3356_Feld_ObjTech505: [{ op: "=", val: nutzerNr }],
+          auftragvon: [
+            { op: ">=", val: von },
+            { op: "<=", val: bis },
+          ],
+        },
+        listlimit: MITARBEITER_OBJEKT_LISTLIMIT,
+      },
+    },
+  ]);
+  const records = result?.response?.results?.[0]?.data?.records || [];
+  return records.filter((r) => !STATUS2_NOCH_IN_AKQUISE.includes(r.elements.status2 ?? "")).length;
 }
 
 // Zählt Kunden (Adressen) eines Mitarbeiters mit Adressstatus "Aktiv" (Parameter 5 von 5, siehe

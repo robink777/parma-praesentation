@@ -219,9 +219,8 @@ export const FINANZ_NAMEN = ["Stefanie Scalone"];
 // raus und nimm Sarah und Kathi mit rein" — Daniel Parma und Robin Kolbe bleiben für die
 // Admin-Statistik weiterhin ganz normal im Akquise-Reiter (siehe AKQUISE_NAMEN), nehmen aber
 // nicht mehr am Wettkampf teil; Sarah Barth und Katharina Becker (Setting-Team, siehe
-// SETTING_NAMEN) kommen NEU dazu. Für Sarah/Kathi greifen in berechnePunkte() automatisch nur die
-// Kategorien Telefonate/Besichtigungen (nicht an istAkquise/istFinanz geknüpft) — passend zu
-// ihrer tatsächlichen Tätigkeit als Terminsetzer.
+// SETTING_NAMEN) kommen NEU dazu. In berechnePunkte() ist nur die Finanzierung an istFinanz
+// geknüpft, alle anderen Kategorien gelten für jeden Teilnehmer.
 export const WETTKAMPF_NAMEN = [
   "Vanessa Krifft",
   "Kira Woldt",

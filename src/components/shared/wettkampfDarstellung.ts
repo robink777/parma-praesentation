@@ -9,7 +9,7 @@ import type { WettkampfKategorie } from "@/lib/onoffice/wettkampf";
 // der früher hier bei SEGMENT_FARBEN in MitarbeiterLeaderboard.tsx stand).
 //
 // Feste Reihenfolge/Farben je Kategorie (dataviz-Prinzip: Kategorialfarben nie zur Laufzeit neu
-// zugewiesen) — sechs unterscheidbare Töne aus der bereits validierten chart-Palette (siehe
+// zugewiesen) — sieben unterscheidbare Töne aus der bereits validierten chart-Palette (siehe
 // tailwind.config.ts), hier frei von der Bedeutung, die dieselben Töne z.B. in Uebersicht.tsx
 // tragen (dort Objekt-Status, hier Aktivitätsart — zwei verschiedene Dimensionen).
 export const SEGMENT_REIHENFOLGE: WettkampfKategorie[] = [
@@ -18,6 +18,7 @@ export const SEGMENT_REIHENFOLGE: WettkampfKategorie[] = [
   "akquiseTermine",
   "finanzierungTermine",
   "auftraege",
+  "gesetzteAuftraege",
   "verkaeufe",
 ];
 
@@ -27,6 +28,7 @@ export const SEGMENT_FARBEN: Record<WettkampfKategorie, string> = {
   akquiseTermine: "bg-chart-4",
   finanzierungTermine: "bg-chart-8",
   auftraege: "bg-chart-7",
+  gesetzteAuftraege: "bg-chart-3",
   verkaeufe: "bg-chart-1",
 };
 
@@ -36,6 +38,7 @@ export const SEGMENT_LABEL: Record<WettkampfKategorie, string> = {
   akquiseTermine: "Akquise-Termine",
   finanzierungTermine: "Finanzierungs-Termine",
   auftraege: "Aufträge",
+  gesetzteAuftraege: "Gesetzte Aufträge",
   verkaeufe: "Verkäufe",
 };
 
@@ -45,8 +48,9 @@ export const SEGMENT_LABEL: Record<WettkampfKategorie, string> = {
 export const SEGMENT_PUNKTE_TEXT: Record<WettkampfKategorie, string> = {
   telefonate: "1 Pkt.",
   besichtigungen: "3 Pkt.",
-  akquiseTermine: "6/7 Pkt.",
+  akquiseTermine: "5/6 Pkt.",
   finanzierungTermine: "6/7 Pkt.",
   auftraege: "10 Pkt.",
+  gesetzteAuftraege: "5 Pkt.",
   verkaeufe: "10 Pkt.",
 };

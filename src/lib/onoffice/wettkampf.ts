@@ -1,15 +1,18 @@
-import { AKQUISE_NAMEN, FINANZ_NAMEN, TEAM, WETTKAMPF_NAMEN } from "@/data/unternehmen";
+import { FINANZ_NAMEN, SETTING_NAMEN, TEAM, WETTKAMPF_NAMEN } from "@/data/unternehmen";
 import { berlinDatumIso, berlinDatumZeit, berlinMitternachtVon } from "@/lib/zeitzone";
 import {
   AKQUISE_TERMINARTEN,
   FINANZIERUNG_TERMINARTEN,
   ladeNutzerNrFuerMitarbeiter,
+  ladeVerkaufsNachweise,
   pruefeUebergabeHeute,
+  type VerkaufsNachweise,
   zaehleAuftraegeAkquiriert,
   zaehleBesichtigungen,
+  zaehleGesetzteAuftraege,
   zaehleTelefonate,
   zaehleTermineNachArt,
-  zaehleVerkaufteObjekteFuerMitarbeiter,
+  zaehleVollstaendigeVerkaeufe,
 } from "./estate";
 
 // Punktesystem für den Büro-Wettkampf (TV-Vorführung, siehe components/tv/MitarbeiterLeaderboard.tsx)
@@ -18,14 +21,20 @@ import {
 // 10 Punkte, Verkauf = 10 Punkte", ergänzt um "Finanzierung 1 Termin = 6 Punkte, Finanzierung 2
 // Termin = 7 Punkte" (ersetzt eine zunächst angedachte, nicht sauber messbare
 // "Finanzvermittlung"-Kategorie, siehe FINANZIERUNG_TERMINARTEN in estate.ts).
+//
+// KORREKTUR November 2026: Akquise-Termine zählen jetzt für alle, die im Termin eingetragen sind,
+// auf 5/6 Punkte reduziert (Nutzer: "Die Vertrieblicher sind ja auch angehalten Bewertungstermine
+// zu akquiseren, genau so wie das setting angehalten ist 'Ersttermine' zu legen"). Neu dazu
+// "Auftrag gesetzt = 5 Punkte" fürs Setting, siehe zaehleGesetzteAuftraege in estate.ts.
 export const PUNKTE = {
   telefonat: 1,
   besichtigung: 3,
-  akquiseErsttermin: 6,
-  akquiseZweittermin: 7,
+  akquiseErsttermin: 5,
+  akquiseZweittermin: 6,
   finanzierungErsttermin: 6,
   finanzierungZweittermin: 7,
   auftragAkquiriert: 10,
+  auftragGesetzt: 5,
   verkauf: 10,
 } as const;
 
@@ -58,17 +67,6 @@ export function ermittleSaison(heute: Date = new Date()): { von: Date; bis: Date
   return { von: berlinMitternachtVon(jahr, 0, 1), bis: berlinTagesende(jahr, 11, 31) };
 }
 
-// Auswahlfeld "Akquisiteur" in OnOffice (ind_2964_Feld_ObjVerwaltung384) — live geprüft, Oktober
-// 2026: nur diese drei Personen sind als Wert wählbar, siehe zaehleAuftraegeAkquiriert in
-// estate.ts. Jacqueline Henot ist zwar seit Kurzem auch im Akquise-Reiter (siehe AKQUISE_NAMEN),
-// kann als Akquisiteur-WERT in OnOffice aber nicht ausgewählt werden — bekommt hier deshalb
-// bewusst keinen Eintrag, statt einen falschen zu raten.
-const AKQUISITEUR_SCHLUESSEL: Record<string, string> = {
-  "Daniel Parma": "ind_Schl_4919",
-  "Robin Kolbe": "ind_Schl_4917",
-  "Axel Wehmeier": "ind_Schl_4915",
-};
-
 // Kategorien, aus denen sich die Punktzahl zusammensetzt — Grundlage für das gestapelte
 // Balkendiagramm auf der TV-Folie (Chat-Vorgabe Oktober 2026: "Die Balken der jeweiligen
 // Mitarbeiter kannst du aufteilen wie bei der Statistik der Objekte, farblich in den Balken —
@@ -82,6 +80,7 @@ export type WettkampfKategorie =
   | "akquiseTermine"
   | "finanzierungTermine"
   | "auftraege"
+  | "gesetzteAuftraege"
   | "verkaeufe";
 
 export interface WettkampfSegment {
@@ -124,12 +123,12 @@ async function berechnePunkte(
   bis: string,
   vonDatum: string,
   bisDatum: string,
-  heuteDatum: string
+  heuteDatum: string,
+  nachweise: Promise<VerkaufsNachweise>
 ): Promise<WettkampfEintrag> {
   const nutzerNr = ladeNutzerNrFuerMitarbeiter(mitgliedName);
-  const istAkquise = AKQUISE_NAMEN.includes(mitgliedName);
   const istFinanz = FINANZ_NAMEN.includes(mitgliedName);
-  const akquisiteurSchluessel = AKQUISITEUR_SCHLUESSEL[mitgliedName];
+  const istSetting = SETTING_NAMEN.includes(mitgliedName);
 
   const [
     telefonate,
@@ -139,15 +138,16 @@ async function berechnePunkte(
     finanzErst,
     finanzZweit,
     auftraege,
+    gesetzteAuftraege,
     verkaeufe,
     brennt,
   ] = await Promise.all([
     nutzerNr ? zaehleTelefonate(nutzerNr, von, bis).catch(() => 0) : Promise.resolve(0),
     nutzerNr ? zaehleBesichtigungen(nutzerNr, von, bis).catch(() => 0) : Promise.resolve(0),
-    nutzerNr && istAkquise
+    nutzerNr
       ? zaehleTermineNachArt(nutzerNr, von, bis, AKQUISE_TERMINARTEN.ersttermin).catch(() => 0)
       : Promise.resolve(0),
-    nutzerNr && istAkquise
+    nutzerNr
       ? zaehleTermineNachArt(nutzerNr, von, bis, AKQUISE_TERMINARTEN.zweittermin).catch(() => 0)
       : Promise.resolve(0),
     nutzerNr && istFinanz
@@ -156,11 +156,12 @@ async function berechnePunkte(
     nutzerNr && istFinanz
       ? zaehleTermineNachArt(nutzerNr, von, bis, FINANZIERUNG_TERMINARTEN.zweittermin).catch(() => 0)
       : Promise.resolve(0),
-    akquisiteurSchluessel
-      ? zaehleAuftraegeAkquiriert(akquisiteurSchluessel, vonDatum, bisDatum).catch(() => 0)
+    nutzerNr ? zaehleAuftraegeAkquiriert(nutzerNr, vonDatum, bisDatum).catch(() => 0) : Promise.resolve(0),
+    nutzerNr && istSetting
+      ? zaehleGesetzteAuftraege(nutzerNr, vonDatum, bisDatum).catch(() => 0)
       : Promise.resolve(0),
     nutzerNr
-      ? zaehleVerkaufteObjekteFuerMitarbeiter(nutzerNr, vonDatum, bisDatum).catch(() => 0)
+      ? zaehleVollstaendigeVerkaeufe(nutzerNr, vonDatum, bisDatum, nachweise).catch(() => 0)
       : Promise.resolve(0),
     nutzerNr ? pruefeUebergabeHeute(nutzerNr, heuteDatum).catch(() => false) : Promise.resolve(false),
   ]);
@@ -177,6 +178,7 @@ async function berechnePunkte(
       punkte: finanzErst * PUNKTE.finanzierungErsttermin + finanzZweit * PUNKTE.finanzierungZweittermin,
     },
     { kategorie: "auftraege", punkte: auftraege * PUNKTE.auftragAkquiriert },
+    { kategorie: "gesetzteAuftraege", punkte: gesetzteAuftraege * PUNKTE.auftragGesetzt },
     { kategorie: "verkaeufe", punkte: verkaeufe * PUNKTE.verkauf },
   ];
   const punkte = segmente.reduce((summe, s) => summe + s.punkte, 0);
@@ -213,10 +215,11 @@ export async function ladeWettkampfRangliste(): Promise<WettkampfEintrag[]> {
   const vonDatum = berlinDatumIso(von);
   const bisDatum = berlinDatumIso(bis);
   const heuteDatum = berlinDatumIso(heute);
+  const nachweise = ladeVerkaufsNachweise(vonDatum);
 
   const eintraege = await Promise.all(
     teilnehmerListe().map((mitglied) =>
-      berechnePunkte(mitglied.name, vonZeit, bisZeit, vonDatum, bisDatum, heuteDatum).catch(
+      berechnePunkte(mitglied.name, vonZeit, bisZeit, vonDatum, bisDatum, heuteDatum, nachweise).catch(
         (): WettkampfEintrag => ({
           name: mitglied.name,
           punkte: 0,
