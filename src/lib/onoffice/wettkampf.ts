@@ -60,6 +60,28 @@ function formatiereDatumIso(datum: Date): string {
   return `${jahr}-${monat}-${tag}`;
 }
 
+// Formatiert ein Datum MIT seiner eigenen echten Uhrzeit statt einer fest hartkodierten
+// "23:59:59" — Nutzer-Vorgabe November 2026: "Termine zählen generell erst wenn Sie
+// stattgefunden haben". Die reine Tages-Deckelung (bis = min(saisonEnde, heute)) reichte allein
+// NICHT aus: Live-Check direkt nach dem Saisonstart zeigte z.B. Axel Wehmeier bereits mit 7
+// Punkten am Vormittag, obwohl sein einziger punktender Termin ("Lothar Wirtz", Akquise-
+// Zweittermin) laut OnOffice erst um 17 Uhr desselben Tages beginnt — "bis heute 23:59:59" zählt
+// ihn sofort mit, obwohl er noch gar nicht stattgefunden hat. Diese Funktion übernimmt daher die
+// tatsächliche Uhrzeit des übergebenen Date-Objekts: Ist "bis" gleich "jetzt" (Saison noch nicht
+// vorbei), ergibt das den aktuellen Zeitpunkt; ist "bis" ein bereits abgeschlossenes, in der
+// Vergangenheit liegendes Saisonende (ERSTE_SAISON_ENDE bzw. die rollierende Jahresende-Variante
+// in ermittleSaison), trägt dieses Date-Objekt bereits "23:59:59" als Uhrzeit — dieselbe Funktion
+// deckt daher beide Fälle korrekt ab.
+function formatiereDatumZeitVoll(datum: Date): string {
+  const jahr = datum.getFullYear();
+  const monat = String(datum.getMonth() + 1).padStart(2, "0");
+  const tag = String(datum.getDate()).padStart(2, "0");
+  const stunde = String(datum.getHours()).padStart(2, "0");
+  const minute = String(datum.getMinutes()).padStart(2, "0");
+  const sekunde = String(datum.getSeconds()).padStart(2, "0");
+  return `${jahr}-${monat}-${tag} ${stunde}:${minute}:${sekunde}`;
+}
+
 // Auswahlfeld "Akquisiteur" in OnOffice (ind_2964_Feld_ObjVerwaltung384) — live geprüft, Oktober
 // 2026: nur diese drei Personen sind als Wert wählbar, siehe zaehleAuftraegeAkquiriert in
 // estate.ts. Jacqueline Henot ist zwar seit Kurzem auch im Akquise-Reiter (siehe AKQUISE_NAMEN),
@@ -197,13 +219,19 @@ async function berechnePunkte(
 // werden in OnOffice oft Tage/Wochen im Voraus eingetragen — ohne Deckelung zählten bereits
 // vorgebuchte, noch gar nicht stattgefundene Termine der kommenden Wochen sofort mit, ein frisch
 // zurückgesetzter Zähler stand dadurch schon am ersten Tag wieder hoch. Nutzer-Entscheidung:
-// "nur stattgefundene Termine" — ein Termin zählt erst, sobald sein Tag erreicht ist.
+// "nur stattgefundene Termine" — ein Termin zählt erst, sobald er wirklich stattgefunden hat.
+//
+// KORREKTUR November 2026 (Folgefund, Nutzer: "Termine zählen generell erst wenn Sie
+// stattgefunden haben"): Die reine Tages-Deckelung allein reichte nicht — "bis heute 23:59:59"
+// zählte auch heute noch bevorstehende Termine sofort mit (live bestätigt: ein Akquise-Termin um
+// 17 Uhr zählte bereits um 7:28 Uhr morgens). bisZeit nutzt daher jetzt formatiereDatumZeitVoll,
+// die die ECHTE aktuelle Uhrzeit trägt statt immer Tagesende, siehe deren Kommentar oben.
 export async function ladeWettkampfRangliste(): Promise<WettkampfEintrag[]> {
   const { von, bis: saisonEnde } = ermittleSaison();
   const heute = new Date();
   const bis = heute < saisonEnde ? heute : saisonEnde;
   const vonZeit = formatiereDatumZeit(von, "00:00:00");
-  const bisZeit = formatiereDatumZeit(bis, "23:59:59");
+  const bisZeit = formatiereDatumZeitVoll(bis);
   const vonDatum = formatiereDatumIso(von);
   const bisDatum = formatiereDatumIso(bis);
   const heuteDatum = formatiereDatumIso(heute);

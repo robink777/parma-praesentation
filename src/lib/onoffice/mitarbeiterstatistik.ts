@@ -37,6 +37,27 @@ function formatiereDatumZeit(datum: Date, uhrzeit: string): string {
   return `${jahr}-${monat}-${tag} ${uhrzeit}`;
 }
 
+// Formatiert ein Datum MIT seiner eigenen echten Uhrzeit statt einer fest hartkodierten
+// "23:59:59" — Nutzer-Vorgabe November 2026: "Termine zählen generell erst wenn Sie
+// stattgefunden haben". Die reine Tages-Deckelung (bisWoche/bisJahr = min(Periodenende, heute))
+// reichte allein NICHT aus: Live-Check zeigte z.B. "Termine Woche" bereits mit heute noch
+// bevorstehenden (nicht stattgefundenen) Terminen, weil "bis heute 23:59:59" den ganzen
+// restlichen Tag sofort mitzählte, nicht nur bis zum aktuellen Zeitpunkt. Diese Funktion
+// übernimmt daher die tatsächliche Uhrzeit des übergebenen Date-Objekts: Ist die obere Grenze
+// gleich "jetzt" (Periode noch nicht vorbei), ergibt das den aktuellen Zeitpunkt; ist sie ein
+// bereits abgeschlossenes, in der Vergangenheit liegendes Periodenende, trägt dieses Date-Objekt
+// bereits "23:59:59" als Uhrzeit (siehe jahresendeDatum unten) — dieselbe Funktion deckt daher
+// beide Fälle korrekt ab. Analog zu formatiereDatumZeitVoll in onoffice/wettkampf.ts.
+function formatiereDatumZeitVoll(datum: Date): string {
+  const jahr = datum.getFullYear();
+  const monat = String(datum.getMonth() + 1).padStart(2, "0");
+  const tag = String(datum.getDate()).padStart(2, "0");
+  const stunde = String(datum.getHours()).padStart(2, "0");
+  const minute = String(datum.getMinutes()).padStart(2, "0");
+  const sekunde = String(datum.getSeconds()).padStart(2, "0");
+  return `${jahr}-${monat}-${tag} ${stunde}:${minute}:${sekunde}`;
+}
+
 // Liefert die beiden Zeitfenster, die für Parameter 3-5 (Termine, Besichtigungen, siehe
 // Mitarbeiterstatistik.tsx) gebraucht werden: "letzte 30 Tage" (heute minus 30 Tage bis heute)
 // und "aktuelles Kalenderjahr" (1. Januar bis 31. Dezember des laufenden Jahres) — siehe
@@ -44,22 +65,30 @@ function formatiereDatumZeit(datum: Date, uhrzeit: string): string {
 // (reine Absolut-Snapshots ohne Zeitraum).
 //
 // KORREKTUR November 2026 (Nutzer-Entscheidung, siehe ermittleJahresDatumsfenster unten und
-// ermittleHeuteWocheZeitraeume oben): "Jahr" lief bisher bis zum 31.12., auch wenn das Jahr noch
+// ermittleHeuteWocheZeitraeume unten): "Jahr" lief bisher bis zum 31.12., auch wenn das Jahr noch
 // nicht zu Ende ist — bereits vorgebuchte Termine/Besichtigungen der restlichen Jahreshälfte
 // wären dadurch mitgezählt, bevor sie stattgefunden haben. bisJahr ist jetzt min(31.12., heute).
+//
+// KORREKTUR November 2026 (Folgefund, Nutzer: "Termine zählen generell erst wenn Sie
+// stattgefunden haben"): Die reine Tages-Deckelung allein reichte nicht — "bis heute 23:59:59"
+// zählte auch heute noch bevorstehende Termine/Besichtigungen sofort mit. bis30Tage/bisJahr
+// nutzen daher jetzt formatiereDatumZeitVoll, die die ECHTE aktuelle Uhrzeit trägt statt immer
+// Tagesende. jahresendeDatum bekommt dafür explizit 23:59:59 als Uhrzeit (statt Mitternacht),
+// damit diese Funktion auch für den bereits-abgelaufenen Jahresende-Fall korrekt "Tagesende"
+// statt "Tagesbeginn" liefert.
 function ermittleZeitraeume() {
   const heute = new Date();
   const vor30Tagen = new Date(heute);
   vor30Tagen.setDate(vor30Tagen.getDate() - 30);
   const jahresanfang = new Date(heute.getFullYear(), 0, 1);
-  const jahresendeDatum = new Date(heute.getFullYear(), 11, 31);
+  const jahresendeDatum = new Date(heute.getFullYear(), 11, 31, 23, 59, 59);
   const jahresende = heute < jahresendeDatum ? heute : jahresendeDatum;
 
   return {
     von30Tage: formatiereDatumZeit(vor30Tagen, "00:00:00"),
-    bis30Tage: formatiereDatumZeit(heute, "23:59:59"),
+    bis30Tage: formatiereDatumZeitVoll(heute),
     vonJahr: formatiereDatumZeit(jahresanfang, "00:00:00"),
-    bisJahr: formatiereDatumZeit(jahresende, "23:59:59"),
+    bisJahr: formatiereDatumZeitVoll(jahresende),
   };
 }
 
@@ -78,6 +107,12 @@ function ermittleZeitraeume() {
 // live verifiziert). Das Wochenfenster-Ende ist deshalb jetzt min(Sonntag, heute) statt immer
 // Sonntag — an jedem Tag außer Sonntag selbst (letzter Wochentag) blieben sonst bereits
 // vorgebuchte Termine der restlichen Woche fälschlich mitgezählt, bevor sie stattgefunden haben.
+//
+// KORREKTUR November 2026 (Folgefund, Nutzer: "Termine zählen generell erst wenn Sie
+// stattgefunden haben"): Die reine Tages-Deckelung allein reichte nicht — live bestätigt zählten
+// "Termine heute/Woche" morgens bereits Termine mit, die erst am Nachmittag/Abend desselben Tages
+// beginnen. bisHeute/bisWoche nutzen daher jetzt formatiereDatumZeitVoll (echte aktuelle Uhrzeit
+// statt immer Tagesende) statt formatiereDatumZeit(..., "23:59:59").
 function ermittleHeuteWocheZeitraeume() {
   const heute = new Date();
   const montag = montagDerWoche(heute);
@@ -87,9 +122,9 @@ function ermittleHeuteWocheZeitraeume() {
 
   return {
     vonHeute: formatiereDatumZeit(heute, "00:00:00"),
-    bisHeute: formatiereDatumZeit(heute, "23:59:59"),
+    bisHeute: formatiereDatumZeitVoll(heute),
     vonWoche: formatiereDatumZeit(montag, "00:00:00"),
-    bisWoche: formatiereDatumZeit(sonntag, "23:59:59"),
+    bisWoche: formatiereDatumZeitVoll(sonntag),
   };
 }
 

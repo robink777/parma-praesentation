@@ -2209,6 +2209,127 @@ export async function ladeLeadquellenKennzahlen(): Promise<LeadquellenKennzahlen
 // Visualisierung — sowie Termine ganz ohne hinterlegte Terminart) zählen mit.
 const AUSGESCHLOSSENE_TERMINARTEN = ["Urlaub", "Privattermin", "Teammeeting"];
 
+// KORREKTUR November 2026 (Nutzer-Vorgabe: "Termine zählen generell erst wenn Sie stattgefunden
+// haben"): Die Zählfunktionen unten (zaehleTermine/zaehleBesichtigungen/zaehleTermineNachArt)
+// liefen ursprünglich komplett über "listlimit:1 + meta.cntabsolute" mit datestart/dateend als
+// Tagesgrenzen. Live-Test direkt nach dem Wettkampf-Saisonstart-Reset zeigte aber: onOffice
+// ignoriert die UHRZEIT in datestart/dateend vollständig — ein dateend von "07:00:00" lieferte
+// denselben Treffer wie "23:59:59" für einen erst um 17 Uhr beginnenden Termin (per direktem
+// A/B-Test an einem echten Akquise-Zweittermin bestätigt). Eine serverseitige Uhrzeit-Filterung
+// über diese Parameter ist also nicht möglich — nur die Tages-Grenze wirkt.
+//
+// Lösung: zaehleKalenderPraezise teilt [von, bis] in zwei Teile. (1) Alle VOLLEN, bereits
+// abgeschlossenen Tage VOR heute laufen weiter über die schnelle cntabsolute-Zählung (ein
+// API-Call) — an vergangenen Tagen gibt es kein "zählt schon, bevor er stattfand"-Risiko mehr.
+// (2) NUR der heutige Tag wird mit den tatsächlichen Datensätzen inkl. "start_dt" geladen (live
+// geprüft: dieses Feld existiert und liefert die echte Startzeit, z.B. "2026-11-02 17:00:00")
+// und client-seitig auf start_dt <= jetzt gefiltert. An einem einzigen Tag realistisch nie mehr
+// als eine Handvoll Termine pro Mitarbeiter — unproblematisch fürs harte 500er-Listlimit der
+// onOffice-API (siehe Kommentar bei GESAMT_OBJEKT_LISTLIMIT weiter oben in dieser Datei), anders
+// als bei einer Jahres- oder 30-Tage-Abfrage mit mehreren hundert Terminen.
+function formatiereKalenderTagesDatum(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+async function zaehleKalenderCntAbsolute(
+  nutzerNr: string,
+  von: string,
+  bis: string,
+  artFilter: { op: string; val: string | string[] }
+): Promise<number> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "calendar",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id"],
+        listlimit: 1,
+        datestart: von,
+        dateend: bis,
+        users: [Number(nutzerNr)],
+        filter: { art: [artFilter] },
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
+async function zaehleKalenderHeutePraezise(
+  nutzerNr: string,
+  heuteVon: string,
+  heuteBis: string,
+  artFilter: { op: string; val: string | string[] },
+  jetzt: Date
+): Promise<number> {
+  const result = await callOnOfficeApi<{ elements: { start_dt?: string } }>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "calendar",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Id", "start_dt"],
+        listlimit: 50,
+        datestart: heuteVon,
+        dateend: heuteBis,
+        users: [Number(nutzerNr)],
+        filter: { art: [artFilter] },
+      },
+    },
+  ]);
+  const records = result?.response?.results?.[0]?.data?.records || [];
+
+  // Nur die UHRZEIT (nicht das Datum) von start_dt vergleichen — live geprüft: bei einem
+  // Serientermin (rp_flag: true, z.B. Tim Hartwichs wöchentliche "Berufsschule" montags 8 Uhr)
+  // liefert onOffice als start_dt das Datum der ERSTEN Serie (hier "2026-03-16", seit Monaten in
+  // der Vergangenheit) statt des heutigen Vorkommens — ein voller Datum+Uhrzeit-Vergleich hätte
+  // JEDEN Serientermin fälschlich sofort als "schon stattgefunden" gewertet, unabhängig von der
+  // tatsächlichen heutigen Uhrzeit. Die Uhrzeit selbst (z.B. "08:00:00") ist bei Serienterminen
+  // dagegen korrekt die tägliche Startzeit — ein reiner Uhrzeitvergleich funktioniert daher für
+  // normale UND wiederkehrende Termine gleichermaßen (bei normalen Terminen ist das Datum in
+  // start_dt ohnehin "heute", der Datumsanteil ist für den Vergleich also redundant).
+  const jetztUhrzeit = `${String(jetzt.getHours()).padStart(2, "0")}:${String(jetzt.getMinutes()).padStart(2, "0")}:${String(jetzt.getSeconds()).padStart(2, "0")}`;
+  return records.filter((r) => {
+    const start = r.elements.start_dt;
+    return typeof start === "string" && start.slice(11) <= jetztUhrzeit;
+  }).length;
+}
+
+async function zaehleKalenderPraezise(
+  nutzerNr: string,
+  von: string,
+  bis: string,
+  artFilter: { op: string; val: string | string[] }
+): Promise<number> {
+  const jetzt = new Date();
+  const heuteDatum = formatiereKalenderTagesDatum(jetzt);
+  const bisDatum = bis.slice(0, 10);
+
+  // Zeitraum liegt komplett vor heute (z.B. ein bereits abgeschlossenes früheres Saisonende) —
+  // keine Aufteilung nötig, die reine Tages-Zählung ist hier schon korrekt.
+  if (bisDatum < heuteDatum) {
+    return zaehleKalenderCntAbsolute(nutzerNr, von, bis, artFilter);
+  }
+
+  const vonDatum = von.slice(0, 10);
+  const gestern = new Date(jetzt);
+  gestern.setDate(gestern.getDate() - 1);
+  const gesternDatum = formatiereKalenderTagesDatum(gestern);
+
+  const [vollerAnteil, heutigerAnteil] = await Promise.all([
+    vonDatum <= gesternDatum
+      ? zaehleKalenderCntAbsolute(nutzerNr, von, `${gesternDatum} 23:59:59`, artFilter)
+      : Promise.resolve(0),
+    zaehleKalenderHeutePraezise(nutzerNr, `${heuteDatum} 00:00:00`, bis, artFilter, jetzt),
+  ]);
+
+  return vollerAnteil + heutigerAnteil;
+}
+
 // Zählt Termine eines Mitarbeiters (Parameter 3 von 5, siehe Mitarbeiterstatistik.tsx) im
 // Zeitraum [von, bis] (jeweils "YYYY-MM-DD HH:mm:ss", siehe ermittleZeitraeume in
 // onoffice/mitarbeiterstatistik.ts für die konkreten 30-Tage-/Kalenderjahr-Fenster), ohne die
@@ -2223,26 +2344,10 @@ const AUSGESCHLOSSENE_TERMINARTEN = ["Urlaub", "Privattermin", "Teammeeting"];
 // bestätigt) — 9 + 61 (mit "art NOT IN"-Filter) = 70, damit sichergestellt, dass "NOT IN" keine
 // Termine ohne hinterlegte Terminart verschluckt.
 export async function zaehleTermine(nutzerNr: string, von: string, bis: string): Promise<number> {
-  const result = await callOnOfficeApi([
-    {
-      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
-      resourcetype: "calendar",
-      resourceid: "",
-      identifier: "",
-      cacheable: false,
-      parameters: {
-        data: ["Id"],
-        listlimit: 1,
-        datestart: von,
-        dateend: bis,
-        users: [Number(nutzerNr)],
-        filter: {
-          art: [{ op: "NOT IN", val: AUSGESCHLOSSENE_TERMINARTEN }],
-        },
-      },
-    },
-  ]);
-  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+  return zaehleKalenderPraezise(nutzerNr, von, bis, {
+    op: "NOT IN",
+    val: AUSGESCHLOSSENE_TERMINARTEN,
+  });
 }
 
 // Terminarten, die in die "Besichtigungen"-Kennzahl (Parameter 4 von 5) einfließen — auf
@@ -2260,26 +2365,10 @@ export async function zaehleBesichtigungen(
   von: string,
   bis: string
 ): Promise<number> {
-  const result = await callOnOfficeApi([
-    {
-      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
-      resourcetype: "calendar",
-      resourceid: "",
-      identifier: "",
-      cacheable: false,
-      parameters: {
-        data: ["Id"],
-        listlimit: 1,
-        datestart: von,
-        dateend: bis,
-        users: [Number(nutzerNr)],
-        filter: {
-          art: [{ op: "IN", val: BESICHTIGUNGS_TERMINARTEN }],
-        },
-      },
-    },
-  ]);
-  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+  return zaehleKalenderPraezise(nutzerNr, von, bis, {
+    op: "IN",
+    val: BESICHTIGUNGS_TERMINARTEN,
+  });
 }
 
 // Zählt Telefonat-Aktivitäten eines Mitarbeiters im Zeitraum [von, bis] — Grundlage für
@@ -2344,26 +2433,7 @@ export async function zaehleTermineNachArt(
   bis: string,
   art: string
 ): Promise<number> {
-  const result = await callOnOfficeApi([
-    {
-      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
-      resourcetype: "calendar",
-      resourceid: "",
-      identifier: "",
-      cacheable: false,
-      parameters: {
-        data: ["Id"],
-        listlimit: 1,
-        datestart: von,
-        dateend: bis,
-        users: [Number(nutzerNr)],
-        filter: {
-          art: [{ op: "=", val: art }],
-        },
-      },
-    },
-  ]);
-  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+  return zaehleKalenderPraezise(nutzerNr, von, bis, { op: "=", val: art });
 }
 
 // Terminarten für die Finanzierungs-Punkte im Wettkampf-Punktesystem (Oktober 2026 Chat-Vorgabe:
