@@ -18,6 +18,12 @@ import {
 // nachtragen zu müssen.
 const TV_PFAD = "/tv";
 
+// Mitarbeiterfoto-Proxy (siehe app/api/mitarbeiterfoto/route.ts, November 2026) — wird sowohl von
+// der öffentlichen TV-Folie als auch von der /geteilt-Kundenpräsentation aus geladen, beide ohne
+// App-Session. Zeigt ausschließlich die ohnehin öffentlich sichtbaren Mitarbeiter-Profilfotos
+// (keine Kunden-/Objektdaten) — unkritisch, genau wie /tv selbst ohne Sperre.
+const MITARBEITERFOTO_PFAD = "/api/mitarbeiterfoto";
+
 // Schützt die komplette App (Seiten UND API-Routen) hinter dem einen gemeinsamen Passwort aus
 // lib/auth.ts — es gibt bewusst kein Konten-/Nutzersystem, nur diese eine Sperre gegen
 // unautorisierten Zugriff aus dem offenen Internet (insbesondere auf /api/onoffice, das sonst
@@ -42,7 +48,8 @@ export async function middleware(request: NextRequest) {
   if (
     request.nextUrl.pathname === "/geteilt" ||
     request.nextUrl.pathname === TV_PFAD ||
-    request.nextUrl.pathname.startsWith(`${TV_PFAD}/`)
+    request.nextUrl.pathname.startsWith(`${TV_PFAD}/`) ||
+    request.nextUrl.pathname === MITARBEITERFOTO_PFAD
   ) {
     return NextResponse.next();
   }

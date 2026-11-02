@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon } from "@/components/icons/Icon";
+import { fotoProxyUrl } from "@/lib/mitarbeiterFotos";
 import { Betreuer } from "@/types";
 
 function initialen(vorname: string, nachname: string) {
@@ -33,8 +34,19 @@ function PersonKarte({ person }: { person: Betreuer }) {
   return (
     <Card className="flex flex-col items-start gap-lg md:flex-row md:items-center">
       <div className="relative h-40 w-40 shrink-0 overflow-hidden rounded-full bg-sand">
+        {/* fotoProxyUrl + unoptimized: onOffice-Foto-URLs scheitern im direkten Browser-Abruf mit
+            "402 Payment Required", funktionieren aber server-seitig zuverlässig — siehe
+            ausführliche Begründung in components/shared/MitarbeiterFoto.tsx bzw.
+            app/api/mitarbeiterfoto/route.ts (November 2026). */}
         {person.profilbildUrl ? (
-          <Image src={person.profilbildUrl} alt={name} fill className="object-cover" sizes="160px" />
+          <Image
+            src={fotoProxyUrl(person.profilbildUrl)}
+            alt={name}
+            fill
+            unoptimized
+            className="object-cover"
+            sizes="160px"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center font-slab text-4xl font-bold text-walnuss">
             {initialen(person.vorname, person.nachname)}

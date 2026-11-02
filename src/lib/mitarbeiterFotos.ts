@@ -25,3 +25,15 @@ export function fotoLookup(alleMitarbeiter: Betreuer[]): Record<string, string> 
   }
   return lookup;
 }
+
+// Baut die proxied Bild-URL für app/api/mitarbeiterfoto/route.ts — November 2026, Live-Diagnose
+// nach "Die Bilder laden nach wie vor nicht auf meinem Fernseher": Die onOffice-Foto-URLs
+// funktionieren zuverlässig bei einem Server-Abruf, liefern aber "402 Payment Required", sobald
+// der BROWSER sie direkt lädt (siehe ausführlichen Kommentar in der Proxy-Route). ALLE Stellen,
+// die ein Mitarbeiter-/Betreuerfoto direkt im Browser rendern (MitarbeiterFoto.tsx,
+// Kontaktperson.tsx, Unternehmen.tsx, MitarbeiterBereich.tsx), müssen deshalb über diesen Proxy
+// gehen statt die rohe profilbildUrl direkt als Bild-src zu verwenden — ein zentraler Helfer
+// statt viermal denselben URL-Aufbau zu wiederholen.
+export function fotoProxyUrl(fotoUrl: string): string {
+  return `/api/mitarbeiterfoto?url=${encodeURIComponent(fotoUrl)}`;
+}
