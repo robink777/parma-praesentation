@@ -9,18 +9,23 @@ import { initialen } from "@/lib/mitarbeiterFotos";
 // tatsächliche Bild-Abruf aber fehlschlägt.
 //
 // Nutzer-Meldung November 2026 (TV-Fernseher-Ansicht): "hier sind nur platzhalter ausgegeben
-// außer bei Jacy". Live-Diagnose zeigte: die onOffice-Profilfoto-URLs selbst sind vorhanden und
-// einzeln abrufbar, aber Next.js' eingebauter Bild-Optimierer (/_next/image) hat — anders als
-// callOnOfficeApi in onoffice/client.ts mit seiner dreifachen Wiederholung bei transienten
-// Verbindungsfehlern (siehe MAX_VERSUCHE dort) — KEINE eigene Wiederholung: Ein einzelner
-// vorübergehender Verbindungsabbruch zum onOffice-Bildserver (live im Server-Log bestätigt:
-// wiederholte "SocherError: other side closed"/UND_ERR_SOCKET-Fehler gegen die onOffice-API,
-// exakt dieselbe Fehlerklasse, die callOnOfficeApi sonst automatisch abfängt) lässt den
-// Bild-Request dauerhaft mit einem 500er scheitern — und die Kachel zeigte bis jetzt dafür WEDER
-// das Foto NOCH den Initialen-Fallback, sondern einen leeren Kreis (da der bisherige Code nur
-// prüfte, ob überhaupt eine fotoUrl bekannt ist, nicht ob der Abruf tatsächlich gelingt). Welche
-// Mitarbeiter-Fotos das trifft, ist deshalb pro Seitenaufruf zufällig — abhängig davon, welcher
-// einzelne Bild-Request gerade von der Störung betroffen ist.
+// außer bei Jacy" — nach einem ersten Fix (nur der onError-Fallback unten, der einen leeren
+// Kreis durch die Initialen ersetzt) meldete der Nutzer richtig zurück: "Die Bilder laden nach
+// wie vor nicht". Live-Diagnose auf der PRODUKTIONS-Domain zeigte den eigentlichen Grund: Next.js'
+// eingebauter Bild-Optimierer (/_next/image, läuft bei Vercel als eigener, abrechenbarer Dienst)
+// lieferte für JEDE einzelne onOffice-Foto-URL (außer Jacquelines) den Status "402 Payment
+// Required" — Vercels monatliches Kontingent für Bild-Optimierungen war erschöpft. Grund: Die
+// Foto-URLs aus ladeUserFotosByEmails (onoffice/estate.ts, "photosAsLinks: true") sind signierte
+// EINMAL-Links, die sich bei JEDEM Seitenaufruf ändern (siehe deren params-Parameter) — jeder
+// Mitarbeiter auf JEDEM Seitenaufruf zählte dadurch als ein NEUES, erstmals zu optimierendes Bild
+// gegen das Kontingent, statt aus dem Cache bedient zu werden. Nur Jacquelines Foto liegt (anders
+// als bei allen anderen) unter einer stabilen, unveränderlichen URL (crm-beta.onoffice.de/.../
+// Userphoto_39.jpg) — DAS ist der eigentliche Grund, warum ausgerechnet ihres lud, nicht ihr
+// Platz 1 in der Rangliste. Lösung: `unoptimized` unten — umgeht Vercels Bild-Optimierer
+// komplett, der Fernseher/das Smartphone lädt die onOffice-URL direkt. Für kleine, bereits
+// komprimierte 30-40px-Avatare ohne spürbaren Nachteil, und verbraucht nie wieder dieses
+// Kontingent. Der onError-Fallback (siehe unten) bleibt zusätzlich bestehen — als Netz für den
+// Fall, dass der onOffice-Bildserver selbst einmal kurz nicht erreichbar ist.
 //
 // Diese Komponente ist bewusst eine eigene, kleine Client-Komponente (statt der Inline-Ternary
 // in MitarbeiterLeaderboard.tsx/TvMobil.tsx) — `onError` auf next/image braucht lokalen
@@ -55,6 +60,7 @@ export function MitarbeiterFoto({
       src={fotoUrl}
       alt={name}
       fill
+      unoptimized
       className="object-cover"
       sizes={groesseText}
       onError={() => setFehlgeschlagen(true)}
