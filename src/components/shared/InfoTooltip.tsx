@@ -1,31 +1,32 @@
+"use client";
+
+import { useRef, useState } from "react";
 import { Icon } from "@/components/icons/Icon";
 
 // Kleines (i)-Hover-Symbol für statistische Werte im Admin-Bereich (Nutzer-Vorgabe Oktober 2026:
 // "bei jedem statistischen Wert ... eine kleine Infobox oder so ein kleines (i) wo man drüber
-// hovern kann ... nicht im TV- oder Smartphone-Bereich"). Reines CSS-Hover (Tailwind
-// group/info-Muster), kein Zustand, kein Klick nötig; `focus-within` zusätzlich für
-// Tastaturbedienung.
+// hovern kann ... nicht im TV- oder Smartphone-Bereich"). Sichtbarkeit weiterhin reines CSS-Hover
+// (Tailwind group/info-Muster) mit `focus-within` für Tastaturbedienung — nur die HORIZONTALE
+// Position wird jetzt per JS an den tatsächlich verfügbaren Platz angepasst (siehe
+// aktualisierePosition unten), kein Klick nötig.
 //
-// Korrektur nach erstem Entwurf: "die Platzierung passt mir gar nicht, das (i) bitte optisch
-// schöner und besser platziert. Die OnOffice-Felder gerne prominent wie Labels bei Gmail,
-// darunter dann der Erklärungstext mit der mathematischen Logik." Deshalb jetzt zwei getrennte
-// Props statt eines einzelnen Fließtexts: `felder` (OnOffice-Feldnamen, als eigene Pillen oben im
-// Tooltip) und `text` (die Formel/Logik als Fließtext darunter). Der Auslöser selbst ist jetzt das
-// echte "info"-Icon (siehe Icon.tsx) statt eines eingekreisten Textzeichens, und wird von den
-// Aufrufern INLINE im jeweiligen Zeilenfluss platziert (nicht mehr absolut in der Kachel-Ecke, wo
-// es Inhalte überlagern konnte) — nur das Popup selbst bleibt absolut positioniert.
+// Korrektur nach erstem Entwurf: "die Platzierung passt mir gar nicht ... Die OnOffice-Felder
+// gerne prominent wie Labels bei Gmail, darunter dann der Erklärungstext". Deshalb zwei getrennte
+// Props statt eines einzelnen Fließtexts: `felder` (als Pillen oben) und `text` (Formel/Logik
+// darunter). Auslöser ist das "info"-Icon (siehe Icon.tsx), inline im Zeilenfluss platziert.
 //
-// Zweite Korrektur: "das klappt so nicht, mach die Infobox nach oben rechts, die Infobox ist
-// nicht leserlich" — das Popup öffnete bis dahin nach UNTEN LINKS (rechtsbündig am Auslöser
-// verankert, Box wächst nach links). Für ein (i) nah am linken Bildschirmrand (z.B. die erste
-// KPI-Spalte) lief die Box dadurch über den Viewport-Rand hinaus und wurde dort abgeschnitten.
-// Ein erster Versuch mit "nach oben rechts" (wie gewünscht) zeigte live im Admin-Bereich sofort
-// ein neues Problem: die KPI-Kacheln der ERSTEN Zeile sitzen direkt unter der Navi-Leiste, ohne
-// Platz nach oben — die Box wurde dort stattdessen von oben abgeschnitten (sogar noch weniger
-// lesbar als zuvor). Deshalb stattdessen nach UNTEN RECHTS geöffnet (linksbündig am Auslöser
-// verankert, wächst nach rechts und nach unten): behält den Effekt, der das ursprüngliche Problem
-// löste (Platz nach rechts statt nach links, löst die linke Rand-Kollision), vermeidet aber die
-// neue Kollision oben, weil unter JEDER Kachel immer Inhalt/Weißraum folgt, nie der Viewport-Rand.
+// DRITTE Korrektur (November 2026, Nutzer-Screenshot: "die infobox ist nich lesbar" — Box der
+// letzten KPI-Spalte lief über den rechten Bildschirmrand hinaus): Die bisherigen ZWEI Korrekturen
+// (siehe Git-Historie) probierten jeweils eine feste Öffnungsrichtung per CSS — "oben rechts" löste
+// die linke Randkollision, kollidierte dafür mit der Navi-Leiste oben; "unten rechts" löste das,
+// überschritt dafür bei der LETZTEN Spalte eines responsiven Grids den rechten Rand. Eine einzelne
+// feste CSS-Richtung kann das grundsätzlich nicht für JEDE Spaltenposition gleichzeitig lösen.
+// Deshalb jetzt dynamisch: Beim Hover/Fokus wird die tatsächliche Position des Auslösers per
+// getBoundingClientRect() gemessen und die Box als `position: fixed` so platziert, dass sie nie
+// über den rechten (oder linken) Viewport-Rand hinausragt — unabhängig davon, in welcher Spalte
+// das (i) gerade sitzt.
+const RAND_ABSTAND_PX = 12;
+
 export function InfoTooltip({
   felder,
   text,
@@ -39,10 +40,25 @@ export function InfoTooltip({
   // Kachel über alle dort sichtbaren Kennzahlen) — etwas mehr Breite für den längeren Text.
   breit?: boolean;
 }) {
+  const auslöserRef = useRef<HTMLButtonElement>(null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const breiteNum = breit ? 320 : 280;
+
+  function aktualisierePosition() {
+    const rect = auslöserRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const maxLeft = window.innerWidth - breiteNum - RAND_ABSTAND_PX;
+    const left = Math.max(RAND_ABSTAND_PX, Math.min(rect.left - 6, maxLeft));
+    setPosition({ top: rect.bottom + 8, left });
+  }
+
   return (
     <span className={`group/info relative inline-flex shrink-0 translate-y-[1px] ${className}`}>
       <button
+        ref={auslöserRef}
         type="button"
+        onMouseEnter={aktualisierePosition}
+        onFocus={aktualisierePosition}
         className="flex items-center justify-center rounded-full text-anthrazit/35 outline-none transition-colors hover:text-messing focus-visible:text-messing"
         aria-label="Erläuterung anzeigen"
       >
@@ -50,9 +66,8 @@ export function InfoTooltip({
       </button>
       <span
         role="tooltip"
-        className={`pointer-events-none absolute left-[-6px] top-[calc(100%+8px)] z-30 origin-top-left scale-95 rounded-md bg-anthrazit p-sm text-left opacity-0 shadow-lg transition-all duration-100 group-hover/info:scale-100 group-hover/info:opacity-100 group-focus-within/info:scale-100 group-focus-within/info:opacity-100 ${
-          breit ? "w-[320px]" : "w-[280px]"
-        }`}
+        style={position ? { top: position.top, left: position.left, width: breiteNum } : undefined}
+        className={`pointer-events-none fixed z-30 origin-top scale-95 rounded-md bg-anthrazit p-sm text-left opacity-0 shadow-lg transition-all duration-100 group-hover/info:scale-100 group-hover/info:opacity-100 group-focus-within/info:scale-100 group-focus-within/info:opacity-100`}
       >
         {felder.length > 0 && (
           <span className="mb-xs flex flex-wrap gap-[5px]">
