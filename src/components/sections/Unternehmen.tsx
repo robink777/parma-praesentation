@@ -2,7 +2,7 @@ import Image from "next/image";
 import { SectionShell, Card } from "@/components/layout/SectionShell";
 import { Icon, IconName } from "@/components/icons/Icon";
 import { GOOGLE_BEWERTUNG, KENNZAHLEN, PORTALANFRAGEN_JAHR, STANDORTE, TEAM } from "@/data/unternehmen";
-import { fotoLookup, fotoProxyUrl, initialen } from "@/lib/mitarbeiterFotos";
+import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import { Betreuer, Kennzahl } from "@/types";
 
 // Deutsches Tausendertrennzeichen (Punkt) für die live abgerufenen/gepflegten Kennzahlen unten —
@@ -171,16 +171,11 @@ export function Unternehmen({
         {TEAM.map((t) => (
           <Card key={t.name} className="flex items-center gap-sm">
             <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-sand">
-              {/* fotoProxyUrl + unoptimized: siehe Begründung in components/shared/
-                  MitarbeiterFoto.tsx bzw. app/api/mitarbeiterfoto/route.ts (November 2026) —
-                  onOffice-Foto-URLs scheitern im direkten Browser-Abruf mit "402 Payment
-                  Required", funktionieren aber server-seitig zuverlässig. */}
               {fotos[t.name] ? (
                 <Image
-                  src={fotoProxyUrl(fotos[t.name])}
+                  src={fotos[t.name]}
                   alt={t.name}
                   fill
-                  unoptimized
                   className="object-cover"
                   sizes="48px"
                 />

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { AKQUISE_NAMEN, SETTING_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unternehmen";
 import { InfoTooltip } from "@/components/shared/InfoTooltip";
-import { fotoLookup, fotoProxyUrl, initialen } from "@/lib/mitarbeiterFotos";
+import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import { Betreuer, MitarbeiterKennzahlen, TeamMitglied } from "@/types";
 
 // "Mitarbeiter"-Baustein des Admin-Dashboards (siehe AdminDashboard.tsx) — Oktober 2026
@@ -299,19 +299,8 @@ function MitarbeiterKachel({
     <div className="flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] md:p-md">
       <div className="mb-sm flex shrink-0 items-center gap-sm">
         <div className="relative h-[clamp(36px,6vh,56px)] w-[clamp(36px,6vh,56px)] shrink-0 overflow-hidden rounded-full bg-sand">
-          {/* fotoProxyUrl + unoptimized: siehe Begründung in components/shared/
-              MitarbeiterFoto.tsx bzw. app/api/mitarbeiterfoto/route.ts (November 2026) —
-              onOffice-Foto-URLs scheitern im direkten Browser-Abruf mit "402 Payment Required",
-              funktionieren aber server-seitig zuverlässig. */}
           {fotoUrl ? (
-            <Image
-              src={fotoProxyUrl(fotoUrl)}
-              alt={mitglied.name}
-              fill
-              unoptimized
-              className="object-cover"
-              sizes="56px"
-            />
+            <Image src={fotoUrl} alt={mitglied.name} fill className="object-cover" sizes="56px" />
           ) : (
             <div className="flex h-full w-full items-center justify-center font-slab text-sm font-bold text-walnuss">
               {initialen(mitglied.name)}
