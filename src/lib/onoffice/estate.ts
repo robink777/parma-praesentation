@@ -1482,6 +1482,9 @@ interface RawMitarbeiterObjektRecord {
     ind_3402_Feld_ObjTech528?: string;
     // Setter (Technische Daten – Allgemein – Setter) und Adresse für die Objektlisten.
     ind_3356_Feld_ObjTech505?: string;
+    // Akquise Vertrieb und tatsächlicher Kaufpreis, siehe MitarbeiterObjekt in types/index.ts.
+    ind_3584_Feld_ObjTech519?: string;
+    ind_2954_Feld_ObjPreise379?: string | number;
     strasse?: string;
     hausnummer?: string;
     plz?: string;
@@ -1503,6 +1506,8 @@ const MITARBEITER_OBJEKT_FIELDS = [
   "benutzer",
   "ind_3402_Feld_ObjTech528",
   "ind_3356_Feld_ObjTech505",
+  "ind_3584_Feld_ObjTech519",
+  "ind_2954_Feld_ObjPreise379",
   "strasse",
   "hausnummer",
   "plz",
@@ -1597,12 +1602,35 @@ function listenAngaben(el: RawMitarbeiterObjektRecord["elements"]) {
     akquisiteurNr: nutzerNrOderNull(el.ind_3402_Feld_ObjTech528),
     setterNr: nutzerNrOderNull(el.ind_3356_Feld_ObjTech505),
     betreuerNr: nutzerNrOderNull(el.benutzer),
+    akquiseVertriebNr: nutzerNrOderNull(el.ind_3584_Feld_ObjTech519),
+    angebotspreis: Number(el.kaufpreis) || 0,
   };
 }
 
 function mapMitarbeiterObjekt(record: RawMitarbeiterObjektRecord): MitarbeiterObjekt {
+  return mapKaufobjekt(record, Number(record.elements.kaufpreis) || 0);
+}
+
+// Verkaufte Objekte rechnen mit dem tatsächlichen Kaufpreis statt mit dem Angebotspreis
+// (Nutzer-Vorgabe November 2026 nach dem Abgleich mit der Buchhaltung: in 55 Fällen wich der
+// Angebotspreis ab). Fehlt er, fließt das Objekt nicht in Volumen und Provision ein und erscheint
+// unter "ohne Angabe" — bewusst kein Rückgriff auf den Angebotspreis, der die Summe zu hoch zeigte.
+function mapVerkauftesObjekt(record: RawMitarbeiterObjektRecord): MitarbeiterObjekt {
+  const tatsaechlich = Number(record.elements.ind_2954_Feld_ObjPreise379) || 0;
+  const objekt = mapKaufobjekt(record, tatsaechlich);
+  if (tatsaechlich > 0) return objekt;
+  return {
+    ...objekt,
+    kaufpreisFehlt: true,
+    provisionsvorlauf: null,
+    provisionsvorlaufFehlt: true,
+    aussenProvision: null,
+    innenProvision: null,
+  };
+}
+
+function mapKaufobjekt(record: RawMitarbeiterObjektRecord, preis: number): MitarbeiterObjekt {
   const el = record.elements;
-  const preis = Number(el.kaufpreis) || 0;
 
   const aussenProzent = parseProvisionsProzent(el.prozent_aussenprovision);
   const innenProzent = parseProvisionsProzent(el.prozent_innenprovision);
@@ -1628,6 +1656,8 @@ function mapMitarbeiterObjekt(record: RawMitarbeiterObjektRecord): MitarbeiterOb
     aussenProvision: nettoBetrag(aussenProzent),
     innenProvision: nettoBetrag(innenProzent),
     ...listenAngaben(el),
+    kaufpreisFehlt: false,
+    istVermietung: false,
   };
 }
 
@@ -1676,6 +1706,25 @@ function mapMitarbeiterVermietung(record: RawMitarbeiterObjektRecord): Mitarbeit
     aussenProvision: null,
     innenProvision: null,
     ...listenAngaben(el),
+    kaufpreisFehlt: false,
+    istVermietung: true,
+  };
+}
+
+// Provision einer abgeschlossenen Vermietung in Kaltmieten, netto. OnOffice hat dafür kein
+// strukturiertes Feld (Prozentfelder bei Mietobjekten 0 oder Kaufobjekt-Werte, Courtage nur als
+// Freitext); die Buchhaltungsliste 2026 rechnet in 4 von 6 Fällen mit 2 Kaltmieten.
+const VERMIETUNG_PROVISION_KALTMIETEN = 2;
+
+// Für das Provisionsvolumen des Jahres (Nutzer-Vorgabe November 2026: "Vermietung soll auch
+// eingerechnet werden!").
+function mapAbgeschlosseneVermietung(record: RawMitarbeiterObjektRecord): MitarbeiterObjekt {
+  const objekt = mapMitarbeiterVermietung(record);
+  const fehlt = objekt.preis <= 0;
+  return {
+    ...objekt,
+    provisionsvorlauf: fehlt ? null : objekt.preis * VERMIETUNG_PROVISION_KALTMIETEN,
+    provisionsvorlaufFehlt: fehlt,
   };
 }
 
@@ -1852,7 +1901,7 @@ export async function ladeVerkaufteObjekteFuerMitarbeiter(
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records || [];
-  return (await nurGezaehlteVerkaeufe(dedupliziereVerkaufteObjekte(records))).map(mapMitarbeiterObjekt);
+  return (await nurGezaehlteVerkaeufe(dedupliziereVerkaufteObjekte(records))).map(mapVerkauftesObjekt);
 }
 
 // Deutlich über dem live beobachteten Gesamtbestand (Juli 2026: rund 103 aktive + 22 in
@@ -1933,33 +1982,39 @@ export async function ladeAlleObjekteInAufarbeitung(): Promise<MitarbeiterObjekt
 // Jahreszahl auf 36 gedrückt statt der tatsächlichen 61, siehe Chat, August 2026). Zusätzlich per
 // dedupliziereVerkaufteObjekte (siehe oben) um exakte Duplikate bereinigt — ohne diesen Schritt
 // lieferte die reine Datumsfilterung 62 statt 61 (ein Objekt existierte doppelt in OnOffice).
+//
+// Seit November 2026 kommen die im Zeitfenster vermieteten Objekte dazu (istVermietung, siehe
+// mapAbgeschlosseneVermietung). Die Verkaufsregel ab VERKAUFSREGEL_AB gilt für sie nicht, weil es
+// bei einer Vermietung weder Notartermin noch Übergabe-Wechsel gibt.
 export async function ladeAlleVerkauftenObjekte(
   von: string,
   bis: string
 ): Promise<MitarbeiterObjekt[]> {
-  const result = await callOnOfficeApi<RawMitarbeiterObjektRecord>([
-    {
-      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
-      resourcetype: "estate",
-      resourceid: "",
-      identifier: "",
-      cacheable: false,
-      parameters: {
-        data: MITARBEITER_OBJEKT_FIELDS,
-        filter: {
-          vermarktungsart: [{ op: "=", val: "kauf" }],
-          verkauft_am: [
-            { op: ">=", val: von },
-            { op: "<=", val: bis },
-          ],
+  const abfrage = (vermarktungsart: "kauf" | "miete") =>
+    callOnOfficeApi<RawMitarbeiterObjektRecord>([
+      {
+        actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+        resourcetype: "estate",
+        resourceid: "",
+        identifier: "",
+        cacheable: false,
+        parameters: {
+          data: MITARBEITER_OBJEKT_FIELDS,
+          filter: {
+            vermarktungsart: [{ op: "=", val: vermarktungsart }],
+            verkauft_am: [
+              { op: ">=", val: von },
+              { op: "<=", val: bis },
+            ],
+          },
+          listlimit: GESAMT_OBJEKT_LISTLIMIT,
+          sortby: { objekttitel: "ASC" },
         },
-        listlimit: GESAMT_OBJEKT_LISTLIMIT,
-        sortby: { objekttitel: "ASC" },
       },
-    },
-  ]);
-  const records = result?.response?.results?.[0]?.data?.records || [];
-  return (await nurGezaehlteVerkaeufe(dedupliziereVerkaufteObjekte(records))).map(mapMitarbeiterObjekt);
+    ]).then((result) => result?.response?.results?.[0]?.data?.records || []);
+  const [kauf, miete] = await Promise.all([abfrage("kauf"), abfrage("miete")]);
+  const verkaeufe = (await nurGezaehlteVerkaeufe(dedupliziereVerkaufteObjekte(kauf))).map(mapVerkauftesObjekt);
+  return [...verkaeufe, ...dedupliziereVerkaufteObjekte(miete).map(mapAbgeschlosseneVermietung)];
 }
 
 interface RawKontrollRecord {

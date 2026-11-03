@@ -195,7 +195,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       href: href("verkauftJahr"),
       info: info(
         ["verkauft_am", "vermarktungsart", "status2", "benutzer", "ind_3402_Feld_ObjTech528"],
-        "Kaufobjekte mit Verkaufsdatum im laufenden Kalenderjahr, exakte Duplikate bereinigt. Ab 1.11.2026 zählt ein Verkauf nur mit Wechsel von Aktive Vermarktung oder Reserviert auf in Übergabe, verknüpftem Notartermin, Akquisiteur und Betreuer. Ältere Verkäufe zählen allein über das Verkaufsdatum, bis sie rückwirkend geprüft sind."
+        "Kaufobjekte mit Verkaufsdatum (= Tag des Notartermins) im laufenden Kalenderjahr, exakte Duplikate bereinigt. Vermietungen zählen nicht mit, nur ihre Provision im Provisionsvolumen. Ab 1.11.2026 zählt ein Verkauf nur mit Wechsel von Aktive Vermarktung oder Reserviert auf in Übergabe, verknüpftem Notartermin, Akquisiteur und Betreuer. Ältere Verkäufe zählen allein über das Verkaufsdatum, bis sie rückwirkend geprüft sind."
       ),
     },
     {
@@ -213,8 +213,8 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       akzent: "chart-3",
       href: href("verkauftJahr"),
       info: info(
-        ["kaufpreis", "verkauft_am"],
-        'Σ kaufpreis über alle im laufenden Kalenderjahr verkauften Objekte (dieselbe Menge wie "Verkaufte Objekte" links daneben).'
+        ["ind_2954_Feld_ObjPreise379", "verkauft_am"],
+        'Σ tatsächlicher Kaufpreis über alle im laufenden Kalenderjahr verkauften Objekte (dieselbe Menge wie "Verkaufte Objekte" links daneben). Objekte ohne tatsächlichen Kaufpreis fließen nicht ein, siehe "ohne Angabe" beim Provisionsvolumen.'
       ),
     },
     {
@@ -261,8 +261,8 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       hinweisHref: interaktiv ? "/admin/provisionsfehler?quelle=verkauft" : undefined,
       href: href("verkauftJahr"),
       info: info(
-        ["kaufpreis", "prozent_aussenprovision", "prozent_innenprovision", "verkauft_am"],
-        'Gleiche Formel wie "Provisionsvorlauf gesamt", aber nur über die im laufenden Kalenderjahr verkauften Objekte.'
+        ["ind_2954_Feld_ObjPreise379", "prozent_aussenprovision", "prozent_innenprovision", "kaltmiete", "verkauft_am"],
+        'Verkäufe: tatsächlicher Kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19. Vermietungen: 2 Kaltmieten. Jeweils mit Verkauft-/Vermietet-am-Datum im laufenden Kalenderjahr. Fehlen tatsächlicher Kaufpreis oder Prozentsätze, zählt das Objekt unter "ohne Angabe".'
       ),
     },
     {

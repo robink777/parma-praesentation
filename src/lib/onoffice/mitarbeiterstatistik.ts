@@ -425,7 +425,10 @@ export async function ladeObjektGesamtKennzahlen(): Promise<ObjektGesamtKennzahl
   // Neuer Block "Verkaufte Objekte {Jahr} / Provisionsvolumen {Jahr} / Gesamtvolumen {Jahr}"
   // (Juli 2026 Chat-Vorgabe) — gleiches Muster wie oben, aber ausschließlich über die im
   // laufenden Kalenderjahr verkauften Objekte (verkauftJahr), nicht über den Gesamtbestand.
-  const objektvolumenVerkauftJahr = verkauftJahr.reduce((summe, objekt) => summe + objekt.preis, 0);
+  // verkauftJahr enthält seit November 2026 auch die Vermietungen des Jahres: Sie zählen nur beim
+  // Provisionsvolumen, nicht als Verkauf und nicht im Gesamtvolumen (Kaltmiete ≠ Kaufpreis).
+  const verkaeufe = verkauftJahr.filter((objekt) => !objekt.istVermietung);
+  const objektvolumenVerkauftJahr = verkaeufe.reduce((summe, objekt) => summe + objekt.preis, 0);
   const provisionsWerteVerkauftJahr = verkauftJahr
     .map((objekt) => objekt.provisionsvorlauf)
     .filter((wert): wert is number => wert !== null);
@@ -444,7 +447,8 @@ export async function ladeObjektGesamtKennzahlen(): Promise<ObjektGesamtKennzahl
     objektvolumenGesamt,
     provisionsvorlaufGesamt,
     provisionsvorlaufFehltAnzahl,
-    verkaufteObjekteJahrGesamt: verkauftJahr.length,
+    verkaufteObjekteJahrGesamt: verkaeufe.length,
+    vermietungenJahrGesamt: verkauftJahr.length - verkaeufe.length,
     objektvolumenVerkauftJahr,
     provisionsvolumenVerkauftJahr,
     provisionsvolumenVerkauftJahrFehltAnzahl,

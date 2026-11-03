@@ -28,7 +28,7 @@ const QUELLEN_TEXT = {
   verkauft: {
     titel: "Provisionsvolumen — Objekte ohne Angabe",
     beschreibung:
-      "Diese im laufenden Kalenderjahr verkauften Objekte haben keine auswertbare Außen- oder Innen-Provision in OnOffice hinterlegt und fließen deshalb nicht in die Summe \"Provisionsvolumen\" des Jahres ein.",
+      "Diesen im laufenden Kalenderjahr verkauften oder vermieteten Objekten fehlt in OnOffice der tatsächliche Kaufpreis (bzw. die Kaltmiete) oder eine auswertbare Außen- oder Innen-Provision. Sie fließen deshalb nicht in die Summe \"Provisionsvolumen\" des Jahres ein.",
   },
 } as const;
 

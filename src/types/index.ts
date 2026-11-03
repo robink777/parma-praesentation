@@ -392,6 +392,17 @@ export interface MitarbeiterObjekt {
   akquisiteurNr: string | null;
   setterNr: string | null;
   betreuerNr: string | null;
+  // "Akquise Vertrieb" (ind_3584_Feld_ObjTech519, seit November 2026): Vertriebler, der das Objekt
+  // selbst akquiriert hat (Excel-Spalten "A&V"/"A&Vex"). Der Akquisiteur ist dann die Person aus
+  // der Akquise, die bewertet hat.
+  akquiseVertriebNr: string | null;
+  // Angebotspreis laut OnOffice ("kaufpreis"). Bei verkauften Objekten ist "preis" der tatsächliche
+  // Kaufpreis (Nutzer-Vorgabe November 2026), sonst sind beide gleich.
+  angebotspreis: number;
+  // Verkauft, aber ohne tatsächlichen Kaufpreis — fließt nicht in Volumen und Provision ein.
+  kaufpreisFehlt: boolean;
+  // Vermietungen zählen beim Provisionsvolumen mit; "preis" ist dann die Kaltmiete.
+  istVermietung: boolean;
 }
 
 // Unternehmensweite Summen über ALLE Mitarbeiter hinweg (nicht je Person), für die
@@ -424,8 +435,11 @@ export interface ObjektGesamtKennzahlen {
   // verkaufteObjekteJahr, hier nur unternehmensweit aggregiert. Das Jahr wird in der UI dynamisch
   // aus dem Systemdatum bestimmt (aktuellesJahr() in Mitarbeiterstatistik.tsx), nicht hier im Typ.
   verkaufteObjekteJahrGesamt: number | null;
-  // Summe von MitarbeiterObjekt.preis (= Kaufpreis) über alle im laufenden Kalenderjahr
-  // verkauften Objekte — "Gesamtvolumen {Jahr}".
+  // Vermietungen mit Vermietet-am-Datum im laufenden Jahr — zählen nicht als Verkauf, ihre
+  // Provision aber im Provisionsvolumen (Nutzer-Vorgabe November 2026).
+  vermietungenJahrGesamt: number;
+  // Summe des tatsächlichen Kaufpreises über alle im laufenden Kalenderjahr verkauften Objekte —
+  // "Gesamtvolumen {Jahr}". Vermietungen zählen hier nicht mit.
   objektvolumenVerkauftJahr: number | null;
   // Summe von MitarbeiterObjekt.provisionsvorlauf über alle im laufenden Kalenderjahr verkauften
   // Objekte, bei denen der Wert berechenbar war — "Provisionsvolumen {Jahr}". null, wenn kein

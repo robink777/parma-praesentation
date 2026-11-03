@@ -20,9 +20,9 @@ export const dynamic = "force-dynamic";
 // gewollt, nicht übersehen: alle drei Kennzahlen errechnen sich aus exakt derselben Objektmenge.
 const KATEGORIE_TEXT = {
   verkauftJahr: {
-    titel: (jahr: number) => `Verkaufte Objekte ${jahr}`,
+    titel: (jahr: number) => `Verkaufte und vermietete Objekte ${jahr}`,
     beschreibung: (jahr: number) =>
-      `Alle im laufenden Kalenderjahr (${jahr}) verkauften Objekte (verkauft_am) — Grundlage für "Verkaufte Objekte", "Gesamtvolumen" und "Provisionsvolumen" ${jahr}.`,
+      `Alle im laufenden Kalenderjahr (${jahr}) verkauften oder vermieteten Objekte (verkauft_am = Tag des Notartermins) — Grundlage für "Verkaufte Objekte", "Gesamtvolumen" und "Provisionsvolumen" ${jahr}. Vermietungen zählen nur beim Provisionsvolumen.`,
   },
   aktiv: {
     titel: () => "Aktive Vermarktung",

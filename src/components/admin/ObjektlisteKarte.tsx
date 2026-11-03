@@ -57,11 +57,12 @@ interface Summen {
   provision: number;
 }
 
+// Kaltmieten gehen nicht in die Kaufpreis-Summe ein, ihre Provision schon.
 function summiere(objekte: MitarbeiterObjekt[]): Summen {
   return objekte.reduce<Summen>(
     (s, o) => ({
       anzahl: s.anzahl + 1,
-      preis: s.preis + o.preis,
+      preis: s.preis + (o.istVermietung ? 0 : o.preis),
       aussen: s.aussen + (o.aussenProvision ?? 0),
       innen: s.innen + (o.innenProvision ?? 0),
       provision: s.provision + (o.provisionsvorlauf ?? 0),
@@ -91,6 +92,33 @@ function PersonZelle({ nr, namen, pflicht }: { nr: string | null; namen: Record<
   return <td className="whitespace-nowrap px-xs py-[6px] text-anthrazit">{namen[nr] ?? `Nutzer ${nr}`}</td>;
 }
 
+// Verkaufte Objekte zeigen den tatsächlichen Kaufpreis, darunter den Angebotspreis, wenn er abweicht.
+function PreisZelle({ objekt }: { objekt: MitarbeiterObjekt }) {
+  const zusatz = (text: string) => <span className="block text-[11px] text-anthrazit/50">{text}</span>;
+  if (objekt.istVermietung) {
+    return (
+      <td className="whitespace-nowrap px-xs py-[6px] text-right text-anthrazit">
+        {formatiereBetrag(objekt.preis)}
+        {zusatz("Kaltmiete")}
+      </td>
+    );
+  }
+  if (objekt.kaufpreisFehlt) {
+    return (
+      <td className="whitespace-nowrap px-xs py-[6px] text-right">
+        <span className="font-medium text-status-warnung">Tats. Kaufpreis fehlt</span>
+        {objekt.angebotspreis > 0 && zusatz(`Angebot ${formatiereBetrag(objekt.angebotspreis)}`)}
+      </td>
+    );
+  }
+  return (
+    <td className="whitespace-nowrap px-xs py-[6px] text-right text-anthrazit">
+      {formatiereBetrag(objekt.preis)}
+      {objekt.angebotspreis > 0 && objekt.angebotspreis !== objekt.preis && zusatz(`Angebot ${formatiereBetrag(objekt.angebotspreis)}`)}
+    </td>
+  );
+}
+
 function ObjektZeile({
   objekt,
   datum,
@@ -112,7 +140,7 @@ function ObjektZeile({
           {[`${objekt.plz} ${objekt.ort}`.trim(), objekt.objektnr].filter(Boolean).join(" · ")}
         </span>
       </td>
-      <td className="whitespace-nowrap px-xs py-[6px] text-right text-anthrazit">{formatiereBetrag(objekt.preis)}</td>
+      <PreisZelle objekt={objekt} />
       <ProvisionsZelle prozent={objekt.aussenProvisionProzent} betrag={objekt.aussenProvision} />
       <ProvisionsZelle prozent={objekt.innenProvisionProzent} betrag={objekt.innenProvision} />
       <td className="whitespace-nowrap px-xs py-[6px] text-right font-medium text-anthrazit">
@@ -121,8 +149,10 @@ function ObjektZeile({
         ) : (
           formatBetragOderStrich(objekt.provisionsvorlauf)
         )}
+        {objekt.istVermietung && <span className="block text-[11px] font-normal text-anthrazit/50">Vermietung</span>}
       </td>
       <PersonZelle nr={objekt.akquisiteurNr} namen={namen} pflicht />
+      <PersonZelle nr={objekt.akquiseVertriebNr} namen={namen} pflicht={false} />
       <PersonZelle nr={objekt.setterNr} namen={namen} pflicht={false} />
       <PersonZelle nr={objekt.betreuerNr} namen={namen} pflicht />
       {zeigeDauer && (
@@ -148,7 +178,7 @@ function SummenZeile({ label, summen, zeigeDauer, gesamt }: { label: string; sum
       <td className="whitespace-nowrap px-xs py-[6px] text-right font-medium text-anthrazit">{formatiereBetrag(summen.aussen)}</td>
       <td className="whitespace-nowrap px-xs py-[6px] text-right font-medium text-anthrazit">{formatiereBetrag(summen.innen)}</td>
       <td className="whitespace-nowrap px-xs py-[6px] text-right font-bold text-anthrazit">{formatiereBetrag(summen.provision)}</td>
-      <td colSpan={zeigeDauer ? 4 : 3} />
+      <td colSpan={zeigeDauer ? 5 : 4} />
     </tr>
   );
 }
@@ -233,6 +263,7 @@ export function ObjektlisteKarte({
               <th className="px-xs py-[6px] text-right font-medium">Innenprov.</th>
               <th className="px-xs py-[6px] text-right font-medium">Provision</th>
               <th className="px-xs py-[6px] font-medium">Akquise</th>
+              <th className="px-xs py-[6px] font-medium">Akquise Vertrieb</th>
               <th className="px-xs py-[6px] font-medium">Setting</th>
               <th className="px-xs py-[6px] font-medium">Betreuer</th>
               {zeigeDauer && <th className="px-xs py-[6px] text-right font-medium">Dauer</th>}
@@ -255,8 +286,9 @@ export function ObjektlisteKarte({
       </div>
 
       <p className="mt-sm text-[11px] text-anthrazit/50">
-        Provisionen netto (÷ 1,19) auf den Kaufpreis. „Provision“ zählt nur Objekte mit Außen- und Innenprovision,
-        deshalb kann die Summe kleiner sein als Außen- plus Innenprovision.
+        Provisionen netto (÷ 1,19) auf den Kaufpreis, bei verkauften Objekten auf den tatsächlichen Kaufpreis.
+        Vermietungen mit 2 Kaltmieten; ihre Kaltmiete zählt nicht zur Kaufpreis-Summe. „Provision“ zählt nur Objekte
+        mit Außen- und Innenprovision, deshalb kann die Summe kleiner sein als Außen- plus Innenprovision.
       </p>
     </Card>
   );
