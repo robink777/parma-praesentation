@@ -58,7 +58,7 @@ function wurdeNachtraeglichGespeichert(a: MitarbeiterAktivitaet): boolean {
 function eigeneBemerkung(a: MitarbeiterAktivitaet): string {
   if (a.aktionsart !== TELEFONAT || !/^Telefonat\s*(\n|$)/.test(a.bemerkung)) return a.bemerkung;
   const rest = a.bemerkung.replace(/^Telefonat\s*/, "");
-  for (const kontakt of a.kontakte) {
+  for (const { name: kontakt } of a.kontakte) {
     for (const name of [kontakt, kontakt.split(" geb. ")[0]]) {
       if (rest.startsWith(name)) return rest.slice(name.length).replace(/^[\s,;:-]+/, "");
     }
@@ -122,9 +122,18 @@ function AktivitaetZeile({ aktivitaet }: { aktivitaet: MitarbeiterAktivitaet }) 
             <span className="font-normal text-anthrazit/50"> · {aktivitaet.aktionstyp}</span>
           )}
         </p>
-        <p className="mt-[2px] text-small text-anthrazit/60">
-          {aktivitaet.kontakte.length > 0 ? aktivitaet.kontakte.join(", ") : "Kein Kontakt verknüpft"}
-        </p>
+        {aktivitaet.kontakte.length > 0 ? (
+          aktivitaet.kontakte.map((kontakt, i) => (
+            <p key={i} className="mt-[2px] text-small text-anthrazit/60">
+              {kontakt.name}
+              {kontakt.kundennr && (
+                <span className="ml-[6px] font-mono text-[11px] text-anthrazit/45">KdNr {kontakt.kundennr}</span>
+              )}
+            </p>
+          ))
+        ) : (
+          <p className="mt-[2px] text-small text-anthrazit/60">Kein Kontakt verknüpft</p>
+        )}
         {nichtErreicht && (
           <span className="mt-[4px] inline-block rounded-sm bg-status-warnung/10 px-xs text-small font-medium text-status-warnung">
             Nicht erreicht

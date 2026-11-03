@@ -251,7 +251,9 @@ export interface MitarbeiterAktivitaet {
   aktionsart: string;
   aktionstyp: string;
   bemerkung: string;
-  kontakte: string[];
+  // kundennr = onOffice-Feld KdNr (die in onOffice sichtbare Kundennummer), leer, wenn nicht gepflegt
+  // oder der Adressabruf scheitert. Nutzer-Vorgabe November 2026: Kunden können gleich heißen.
+  kontakte: { name: string; kundennr: string }[];
 }
 
 export interface TeamMitglied {

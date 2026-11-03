@@ -2734,7 +2734,7 @@ interface RawAktivitaetRecord {
 
 interface RawKontaktRecord {
   id: string | number;
-  elements: { Vorname?: string; Name?: string; Zusatz1?: string };
+  elements: { Vorname?: string; Name?: string; Zusatz1?: string; KdNr?: string | number };
 }
 
 const AKTIVITAETEN_SEITENGROESSE = 500;
@@ -2771,10 +2771,13 @@ function ladeAktivitaetenSeite(
   ]);
 }
 
-// Löst Adress-Nummern in lesbare Kontaktnamen auf. Ein Fehler hier darf die Liste nicht kippen —
-// Bemerkung und Zeitpunkt sind das Wichtigere, die Zeile fällt dann auf die Nummer zurück.
-async function ladeKontaktnamen(adressNummern: string[]): Promise<Record<string, string>> {
-  const namen: Record<string, string> = {};
+// Löst Adress-Nummern in lesbare Kontaktnamen samt Kundennummer (KdNr) auf. Ein Fehler hier darf
+// die Liste nicht kippen — Bemerkung und Zeitpunkt sind das Wichtigere, die Zeile fällt dann auf
+// die Nummer zurück.
+async function ladeKontaktnamen(
+  adressNummern: string[]
+): Promise<Record<string, { name: string; kundennr: string }>> {
+  const namen: Record<string, { name: string; kundennr: string }> = {};
   for (let i = 0; i < adressNummern.length; i += AKTIVITAETEN_SEITENGROESSE) {
     const chunk = adressNummern.slice(i, i + AKTIVITAETEN_SEITENGROESSE);
     const result = await callOnOfficeApi<RawKontaktRecord>([
@@ -2785,7 +2788,7 @@ async function ladeKontaktnamen(adressNummern: string[]): Promise<Record<string,
         identifier: "",
         cacheable: false,
         parameters: {
-          data: ["Vorname", "Name", "Zusatz1"],
+          data: ["Vorname", "Name", "Zusatz1", "KdNr"],
           recordids: chunk,
           listlimit: AKTIVITAETEN_SEITENGROESSE,
         },
@@ -2795,9 +2798,9 @@ async function ladeKontaktnamen(adressNummern: string[]): Promise<Record<string,
       return null;
     });
     for (const r of result?.response?.results?.[0]?.data?.records ?? []) {
-      const { Vorname, Name, Zusatz1 } = r.elements;
-      const name = [Vorname, Name].filter(Boolean).join(" ") || Zusatz1;
-      if (name) namen[String(r.id)] = name;
+      const { Vorname, Name, Zusatz1, KdNr } = r.elements;
+      const name = [Vorname, Name].filter(Boolean).join(" ") || Zusatz1 || `Adresse ${r.id}`;
+      namen[String(r.id)] = { name, kundennr: KdNr ? String(KdNr) : "" };
     }
   }
   return namen;
@@ -2847,7 +2850,7 @@ export async function ladeAktivitaetenFuerMitarbeiter(
     aktionsart: r.elements.Aktionsart ?? "",
     aktionstyp: r.elements.Aktionstyp ?? "",
     bemerkung: (r.elements.Bemerkung ?? "").trim(),
-    kontakte: adressNummernJe[i].map((nr) => namen[nr] ?? `Adresse ${nr}`),
+    kontakte: adressNummernJe[i].map((nr) => namen[nr] ?? { name: `Adresse ${nr}`, kundennr: "" }),
   }));
   return { aktivitaeten, abgeschnitten };
 }
