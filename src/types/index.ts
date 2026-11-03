@@ -371,6 +371,25 @@ export interface MitarbeiterObjekt {
   // dafür einen eigenen Hinweis statt eines schlichten "–", um "Feld in OnOffice nicht gepflegt"
   // von "Wert ist 0" zu unterscheiden (Chat-Vorgabe).
   provisionsvorlaufFehlt: boolean;
+  // Für die Objektlisten hinter den KPI-Kacheln (Nutzer-Vorgabe November 2026, Abgleich mit den
+  // Excel-Listen der Buchhaltung): Sortierung nach Monat oder Straße, Außen-/Innenprovision
+  // getrennt sowie Akquise, Setting und Betreuer je Objekt.
+  strasse: string;
+  hausnummer: string;
+  plz: string;
+  ort: string;
+  // "JJJJ-MM-TT" oder null, wenn in OnOffice kein Datum hinterlegt ist.
+  verkauftAm: string | null;
+  auftragVon: string | null;
+  // Prozentsätze wie in OnOffice hinterlegt (brutto), Beträge netto (÷ 1,19) wie provisionsvorlauf.
+  aussenProvisionProzent: number | null;
+  innenProvisionProzent: number | null;
+  aussenProvision: number | null;
+  innenProvision: number | null;
+  // OnOffice-Nutzer-Nr; Namen löst der Aufrufer über ladeNutzerNamen (onoffice/estate.ts) auf.
+  akquisiteurNr: string | null;
+  setterNr: string | null;
+  betreuerNr: string | null;
 }
 
 // Unternehmensweite Summen über ALLE Mitarbeiter hinweg (nicht je Person), für die

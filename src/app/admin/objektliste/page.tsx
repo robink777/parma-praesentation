@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ObjektlisteKarte } from "@/components/admin/ObjektlisteKarte";
+import { istObjektlistenAnsicht, ObjektlisteKarte } from "@/components/admin/ObjektlisteKarte";
+import { ladeNutzerNamen } from "@/lib/onoffice/estate";
 import { ladeObjektlisteFuerKategorie } from "@/lib/onoffice/mitarbeiterstatistik";
 
 // Kein Caching — Live-Abruf bei jedem Aufruf, analog zum restlichen Admin-Bereich (siehe
@@ -48,14 +49,18 @@ function istKategorie(wert: string | undefined): wert is Kategorie {
 export default async function ObjektlistePage({
   searchParams,
 }: {
-  searchParams: Promise<{ kategorie?: string }>;
+  searchParams: Promise<{ kategorie?: string; ansicht?: string }>;
 }) {
-  const { kategorie: kategorieParam } = await searchParams;
+  const { kategorie: kategorieParam, ansicht: ansichtParam } = await searchParams;
   const kategorie: Kategorie = istKategorie(kategorieParam) ? kategorieParam : "aktiv";
+  const ansicht = istObjektlistenAnsicht(ansichtParam) ? ansichtParam : "monat";
   const jahr = new Date().getFullYear();
   const text = KATEGORIE_TEXT[kategorie];
 
-  const objekte = await ladeObjektlisteFuerKategorie(kategorie).catch(() => undefined);
+  const [objekte, namen] = await Promise.all([
+    ladeObjektlisteFuerKategorie(kategorie).catch(() => undefined),
+    ladeNutzerNamen().catch(() => ({}) as Record<string, string>),
+  ]);
 
   return (
     <div className="min-h-screen bg-stein">
@@ -64,14 +69,25 @@ export default async function ObjektlistePage({
         <div className="h-5 w-px bg-walnuss/15" />
         <p className="label">Admin-Bereich</p>
       </header>
-      <main className="mx-auto max-w-content px-lg pb-xl">
+      <main className="mx-auto max-w-[1600px] px-lg pb-xl">
         <Link href="/admin" className="mb-md inline-block text-small text-anthrazit/60 hover:text-anthrazit">
           ← Zurück zur Übersicht
         </Link>
         <h1 className="mb-xs font-slab text-2xl font-bold text-anthrazit">{text.titel(jahr)}</h1>
         <p className="mb-lg max-w-[65ch] text-body text-anthrazit/60">{text.beschreibung(jahr)}</p>
 
-        <ObjektlisteKarte objekte={objekte} leerText="Keine Objekte in dieser Kategorie gefunden." zeigeDetails />
+        <ObjektlisteKarte
+          objekte={objekte}
+          leerText="Keine Objekte in dieser Kategorie gefunden."
+          namen={namen}
+          ansicht={ansicht}
+          ansichtHref={{
+            monat: `/admin/objektliste?kategorie=${kategorie}&ansicht=monat`,
+            strasse: `/admin/objektliste?kategorie=${kategorie}&ansicht=strasse`,
+          }}
+          datumsfeld={kategorie === "verkauftJahr" ? "verkauftAm" : "auftragVon"}
+          zeigeDauer={kategorie !== "verkauftJahr"}
+        />
       </main>
     </div>
   );

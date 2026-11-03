@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ObjektlisteKarte } from "@/components/admin/ObjektlisteKarte";
+import { istObjektlistenAnsicht, ObjektlisteKarte } from "@/components/admin/ObjektlisteKarte";
+import { ladeNutzerNamen } from "@/lib/onoffice/estate";
 import { ladeObjekteOhneProvisionsangabe } from "@/lib/onoffice/mitarbeiterstatistik";
 
 // Kein Caching — Live-Abruf bei jedem Aufruf, analog zum restlichen Admin-Bereich (siehe
@@ -13,8 +14,8 @@ export const dynamic = "force-dynamic";
 // Objekte angezeigt werden, damit man die Fehler direkt in OnOffice suchen kann und beheben
 // kann"). Bewusst KLICK statt wörtlichem Hover — eine Navigation direkt beim Hovern würde die
 // Seite schon beim versehentlichen Drüberfahren verlassen; die KPI-Kachel bekommt stattdessen
-// einen klickbaren, unterstrichenen Hinweis mit Hover-Zustand (siehe KpiKachel.tsx). Zeigt bewusst
-// nur Objektnummer/Titel/Preis — KEIN direkter Tiefenlink ins OnOffice-Backend, dessen genaues
+// einen klickbaren, unterstrichenen Hinweis mit Hover-Zustand (siehe KpiKachel.tsx). Gleiche Tabelle
+// wie die Objektliste (siehe ObjektlisteKarte.tsx), aber KEIN direkter Tiefenlink ins OnOffice-Backend, dessen genaues
 // URL-Schema für diesen Account nicht bekannt ist (lieber kein geratener Link als ein falscher);
 // die Objektnummer ist der Suchbegriff, mit dem sich der Datensatz in OnOffice selbst finden
 // lässt.
@@ -34,15 +35,17 @@ const QUELLEN_TEXT = {
 export default async function ProvisionsfehlerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ quelle?: string }>;
+  searchParams: Promise<{ quelle?: string; ansicht?: string }>;
 }) {
-  const { quelle: quelleParam } = await searchParams;
+  const { quelle: quelleParam, ansicht: ansichtParam } = await searchParams;
   const quelle = quelleParam === "verkauft" ? "verkauft" : "gesamt";
+  const ansicht = istObjektlistenAnsicht(ansichtParam) ? ansichtParam : "monat";
   const text = QUELLEN_TEXT[quelle];
 
-  const objekte = await ladeObjekteOhneProvisionsangabe(
-    quelle === "verkauft" ? "verkauftJahr" : "gesamt"
-  ).catch(() => undefined);
+  const [objekte, namen] = await Promise.all([
+    ladeObjekteOhneProvisionsangabe(quelle === "verkauft" ? "verkauftJahr" : "gesamt").catch(() => undefined),
+    ladeNutzerNamen().catch(() => ({}) as Record<string, string>),
+  ]);
 
   return (
     <div className="min-h-screen bg-stein">
@@ -51,7 +54,7 @@ export default async function ProvisionsfehlerPage({
         <div className="h-5 w-px bg-walnuss/15" />
         <p className="label">Admin-Bereich</p>
       </header>
-      <main className="mx-auto max-w-content px-lg pb-xl">
+      <main className="mx-auto max-w-[1600px] px-lg pb-xl">
         <Link href="/admin" className="mb-md inline-block text-small text-anthrazit/60 hover:text-anthrazit">
           ← Zurück zur Übersicht
         </Link>
@@ -61,6 +64,14 @@ export default async function ProvisionsfehlerPage({
         <ObjektlisteKarte
           objekte={objekte}
           leerText="Keine Objekte ohne Provisionsangabe gefunden — die Liste ist leer."
+          namen={namen}
+          ansicht={ansicht}
+          ansichtHref={{
+            monat: `/admin/provisionsfehler?quelle=${quelle}&ansicht=monat`,
+            strasse: `/admin/provisionsfehler?quelle=${quelle}&ansicht=strasse`,
+          }}
+          datumsfeld={quelle === "verkauft" ? "verkauftAm" : "auftragVon"}
+          zeigeDauer={quelle !== "verkauft"}
         />
       </main>
     </div>

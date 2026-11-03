@@ -1480,6 +1480,12 @@ interface RawMitarbeiterObjektRecord {
     // Für die Verkaufsregel ab VERKAUFSREGEL_AB (siehe verkaufsMaengel): Betreuer und Akquisiteur.
     benutzer?: string;
     ind_3402_Feld_ObjTech528?: string;
+    // Setter (Technische Daten – Allgemein – Setter) und Adresse für die Objektlisten.
+    ind_3356_Feld_ObjTech505?: string;
+    strasse?: string;
+    hausnummer?: string;
+    plz?: string;
+    ort?: string;
   };
 }
 
@@ -1496,6 +1502,11 @@ const MITARBEITER_OBJEKT_FIELDS = [
   "status2",
   "benutzer",
   "ind_3402_Feld_ObjTech528",
+  "ind_3356_Feld_ObjTech505",
+  "strasse",
+  "hausnummer",
+  "plz",
+  "ort",
 ];
 
 // Manche Objekte existieren in OnOffice als exaktes Duplikat desselben tatsächlichen Verkaufs —
@@ -1563,12 +1574,39 @@ function parseProvisionsProzent(wert?: string | number): number | null {
 // rausgerechnet werden um die reale Provision zu sehen").
 const MWST_FAKTOR = 1.19;
 
+// "0000-00-00" und leere Werte sind OnOffices NULL für Datumsfelder.
+function datumOderNull(wert?: string): string | null {
+  return wert && wert !== "0000-00-00" ? wert.slice(0, 10) : null;
+}
+
+// Nutzer-Nr-Felder liefern "0" oder "", wenn niemand eingetragen ist.
+function nutzerNrOderNull(wert?: string): string | null {
+  return wert && wert !== "0" ? String(wert) : null;
+}
+
+// Adresse, Daten und Personen für die Objektlisten (siehe MitarbeiterObjekt in types/index.ts) —
+// gemeinsam für Kauf- und Mietobjekte.
+function listenAngaben(el: RawMitarbeiterObjektRecord["elements"]) {
+  return {
+    strasse: (el.strasse ?? "").trim(),
+    hausnummer: (el.hausnummer ?? "").trim(),
+    plz: el.plz ?? "",
+    ort: el.ort ?? "",
+    verkauftAm: datumOderNull(el.verkauft_am),
+    auftragVon: datumOderNull(el.auftragvon),
+    akquisiteurNr: nutzerNrOderNull(el.ind_3402_Feld_ObjTech528),
+    setterNr: nutzerNrOderNull(el.ind_3356_Feld_ObjTech505),
+    betreuerNr: nutzerNrOderNull(el.benutzer),
+  };
+}
+
 function mapMitarbeiterObjekt(record: RawMitarbeiterObjektRecord): MitarbeiterObjekt {
   const el = record.elements;
   const preis = Number(el.kaufpreis) || 0;
 
   const aussenProzent = parseProvisionsProzent(el.prozent_aussenprovision);
   const innenProzent = parseProvisionsProzent(el.prozent_innenprovision);
+  const nettoBetrag = (prozent: number | null) => (prozent === null ? null : (preis * prozent) / 100 / MWST_FAKTOR);
   // Nur berechnen, wenn BEIDE Felder einen auswertbaren Prozentsatz enthalten — fehlt eines,
   // wäre die Summe unvollständig und damit irreführend, siehe provisionsvorlaufFehlt.
   const provisionsvorlaufFehlt = aussenProzent === null || innenProzent === null;
@@ -1585,7 +1623,34 @@ function mapMitarbeiterObjekt(record: RawMitarbeiterObjektRecord): MitarbeiterOb
     titelbildUrl: null,
     provisionsvorlauf,
     provisionsvorlaufFehlt,
+    aussenProvisionProzent: aussenProzent,
+    innenProvisionProzent: innenProzent,
+    aussenProvision: nettoBetrag(aussenProzent),
+    innenProvision: nettoBetrag(innenProzent),
+    ...listenAngaben(el),
   };
+}
+
+// Vor- und Nachname aller OnOffice-Nutzer, nach Nutzer-Nr — für die Spalten Akquise, Setting und
+// Betreuer der Objektlisten. Ein Abruf für alle statt je Objekt; Nutzer, die nicht im TEAM
+// stehen (z. B. ehemalige Mitarbeiter), werden so ebenfalls aufgelöst.
+export async function ladeNutzerNamen(): Promise<Record<string, string>> {
+  const result = await callOnOfficeApi<RawUserNameRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "user",
+      resourceid: "",
+      identifier: "",
+      cacheable: true,
+      parameters: { data: ["Vorname", "Nachname"], listlimit: 500 },
+    },
+  ]);
+  const namen: Record<string, string> = {};
+  for (const r of result?.response?.results?.[0]?.data?.records || []) {
+    const name = `${r.elements?.Vorname?.trim() ?? ""} ${r.elements?.Nachname?.trim() ?? ""}`.trim();
+    if (name) namen[String(r.id)] = name;
+  }
+  return namen;
 }
 
 // Mapping-Variante für Vermietungsobjekte (vermarktungsart=miete, siehe
@@ -1606,6 +1671,11 @@ function mapMitarbeiterVermietung(record: RawMitarbeiterObjektRecord): Mitarbeit
     titelbildUrl: null,
     provisionsvorlauf: null,
     provisionsvorlaufFehlt: false,
+    aussenProvisionProzent: null,
+    innenProvisionProzent: null,
+    aussenProvision: null,
+    innenProvision: null,
+    ...listenAngaben(el),
   };
 }
 
