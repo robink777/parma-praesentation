@@ -1203,7 +1203,7 @@ export async function zaehleVerkaufteObjekteFuerMitarbeiter(
   von: string,
   bis: string
 ): Promise<number> {
-  return (await ladeVerkaufteRecords(nutzerNr, von, bis)).length;
+  return (await nurGezaehlteVerkaeufe(await ladeVerkaufteRecords(nutzerNr, von, bis))).length;
 }
 
 async function ladeVerkaufteRecords(nutzerNr: string, von: string, bis: string) {
@@ -1213,6 +1213,7 @@ async function ladeVerkaufteRecords(nutzerNr: string, von: string, bis: string) 
       objekttitel?: string;
       verkauft_am?: string;
       status2?: string;
+      benutzer?: string;
       ind_3402_Feld_ObjTech528?: string;
     };
   }>([
@@ -1223,7 +1224,7 @@ async function ladeVerkaufteRecords(nutzerNr: string, von: string, bis: string) 
       identifier: "",
       cacheable: false,
       parameters: {
-        data: ["Id", "objekttitel", "verkauft_am", "status2", "ind_3402_Feld_ObjTech528"],
+        data: ["Id", "objekttitel", "verkauft_am", "status2", "benutzer", "ind_3402_Feld_ObjTech528"],
         filter: {
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
@@ -1240,9 +1241,23 @@ async function ladeVerkaufteRecords(nutzerNr: string, von: string, bis: string) 
   return dedupliziereVerkaufteObjekte(records);
 }
 
+// Stichtag der vollständigen Verkaufsregel (Nutzer-Vorgabe November 2026: "Jetzt gerade hätte ich
+// gerne Datenwahrheit ab dem 1.11."). Ältere Verkäufe zählen weiter allein über verkauft_am, bis
+// sie rückwirkend anhand der Kaufverträge geprüft sind — sonst fielen die meisten echten Verkäufe
+// 2026 heraus, weil es den Status "in Übergabe" vorher nicht gab.
+export const VERKAUFSREGEL_AB = "2026-11-01";
+
 // Rückfall-Status nach geplatztem Notartermin (Nutzer-Vorgabe November 2026): Aktiv / Reserviert,
 // Aktiv / Aktive Vermarktung, Archiviert / Auftrag verloren.
-const STATUS2_VERKAUF_GEPLATZT = ["reserviert", "aktive_vermarktung", "auftrag_entzogen"];
+const STATUS2_VERKAUF_GEPLATZT: Record<string, string> = {
+  reserviert: "Aktiv / Reserviert",
+  aktive_vermarktung: "Aktiv / Aktive Vermarktung",
+  auftrag_entzogen: "Archiviert / Auftrag verloren",
+};
+
+// Nur dieser Wechsel zählt (Nutzer-Vorgabe): von Aktive Vermarktung oder Reserviert auf
+// in Übergabe. Ein Wechsel aus leerem Status 2 zählt nicht, Status 2 muss vorher gepflegt sein.
+const WECHSEL_IN_UEBERGABE = /Status2 "(Aktive Vermarktung|Reserviert)" -> "in Übergabe"/;
 
 // Maklerbuch-Einträge lassen sich nicht nach Objekt filtern ("Objekt_nr" liefert live den Fehler
 // "Unknown field", Code 141), deshalb seitenweise über den Zeitraum.
@@ -1288,10 +1303,24 @@ function objektNummern(zeilen: Awaited<ReturnType<typeof ladeMaklerbuchSeiten>>)
   return new Set(zeilen.flatMap((z) => [z.Objekt_nr ?? []].flat().map(String)));
 }
 
-// Dauerhafte Nachweise aus dem Maklerbuch für zaehleVollstaendigeVerkaeufe: Sie bleiben bestehen,
-// wenn das Objekt später weiterzieht. Einmal je Aktualisierung für alle Teilnehmer geladen, nicht
-// je Person, damit die Zahl der Abrufe auch bei einer Jahressaison nicht wächst.
-export async function ladeVerkaufsNachweise(von: string): Promise<VerkaufsNachweise> {
+// Übersicht, zwölf Mitarbeiterzeilen, Kontrollseite und Wettkampf brauchen bei jeder
+// Aktualisierung dieselben Nachweise — kurz zwischengespeichert, damit das Maklerbuch nicht
+// mehrfach seitenweise gelesen wird.
+const NACHWEIS_CACHE_MS = 60 * 1000;
+const nachweisCache = new Map<string, { geladenAm: number; nachweise: Promise<VerkaufsNachweise> }>();
+
+// Dauerhafte Nachweise aus dem Maklerbuch für verkaufsMaengel: Sie bleiben bestehen, wenn das
+// Objekt später weiterzieht.
+export function ladeVerkaufsNachweise(von: string): Promise<VerkaufsNachweise> {
+  const eintrag = nachweisCache.get(von);
+  if (eintrag && Date.now() - eintrag.geladenAm < NACHWEIS_CACHE_MS) return eintrag.nachweise;
+  const nachweise = ladeVerkaufsNachweiseOhneCache(von);
+  nachweisCache.set(von, { geladenAm: Date.now(), nachweise });
+  nachweise.catch(() => nachweisCache.delete(von));
+  return nachweise;
+}
+
+async function ladeVerkaufsNachweiseOhneCache(von: string): Promise<VerkaufsNachweise> {
   const jetzt = new Date();
   const start = new Date(Date.parse(`${von}T00:00:00Z`) - NACHWEIS_VORLAUF_TAGE * 24 * 60 * 60 * 1000);
   const ab = { op: ">=", val: `${start.toISOString().slice(0, 10)} 00:00:00` };
@@ -1308,42 +1337,97 @@ export async function ladeVerkaufsNachweise(von: string): Promise<VerkaufsNachwe
     }),
   ]);
   return {
-    mitUebergabe: objektNummern(uebergaben),
+    mitUebergabe: objektNummern(uebergaben.filter((z) => WECHSEL_IN_UEBERGABE.test(z.Bemerkung ?? ""))),
     mitNotartermin: objektNummern(notartermine.filter((t) => !TERMIN_AUSGEFALLEN.test(t.Bemerkung ?? ""))),
   };
 }
 
-// Zählt Verkäufe für die Wettkampf-Punkte. Nutzer-Vorgabe November 2026, ein Verkauf braucht:
-// 1. einen stattgefundenen Notartermin am Objekt, 2. Status 1 Aktiv / Status 2 in Übergabe,
-// 3. verkauft_am, 4. Betreuer und Akquisiteur. Punkte bekommt nur der Betreuer, der Akquisiteur
-// ist eine indirekte Kontrolle der Datenpflege.
+interface VerkaufsPruefRecord {
+  id: string | number;
+  elements: { verkauft_am?: string; status2?: string; benutzer?: string; ind_3402_Feld_ObjTech528?: string };
+}
+
+// Pflichtbedingungen für einen gezählten Verkauf ab VERKAUFSREGEL_AB (Nutzer-Vorgabe November
+// 2026): verkauft_am (bereits durch die Abfrage gesichert), Wechsel von Aktive Vermarktung oder
+// Reserviert auf in Übergabe, stattgefundener Notartermin am Objekt, Akquisiteur und Betreuer.
+// Gilt einheitlich für Übersicht, Mitarbeiterstatistik, Kontrollseite und Wettkampf. Käufer und
+// Verkäufer sind bewusst keine Bedingung, sondern nur Warnhinweise auf der Kontrollseite.
 //
-// Punkt 1 und 2 kommen aus dem Maklerbuch statt aus dem aktuellen Status (siehe
+// Wechsel und Notartermin kommen aus dem Maklerbuch statt aus dem aktuellen Status (siehe
 // ladeVerkaufsNachweise): Live laufen Objekte danach auch ohne Status 2 ins Archiv (VK1319) oder
-// werden später umgestellt (LO 1269 nach Notartermin und Verkauft auf Akquise - Absage). Punkte
-// entfallen deshalb nur bei den drei Rückfall-Status nach einem geplatzten Termin.
-//
-// Die Admin-Statistik (zaehleVerkaufteObjekteFuerMitarbeiter oben) bleibt bewusst ohne diese
-// Prüfung: Sie enthält auch Verkäufe von vor Einführung des Status "in Übergabe".
+// werden später umgestellt (LO 1269 nach Notartermin und Verkauft auf Akquise - Absage). Ein
+// späterer Status zählt deshalb nur bei den drei Rückfall-Status nach einem geplatzten Termin.
+export function verkaufsMaengel(record: VerkaufsPruefRecord, nachweise: VerkaufsNachweise): string[] {
+  const objekt = String(record.id);
+  const el = record.elements;
+  const maengel: string[] = [];
+  if (!nachweise.mitUebergabe.has(objekt)) {
+    maengel.push("Kein Wechsel von Aktive Vermarktung oder Reserviert auf in Übergabe");
+  }
+  if (!nachweise.mitNotartermin.has(objekt)) maengel.push("Kein Notartermin am Objekt");
+  if (!(Number(el.ind_3402_Feld_ObjTech528 ?? 0) > 0)) maengel.push("Akquisiteur fehlt");
+  if (!(Number(el.benutzer ?? 0) > 0)) maengel.push("Betreuer fehlt");
+  const rueckfall = STATUS2_VERKAUF_GEPLATZT[el.status2 ?? ""];
+  if (rueckfall) maengel.push(`Steht wieder auf ${rueckfall}`);
+  return maengel;
+}
+
+function faelltUnterVerkaufsregel(record: VerkaufsPruefRecord): boolean {
+  return (record.elements.verkauft_am ?? "") >= VERKAUFSREGEL_AB;
+}
+
+// Nachweise ab dem Stichtag bzw. ab dem 1.1. des jüngeren Jahres, damit alle Aufrufer im selben
+// Jahr denselben Cache-Eintrag treffen und das Maklerbuch nicht über Jahre wächst.
+function nachweisStart(datum: string): string {
+  const jahresbeginn = `${datum.slice(0, 4)}-01-01`;
+  return jahresbeginn > VERKAUFSREGEL_AB ? jahresbeginn : VERKAUFSREGEL_AB;
+}
+
+// Lässt Verkäufe vor VERKAUFSREGEL_AB unverändert durch und behält ab dem Stichtag nur die, die
+// alle Pflichtbedingungen erfüllen.
+async function nurGezaehlteVerkaeufe<T extends VerkaufsPruefRecord>(records: T[]): Promise<T[]> {
+  const neue = records.filter(faelltUnterVerkaufsregel);
+  if (neue.length === 0) return records;
+  const fruehestes = neue.map((r) => r.elements.verkauft_am ?? "").sort()[0];
+  const nachweise = await ladeVerkaufsNachweise(nachweisStart(fruehestes));
+  return records.filter((r) => !faelltUnterVerkaufsregel(r) || verkaufsMaengel(r, nachweise).length === 0);
+}
+
+// Zählt Verkäufe für die Wettkampf-Punkte (Saison ab 1.11.2026, also vollständig unter der
+// Verkaufsregel). Punkte bekommt nur der Betreuer.
 export async function zaehleVollstaendigeVerkaeufe(
   nutzerNr: string,
   von: string,
   bis: string,
   nachweise: Promise<VerkaufsNachweise>
 ): Promise<number> {
-  const [records, { mitUebergabe, mitNotartermin }] = await Promise.all([
-    ladeVerkaufteRecords(nutzerNr, von, bis),
-    nachweise,
+  const [records, geladeneNachweise] = await Promise.all([ladeVerkaufteRecords(nutzerNr, von, bis), nachweise]);
+  return records.filter((r) => verkaufsMaengel(r, geladeneNachweise).length === 0).length;
+}
+
+// Objekte (aus `estateIds`), mit denen mindestens eine Adresse als Käufer bzw. Eigentümer
+// verknüpft ist — für die Warnhinweise auf der Kontrollseite. Ein Abruf für alle Objekte.
+async function ladeObjekteMitVerknuepfung(estateIds: string[], typ: "buyer" | "owner"): Promise<Set<string>> {
+  if (estateIds.length === 0) return new Set();
+  const result = await callOnOfficeApi<RawRelationRecord>([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:get",
+      resourcetype: "idsfromrelation",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        relationtype: `urn:onoffice-de-ns:smart:2.5:relationTypes:estate:address:${typ}`,
+        parentids: estateIds.map(Number),
+      },
+    },
   ]);
-  return records.filter((r) => {
-    const objekt = String(r.id);
-    return (
-      mitUebergabe.has(objekt) &&
-      mitNotartermin.has(objekt) &&
-      Number(r.elements.ind_3402_Feld_ObjTech528 ?? 0) > 0 &&
-      !STATUS2_VERKAUF_GEPLATZT.includes(r.elements.status2 ?? "")
-    );
-  }).length;
+  const elemente = result?.response?.results?.[0]?.data?.records?.[0]?.elements ?? {};
+  return new Set(
+    Object.entries(elemente)
+      .filter(([, ids]) => Array.isArray(ids) && ids.length > 0)
+      .map(([id]) => id)
+  );
 }
 
 // Leichte Objekt-Kennung für die aufklappbare Objektliste je Mitarbeiter (Admin-Bereich, siehe
@@ -1393,6 +1477,9 @@ interface RawMitarbeiterObjektRecord {
     // MITARBEITER_OBJEKT_FIELDS-Katalog).
     verkauft_am?: string;
     status2?: string;
+    // Für die Verkaufsregel ab VERKAUFSREGEL_AB (siehe verkaufsMaengel): Betreuer und Akquisiteur.
+    benutzer?: string;
+    ind_3402_Feld_ObjTech528?: string;
   };
 }
 
@@ -1407,6 +1494,8 @@ const MITARBEITER_OBJEKT_FIELDS = [
   "kaltmiete",
   "verkauft_am",
   "status2",
+  "benutzer",
+  "ind_3402_Feld_ObjTech528",
 ];
 
 // Manche Objekte existieren in OnOffice als exaktes Duplikat desselben tatsächlichen Verkaufs —
@@ -1693,7 +1782,7 @@ export async function ladeVerkaufteObjekteFuerMitarbeiter(
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records || [];
-  return dedupliziereVerkaufteObjekte(records).map(mapMitarbeiterObjekt);
+  return (await nurGezaehlteVerkaeufe(dedupliziereVerkaufteObjekte(records))).map(mapMitarbeiterObjekt);
 }
 
 // Deutlich über dem live beobachteten Gesamtbestand (Juli 2026: rund 103 aktive + 22 in
@@ -1800,7 +1889,7 @@ export async function ladeAlleVerkauftenObjekte(
     },
   ]);
   const records = result?.response?.results?.[0]?.data?.records || [];
-  return dedupliziereVerkaufteObjekte(records).map(mapMitarbeiterObjekt);
+  return (await nurGezaehlteVerkaeufe(dedupliziereVerkaufteObjekte(records))).map(mapMitarbeiterObjekt);
 }
 
 interface RawKontrollRecord {
@@ -1813,6 +1902,7 @@ interface RawKontrollRecord {
     status2?: string;
     verkauft_am?: string;
     benutzer?: string;
+    ind_3402_Feld_ObjTech528?: string;
     prozent_aussenprovision?: string | number;
     prozent_innenprovision?: string | number;
   };
@@ -1829,6 +1919,7 @@ const KONTROLL_FIELDS = [
   "benutzer",
   "prozent_aussenprovision",
   "prozent_innenprovision",
+  "ind_3402_Feld_ObjTech528",
 ];
 
 // Klartext von "Status 1" (Live-Feldkatalog geprüft, August 2026: permittedvalues 0/1/2).
@@ -1893,6 +1984,9 @@ async function ladeKontrollRecordsSeite(offset: number): Promise<RawKontrollReco
 //    identischem Verkaufsdatum (dasselbe Kriterium wie dedupliziereVerkaufteObjekte oben, hier
 //    aber bewusst NICHT still bereinigt, sondern als Problem ausgewiesen, damit der Duplikat-Fall
 //    selbst in OnOffice bereinigt werden kann).
+// 4. Verkäufe ab VERKAUFSREGEL_AB: jede fehlende Pflichtbedingung (siehe verkaufsMaengel) als
+//    Problem "Verkauf zählt nicht", fehlender Käufer oder Verkäufer nur als Hinweis (Nutzer-
+//    Vorgabe November 2026: "nicht code-relevant ... einfach nur als Warnhinweis").
 export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
   const alle: RawKontrollRecord[] = [];
   let offset = 0;
@@ -1920,10 +2014,26 @@ export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
     if (gruppe.length > 1) gruppe.forEach((record) => duplikatIds.add(record.id));
   }
 
+  const neueVerkaeufe = alle.filter(faelltUnterVerkaufsregel);
+  const neueIds = neueVerkaeufe.map((record) => String(record.id));
+  const fruehestes = neueVerkaeufe.map((r) => r.elements.verkauft_am ?? "").sort()[0];
+  const [nachweise, mitKaeufer, mitVerkaeufer] = await Promise.all([
+    fruehestes ? ladeVerkaufsNachweise(nachweisStart(fruehestes)) : null,
+    ladeObjekteMitVerknuepfung(neueIds, "buyer"),
+    ladeObjekteMitVerknuepfung(neueIds, "owner"),
+  ]);
+
   const ergebnis: KontrollObjekt[] = [];
   for (const record of alle) {
     const el = record.elements;
     const probleme: string[] = [];
+    const hinweise: string[] = [];
+
+    if (nachweise && faelltUnterVerkaufsregel(record)) {
+      for (const mangel of verkaufsMaengel(record, nachweise)) probleme.push(`Verkauf zählt nicht: ${mangel}`);
+      if (!mitKaeufer.has(String(record.id))) hinweise.push("Käufer fehlt");
+      if (!mitVerkaeufer.has(String(record.id))) hinweise.push("Verkäufer fehlt");
+    }
 
     const verkauftAmGueltig = !!el.verkauft_am && el.verkauft_am !== "0000-00-00";
 
@@ -1951,7 +2061,7 @@ export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
       probleme.push("Möglicherweise doppelt angelegt");
     }
 
-    if (probleme.length === 0) continue;
+    if (probleme.length === 0 && hinweise.length === 0) continue;
 
     ergebnis.push({
       id: String(record.id),
@@ -1960,6 +2070,7 @@ export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
       mitarbeiter: TEAM.find((t) => t.nutzerNr === el.benutzer)?.name ?? null,
       statusLabel: STATUS_LABELS[el.status ?? ""] ?? "Unbekannt",
       probleme,
+      hinweise,
     });
   }
 

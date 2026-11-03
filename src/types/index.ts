@@ -490,6 +490,8 @@ export interface KontrollObjekt {
   // Menschenlesbare Problembeschreibungen, z.B. "Provisionsangabe fehlt",
   // "Status widerspricht Verkaufsdatum (Aktive Vermarktung)", "Möglicherweise doppelt angelegt".
   probleme: string[];
+  // Nur Warnhinweise, die nichts an der Zählung ändern, z.B. "Käufer fehlt".
+  hinweise: string[];
 }
 
 // Einzelnes Objekt innerhalb einer PLZ-Fläche, für die Objektliste im "PLZ"-Navi-Bereich (siehe

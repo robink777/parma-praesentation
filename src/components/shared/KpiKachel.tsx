@@ -194,8 +194,8 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       akzent: "chart-1",
       href: href("verkauftJahr"),
       info: info(
-        ["verkauft_am", "vermarktungsart"],
-        "Anzahl Objekte im laufenden Kalenderjahr. Bewusst OHNE Status-2-Filter (verkauft_am ist zuverlässiger gepflegt als Status 2), exakte Duplikate bereinigt."
+        ["verkauft_am", "vermarktungsart", "status2", "benutzer", "ind_3402_Feld_ObjTech528"],
+        "Kaufobjekte mit Verkaufsdatum im laufenden Kalenderjahr, exakte Duplikate bereinigt. Ab 1.11.2026 zählt ein Verkauf nur mit Wechsel von Aktive Vermarktung oder Reserviert auf in Übergabe, verknüpftem Notartermin, Akquisiteur und Betreuer. Ältere Verkäufe zählen allein über das Verkaufsdatum, bis sie rückwirkend geprüft sind."
       ),
     },
     {

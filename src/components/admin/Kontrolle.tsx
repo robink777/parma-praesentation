@@ -32,6 +32,16 @@ function KontrollZeile({ objekt }: { objekt: KontrollObjekt }) {
             {problem}
           </span>
         ))}
+        {/* Hinweise ändern nichts an der Zählung, deshalb in der milderen Status-Farbe "warnung". */}
+        {objekt.hinweise.map((hinweis) => (
+          <span
+            key={hinweis}
+            className="inline-flex items-center gap-[4px] rounded-sm bg-status-warnung/10 px-sm py-[3px] text-small font-medium text-status-warnung"
+          >
+            <Icon name="warning" size={13} />
+            {hinweis}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -70,12 +80,22 @@ export function Kontrolle({ objekte }: { objekte?: KontrollObjekt[] }) {
         <span>
           {zahlenformat.format(objekte.length)} Objekt{objekte.length === 1 ? "" : "e"} mit
           erkannten Auffälligkeiten — fehlende Provisionsangabe, ein Status, der einem bereits
-          gesetzten Verkaufsdatum widerspricht, oder ein möglicherweise doppelt angelegtes Objekt.
+          gesetzten Verkaufsdatum widerspricht, ein möglicherweise doppelt angelegtes Objekt oder
+          ein Verkauf ab dem 1.11.2026, dem eine Pflichtangabe fehlt. Rot zählt nicht, Gelb ist nur
+          ein Hinweis.
         </span>
         <InfoTooltip
-          felder={["prozent_aussenprovision", "prozent_innenprovision", "verkauft_am", "status2", "objekttitel"]}
+          felder={[
+            "prozent_aussenprovision",
+            "prozent_innenprovision",
+            "verkauft_am",
+            "status2",
+            "objekttitel",
+            "benutzer",
+            "ind_3402_Feld_ObjTech528",
+          ]}
           text={
-            'Drei geprüfte Regeln: (1) "Provisionsangabe fehlt" — Provisionsfelder leer oder nicht auswertbar. (2) "Status widerspricht Verkaufsdatum" — verkauft_am ist gesetzt, status2 steht aber noch auf einem aktiven/Vorbereitungs-Wert. (3) "Möglicherweise doppelt angelegt" — zwei Datensätze mit identischem Objekttitel UND identischem Verkaufsdatum.'
+            'Vier geprüfte Regeln: (1) "Provisionsangabe fehlt" — Provisionsfelder leer oder nicht auswertbar. (2) "Status widerspricht Verkaufsdatum" — verkauft_am ist gesetzt, status2 steht aber noch auf einem aktiven/Vorbereitungs-Wert. (3) "Möglicherweise doppelt angelegt" — zwei Datensätze mit identischem Objekttitel UND identischem Verkaufsdatum. (4) Verkäufe ab 1.11.2026 zählen nur mit Wechsel von Aktive Vermarktung oder Reserviert auf in Übergabe, verknüpftem Notartermin, Akquisiteur und Betreuer; fehlt eines davon, steht "Verkauf zählt nicht". Fehlende Verknüpfung zu Käufer oder Verkäufer erscheint nur als gelber Hinweis.'
           }
           breit
           className="mt-[3px]"
