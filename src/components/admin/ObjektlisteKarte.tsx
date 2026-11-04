@@ -92,14 +92,17 @@ function PersonZelle({ nr, namen, pflicht }: { nr: string | null; namen: Record<
   return <td className="whitespace-nowrap px-xs py-[6px] text-anthrazit">{namen[nr] ?? `Nutzer ${nr}`}</td>;
 }
 
-// Verkaufte Objekte zeigen den tatsächlichen Kaufpreis und darunter immer den Angebotspreis in der
-// Akzentfarbe, auch wenn beide gleich sind (Nutzer-Vorgabe November 2026: "zeig bitte trotzdem beides
-// an und markiere den angebotspreis mit der Akzentfarbe").
+// Verkaufte Objekte zeigen den tatsächlichen Kaufpreis und darunter immer den Angebotspreis. In der
+// Akzentfarbe nur, wenn zum vollen Angebotspreis verkauft wurde (Nutzer-Vorgabe November 2026): Ein
+// Abschlag ist der Normalfall und braucht kein Signal, der volle Preis ist die Ausnahme.
 function PreisZelle({ objekt }: { objekt: MitarbeiterObjekt }) {
   const zusatz = (text: string) => <span className="block text-[11px] text-anthrazit/50">{text}</span>;
+  const vollerPreis = !objekt.kaufpreisFehlt && objekt.angebotspreis === objekt.preis;
   const angebot =
     objekt.angebotspreis > 0 ? (
-      <span className="block text-[11px] font-medium text-messing">Angebot {formatiereBetrag(objekt.angebotspreis)}</span>
+      <span className={`block text-[11px] ${vollerPreis ? "font-medium text-messing" : "text-anthrazit/50"}`}>
+        Angebot {formatiereBetrag(objekt.angebotspreis)}
+      </span>
     ) : null;
   if (objekt.istVermietung) {
     return (
