@@ -92,9 +92,15 @@ function PersonZelle({ nr, namen, pflicht }: { nr: string | null; namen: Record<
   return <td className="whitespace-nowrap px-xs py-[6px] text-anthrazit">{namen[nr] ?? `Nutzer ${nr}`}</td>;
 }
 
-// Verkaufte Objekte zeigen den tatsächlichen Kaufpreis, darunter den Angebotspreis, wenn er abweicht.
+// Verkaufte Objekte zeigen den tatsächlichen Kaufpreis und darunter immer den Angebotspreis in der
+// Akzentfarbe, auch wenn beide gleich sind (Nutzer-Vorgabe November 2026: "zeig bitte trotzdem beides
+// an und markiere den angebotspreis mit der Akzentfarbe").
 function PreisZelle({ objekt }: { objekt: MitarbeiterObjekt }) {
   const zusatz = (text: string) => <span className="block text-[11px] text-anthrazit/50">{text}</span>;
+  const angebot =
+    objekt.angebotspreis > 0 ? (
+      <span className="block text-[11px] font-medium text-messing">Angebot {formatiereBetrag(objekt.angebotspreis)}</span>
+    ) : null;
   if (objekt.istVermietung) {
     return (
       <td className="whitespace-nowrap px-xs py-[6px] text-right text-anthrazit">
@@ -107,14 +113,14 @@ function PreisZelle({ objekt }: { objekt: MitarbeiterObjekt }) {
     return (
       <td className="whitespace-nowrap px-xs py-[6px] text-right">
         <span className="font-medium text-status-warnung">Tats. Kaufpreis fehlt</span>
-        {objekt.angebotspreis > 0 && zusatz(`Angebot ${formatiereBetrag(objekt.angebotspreis)}`)}
+        {angebot}
       </td>
     );
   }
   return (
     <td className="whitespace-nowrap px-xs py-[6px] text-right text-anthrazit">
       {formatiereBetrag(objekt.preis)}
-      {objekt.angebotspreis > 0 && objekt.angebotspreis !== objekt.preis && zusatz(`Angebot ${formatiereBetrag(objekt.angebotspreis)}`)}
+      {angebot}
     </td>
   );
 }
@@ -287,8 +293,8 @@ export function ObjektlisteKarte({
 
       <p className="mt-sm text-[11px] text-anthrazit/50">
         Provisionen netto (÷ 1,19) auf den Kaufpreis, bei verkauften Objekten auf den tatsächlichen Kaufpreis.
-        Vermietungen mit 2 Kaltmieten; ihre Kaltmiete zählt nicht zur Kaufpreis-Summe. „Provision“ zählt nur Objekte
-        mit Außen- und Innenprovision, deshalb kann die Summe kleiner sein als Außen- plus Innenprovision.
+        Vermietungen mit 2 Kaltmieten; ihre Kaltmiete zählt nicht zur Kaufpreis-Summe. Eine Seite darf 0 % haben
+        (Provision nur von einer Seite); „fehlt“ heißt, dass keine Seite einen Satz hat.
       </p>
     </Card>
   );

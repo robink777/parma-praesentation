@@ -1563,14 +1563,21 @@ function berechneVermarktungsdauerTage(auftragvon?: string): number | null {
 }
 
 // prozent_aussenprovision/prozent_innenprovision liefern von OnOffice bereits eine Zahl als
-// String (z.B. "3.5700"), aber bei unbefüllten Objekten "0.0000" statt eines leeren Werts — ein
-// Provisionssatz von exakt 0% ist im hier betreuten Bestand geschäftlich nicht plausibel (siehe
-// die Auswahlwerte des Felds "Maklerprovision" im Feldkatalog, die alle > 0 liegen), daher wird
-// 0 bzw. ein nicht als Zahl interpretierbarer Wert bewusst wie "nicht gepflegt" behandelt.
-function parseProvisionsProzent(wert?: string | number): number | null {
-  const zahl = Number(wert);
-  if (!Number.isFinite(zahl) || zahl <= 0) return null;
-  return zahl;
+// String (z.B. "3.5700"), bei unbefüllten Objekten aber "0.0000" statt eines leeren Werts. Eine 0
+// ist trotzdem ein gültiger Satz (Nutzer-Vorgabe November 2026: "0 muss auch ein möglicher
+// eingabewert sein da bei manchen geschäften nur von einer seite provision genommen wird", z.B.
+// KW508 mit Rechnung nur an den Käufer). Als "nicht gepflegt" gilt deshalb nur, wenn KEINE Seite
+// einen Satz über 0 hat; sonst zählt die leere Seite als 0 %.
+function provisionsSaetze(
+  aussen?: string | number,
+  innen?: string | number
+): { aussen: number; innen: number } | null {
+  const satz = (wert?: string | number) => {
+    const zahl = Number(wert);
+    return Number.isFinite(zahl) && zahl > 0 ? zahl : 0;
+  };
+  const saetze = { aussen: satz(aussen), innen: satz(innen) };
+  return saetze.aussen > 0 || saetze.innen > 0 ? saetze : null;
 }
 
 // MwSt.-Satz, um aus dem in OnOffice hinterlegten Brutto-Prozentsatz (üblicherweise 3,57 % = 3 %
@@ -1632,15 +1639,13 @@ function mapVerkauftesObjekt(record: RawMitarbeiterObjektRecord): MitarbeiterObj
 function mapKaufobjekt(record: RawMitarbeiterObjektRecord, preis: number): MitarbeiterObjekt {
   const el = record.elements;
 
-  const aussenProzent = parseProvisionsProzent(el.prozent_aussenprovision);
-  const innenProzent = parseProvisionsProzent(el.prozent_innenprovision);
+  const saetze = provisionsSaetze(el.prozent_aussenprovision, el.prozent_innenprovision);
+  const aussenProzent = saetze?.aussen ?? null;
+  const innenProzent = saetze?.innen ?? null;
   const nettoBetrag = (prozent: number | null) => (prozent === null ? null : (preis * prozent) / 100 / MWST_FAKTOR);
-  // Nur berechnen, wenn BEIDE Felder einen auswertbaren Prozentsatz enthalten — fehlt eines,
-  // wäre die Summe unvollständig und damit irreführend, siehe provisionsvorlaufFehlt.
-  const provisionsvorlaufFehlt = aussenProzent === null || innenProzent === null;
-  const provisionsvorlauf = provisionsvorlaufFehlt
-    ? null
-    : (preis * ((aussenProzent as number) + (innenProzent as number))) / 100 / MWST_FAKTOR;
+  // Fehlt nur, wenn keine Seite einen Satz hat (siehe provisionsSaetze).
+  const provisionsvorlaufFehlt = saetze === null;
+  const provisionsvorlauf = saetze === null ? null : (preis * (saetze.aussen + saetze.innen)) / 100 / MWST_FAKTOR;
 
   return {
     id: String(record.id),
@@ -2100,7 +2105,7 @@ async function ladeKontrollRecordsSeite(offset: number): Promise<RawKontrollReco
 //
 // Geprüfte Probleme (siehe KontrollObjekt in types/index.ts):
 // 1. Provisionsangabe fehlt — dieselbe Prüfung wie MitarbeiterObjekt.provisionsvorlaufFehlt
-//    (siehe parseProvisionsProzent/mapMitarbeiterObjekt oben), hier unternehmensweit statt nur
+//    (siehe provisionsSaetze/mapMitarbeiterObjekt oben), hier unternehmensweit statt nur
 //    für aktive/in Aufarbeitung befindliche Objekte.
 // 2. Status widerspricht Verkaufsdatum — verkauft_am ist gesetzt, status2 sagt aber noch
 //    "aktiv"/"in Vorbereitung" (siehe STATUS2_NOCH_AKTIV_LABELS oben). Genau das Muster, das der
@@ -2173,9 +2178,7 @@ export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
     // endgültig abgesagte/verlorene Vorgänge, für die nie eine Provision anfallen wird.
     const potenziellRelevant =
       el.status === "1" || el.status2 === "vorbereitung" || verkauftAmGueltig;
-    const aussenProzent = parseProvisionsProzent(el.prozent_aussenprovision);
-    const innenProzent = parseProvisionsProzent(el.prozent_innenprovision);
-    if (potenziellRelevant && (aussenProzent === null || innenProzent === null)) {
+    if (potenziellRelevant && provisionsSaetze(el.prozent_aussenprovision, el.prozent_innenprovision) === null) {
       probleme.push("Provisionsangabe fehlt");
     }
     if (verkauftAmGueltig && el.status2 && STATUS2_NOCH_AKTIV_LABELS[el.status2]) {

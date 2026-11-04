@@ -365,13 +365,12 @@ export interface MitarbeiterObjekt {
   // URL des Titelbilds (siehe ladeTitelbilder in estate.ts) — null, wenn kein Bild hinterlegt ist.
   titelbildUrl: string | null;
   // Provisionsvorlauf = (Außen-Provision % + Innen-Provision %) auf den Kaufpreis, abzüglich
-  // 19% MwSt. (siehe parseProvisionsProzent/mapMitarbeiterObjekt in onoffice/estate.ts, Juli 2026
+  // 19% MwSt. (siehe provisionsSaetze/mapMitarbeiterObjekt in onoffice/estate.ts, Juli 2026
   // Chat-Vorgabe). null, wenn nicht berechenbar — siehe provisionsvorlaufFehlt für den Grund.
   provisionsvorlauf: number | null;
-  // true, wenn aussen_courtage/innen_courtage in OnOffice leer sind ODER sich nicht als
-  // Prozentsatz auswerten lassen (z.B. Freitext-Tippfehler wie "2 KM") — die Statistik-UI zeigt
-  // dafür einen eigenen Hinweis statt eines schlichten "–", um "Feld in OnOffice nicht gepflegt"
-  // von "Wert ist 0" zu unterscheiden (Chat-Vorgabe).
+  // true, wenn weder Außen- noch Innenprovision einen Satz über 0 hat (eine Seite mit 0 % ist
+  // erlaubt, siehe provisionsSaetze) oder bei verkauften Objekten der tatsächliche Kaufpreis
+  // fehlt — die Statistik-UI zeigt dafür einen eigenen Hinweis statt eines schlichten "–".
   provisionsvorlaufFehlt: boolean;
   // Für die Objektlisten hinter den KPI-Kacheln (Nutzer-Vorgabe November 2026, Abgleich mit den
   // Excel-Listen der Buchhaltung): Sortierung nach Monat oder Straße, Außen-/Innenprovision

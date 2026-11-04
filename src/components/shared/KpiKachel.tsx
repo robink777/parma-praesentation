@@ -238,7 +238,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       href: href("alle"),
       info: info(
         ["kaufpreis", "prozent_aussenprovision", "prozent_innenprovision"],
-        "Je Objekt: kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19 (19% MwSt. herausgerechnet). Summiert über aktive Objekte + Aufarbeitung. Fehlt eines der beiden Prozentfelder, fließt das Objekt nicht ein (siehe \"ohne Angabe\")."
+        "Je Objekt: kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19 (19% MwSt. herausgerechnet). Summiert über aktive Objekte + Aufarbeitung. Eine Seite darf 0 % haben (Provision nur von einer Seite). Haben beide Seiten keinen Satz, fließt das Objekt nicht ein (siehe \"ohne Angabe\")."
       ),
     },
     {
@@ -262,7 +262,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       href: href("verkauftJahr"),
       info: info(
         ["ind_2954_Feld_ObjPreise379", "prozent_aussenprovision", "prozent_innenprovision", "kaltmiete", "verkauft_am"],
-        'Verkäufe: tatsächlicher Kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19. Vermietungen: 2 Kaltmieten. Jeweils mit Verkauft-/Vermietet-am-Datum im laufenden Kalenderjahr. Fehlen tatsächlicher Kaufpreis oder Prozentsätze, zählt das Objekt unter "ohne Angabe".'
+        'Verkäufe: tatsächlicher Kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19. Vermietungen: 2 Kaltmieten. Jeweils mit Verkauft-/Vermietet-am-Datum im laufenden Kalenderjahr. Eine Seite darf 0 % haben. Fehlen der tatsächliche Kaufpreis oder beide Prozentsätze, zählt das Objekt unter "ohne Angabe".'
       ),
     },
     {
