@@ -296,7 +296,7 @@ export function ObjektlisteKarte({
 
       <p className="mt-sm text-[11px] text-anthrazit/50">
         Provisionen netto (÷ 1,19) auf den Kaufpreis, bei verkauften Objekten auf den tatsächlichen Kaufpreis.
-        Vermietungen mit 2 Kaltmieten; ihre Kaltmiete zählt nicht zur Kaufpreis-Summe. Eine Seite darf 0 % haben
+        Vermietungen mit der in onOffice eingetragenen Provision (Außen-/Innen-Provision, z. B. „2 Kaltmieten“); ihre Kaltmiete zählt nicht zur Kaufpreis-Summe. Eine Seite darf 0 % haben
         (Provision nur von einer Seite); „fehlt“ heißt, dass keine Seite einen Satz hat.
       </p>
     </Card>

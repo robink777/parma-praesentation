@@ -1,6 +1,7 @@
 import { TvSlideshow } from "@/components/tv/TvSlideshow";
 import { ladeAdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
 import { ermittleSaison, ladeWettkampfRangliste } from "@/lib/onoffice/wettkampf";
+import { DASHBOARD_CACHE_MS, kurzzeitCache } from "@/lib/kurzzeitCache";
 
 // Kein Caching — jeder Aufruf (bzw. jeder minütliche Refresh, siehe TvSlideshow.tsx) soll die
 // aktuellen Live-Daten zeigen, kein gecachter Snapshot (analog zu app/geteilt/page.tsx, Chat-
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function TvPage() {
   const [daten, rangliste] = await Promise.all([
     ladeAdminDashboardDaten(),
-    ladeWettkampfRangliste().catch((error) => {
+    kurzzeitCache("wettkampf-rangliste", DASHBOARD_CACHE_MS, ladeWettkampfRangliste).catch((error) => {
       console.error("Live-Abruf der Wettkampf-Rangliste fehlgeschlagen:", error);
       return [];
     }),

@@ -18,6 +18,7 @@ import {
 import { TEAM } from "@/data/unternehmen";
 import { distanzZwischenPlzKm } from "@/lib/geo";
 import { berlinDatumIso, berlinDatumZeit, berlinMitternacht } from "@/lib/zeitzone";
+import { vermietungsProvision } from "./vermietungsprovision";
 import { callOnOfficeApi } from "./client";
 import { PRAESENTATIONSDATEI_NAME } from "./praesentationsdatei";
 import {
@@ -1063,6 +1064,25 @@ export async function zaehleVerkaufteObjekte(): Promise<number> {
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
+// "Aktiv" heißt Status 1 OHNE Status 2 "in Übergabe" (ind_Schl_5925). Nutzer-Vorgabe November 2026:
+// Nach dem Notartermin wird das Objekt auf "in Übergabe" gestellt und "Verkauft am" = Notartermin
+// eingetragen — es zählt damit bei Verkaufte Objekte/Provisionsvolumen. In OnOffice bleibt es bis
+// zur Übergabe Status 1 (Aktiv), weil die Kunden weiter betreut werden; erst bei der Übergabe wird
+// archiviert. Für die App gehört es trotzdem nicht mehr zur aktiven Vermarktung. Ohne
+// diesen Filter stand es zusätzlich in Aktive Vermarktung, Objektvolumen, Provisionsvorlauf und
+// Ø Vermarktungsdauer (live 10.11.2026: 6 Objekte, rund 1,6 Mio. € doppelt). "!=" behält Objekte
+// mit leerem Status 2 (live geprüft: 96 → 90 aktive Kaufobjekte, genau die 6 in Übergabe fallen
+// heraus). Fehlt bei "in Übergabe" das Verkaufsdatum, meldet die Kontrollseite das.
+const AKTIV_OHNE_UEBERGABE = [{ op: "!=", val: "ind_Schl_5925" }];
+
+// Status 2 "Dublette" (ind_Schl_5931, angelegt 11.11.2026). Nutzer-Entscheidung: Doppelte Datensätze
+// werden nicht gelöscht, sondern nach Übertragung von Maklerbuch und Interessenten auf
+// Archiviert / Dublette gestellt. Sie dürfen nirgends mitzählen — vor allem nicht bei Aufträgen
+// ("Auftrag von" steht oft in beiden Datensätzen), Verkäufen und Neuzugängen. "!=" behält Objekte
+// mit leerem Status 2 (siehe AKTIV_OHNE_UEBERGABE).
+const STATUS2_DUBLETTE = "ind_Schl_5931";
+const OHNE_DUBLETTE = [{ op: "!=", val: STATUS2_DUBLETTE }];
+
 // Zählt die aktuell aktiven Objekte (status=1) eines bestimmten Mitarbeiters (Objekt-Betreuer,
 // Feld "benutzer" = Nutzer-Nr, siehe ladeNutzerNrFuerMitarbeiter/TeamMitglied.nutzerNr oben —
 // NICHT die Adress-ID) für die Mitarbeiterstatistik im Admin-Bereich (Parameter 1 von 5, siehe
@@ -1086,6 +1106,7 @@ export async function zaehleAktiveObjekte(nutzerNr: string): Promise<number> {
         data: ["Id"],
         filter: {
           status: [{ op: "=", val: "1" }],
+          status2: AKTIV_OHNE_UEBERGABE,
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
         },
@@ -1228,6 +1249,7 @@ async function ladeVerkaufteRecords(nutzerNr: string, von: string, bis: string) 
         filter: {
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
+          status2: OHNE_DUBLETTE,
           verkauft_am: [
             { op: ">=", val: von },
             { op: "<=", val: bis },
@@ -1450,6 +1472,9 @@ interface RawMitarbeiterObjektRecord {
     // unplausiblen Werten (z.B. 738977), also nicht verlässlich nutzbar. "auftragvon" liefert bei
     // fehlendem Auftragsdatum "0000-00-00" statt eines echten Datums (siehe
     // berechneVermarktungsdauerTage unten).
+    // Freitext der Provision — nur bei Vermietungen ausgewertet (siehe vermietungsProvision).
+    aussen_courtage?: string;
+    innen_courtage?: string;
     auftragvon?: string;
     // "Prozent Außenprovision"/"Prozent Innenprovision" (Bereich Preise/Flächen > Preise
     // Statistik in OnOffice) — Feldkatalog live geprüft (resourcetype "fields", Juli 2026):
@@ -1500,6 +1525,8 @@ const MITARBEITER_OBJEKT_FIELDS = [
   "auftragvon",
   "prozent_aussenprovision",
   "prozent_innenprovision",
+  "aussen_courtage",
+  "innen_courtage",
   "kaltmiete",
   "verkauft_am",
   "status2",
@@ -1716,20 +1743,21 @@ function mapMitarbeiterVermietung(record: RawMitarbeiterObjektRecord): Mitarbeit
   };
 }
 
-// Provision einer abgeschlossenen Vermietung in Kaltmieten, netto. OnOffice hat dafür kein
-// strukturiertes Feld (Prozentfelder bei Mietobjekten 0 oder Kaufobjekt-Werte, Courtage nur als
-// Freitext); die Buchhaltungsliste 2026 rechnet in 4 von 6 Fällen mit 2 Kaltmieten.
-const VERMIETUNG_PROVISION_KALTMIETEN = 2;
+// Provision einer abgeschlossenen Vermietung: frei eingetragen in Außen-/Innen-Provision, siehe
+// vermietungsprovision.ts (vorher fest 2 Kaltmieten).
+function vermietungsProvisionAusRecord(el: RawMitarbeiterObjektRecord["elements"]): number | null {
+  return vermietungsProvision(el.aussen_courtage, el.innen_courtage, Number(el.kaltmiete) || 0);
+}
 
 // Für das Provisionsvolumen des Jahres (Nutzer-Vorgabe November 2026: "Vermietung soll auch
 // eingerechnet werden!").
 function mapAbgeschlosseneVermietung(record: RawMitarbeiterObjektRecord): MitarbeiterObjekt {
   const objekt = mapMitarbeiterVermietung(record);
-  const fehlt = objekt.preis <= 0;
+  const provision = vermietungsProvisionAusRecord(record.elements);
   return {
     ...objekt,
-    provisionsvorlauf: fehlt ? null : objekt.preis * VERMIETUNG_PROVISION_KALTMIETEN,
-    provisionsvorlaufFehlt: fehlt,
+    provisionsvorlauf: provision,
+    provisionsvorlaufFehlt: provision === null,
   };
 }
 
@@ -1754,6 +1782,7 @@ export async function ladeAktiveObjekteFuerMitarbeiter(
         data: MITARBEITER_OBJEKT_FIELDS,
         filter: {
           status: [{ op: "=", val: "1" }],
+          status2: AKTIV_OHNE_UEBERGABE,
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
         },
@@ -1819,6 +1848,7 @@ export async function ladeAktiveVermietungenFuerMitarbeiter(
         data: MITARBEITER_OBJEKT_FIELDS,
         filter: {
           status: [{ op: "=", val: "1" }],
+          status2: AKTIV_OHNE_UEBERGABE,
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "miete" }],
         },
@@ -1895,6 +1925,7 @@ export async function ladeVerkaufteObjekteFuerMitarbeiter(
         filter: {
           benutzer: [{ op: "=", val: nutzerNr }],
           vermarktungsart: [{ op: "=", val: "kauf" }],
+          status2: OHNE_DUBLETTE,
           verkauft_am: [
             { op: ">=", val: von },
             { op: "<=", val: bis },
@@ -1934,6 +1965,7 @@ export async function ladeAlleAktivenObjekte(): Promise<MitarbeiterObjekt[]> {
         data: MITARBEITER_OBJEKT_FIELDS,
         filter: {
           status: [{ op: "=", val: "1" }],
+          status2: AKTIV_OHNE_UEBERGABE,
           vermarktungsart: [{ op: "=", val: "kauf" }],
         },
         listlimit: GESAMT_OBJEKT_LISTLIMIT,
@@ -2007,6 +2039,7 @@ export async function ladeAlleVerkauftenObjekte(
           data: MITARBEITER_OBJEKT_FIELDS,
           filter: {
             vermarktungsart: [{ op: "=", val: vermarktungsart }],
+            status2: OHNE_DUBLETTE,
             verkauft_am: [
               { op: ">=", val: von },
               { op: "<=", val: bis },
@@ -2035,11 +2068,15 @@ interface RawKontrollRecord {
     ind_3402_Feld_ObjTech528?: string;
     prozent_aussenprovision?: string | number;
     prozent_innenprovision?: string | number;
+    ind_2954_Feld_ObjPreise379?: string | number;
+    geaendert_am?: string;
   };
 }
 
 const KONTROLL_FIELDS = [
   "Id",
+  "ind_2954_Feld_ObjPreise379",
+  "geaendert_am",
   "objekttitel",
   "objektnr_extern",
   "kaufpreis",
@@ -2184,9 +2221,44 @@ export async function ladeKontrollObjekte(): Promise<KontrollObjekt[]> {
     if (verkauftAmGueltig && el.status2 && STATUS2_NOCH_AKTIV_LABELS[el.status2]) {
       probleme.push(`Status widerspricht Verkaufsdatum (${STATUS2_NOCH_AKTIV_LABELS[el.status2]})`);
     }
+    // "in Übergabe" zählt nicht mehr als aktiv (siehe AKTIV_OHNE_UEBERGABE). Ohne Verkaufsdatum
+    // würde so ein Objekt in keiner Kachel mehr auftauchen.
+    if (el.status2 === STATUS2_IN_UEBERGABE && !verkauftAmGueltig) {
+      probleme.push("In Übergabe, aber Verkaufsdatum fehlt");
+    }
 
     if (duplikatIds.has(record.id)) {
       probleme.push("Möglicherweise doppelt angelegt");
+    }
+    // Ergänzt 11.11.2026 nach dem Datenabgleich 2026:
+    // (6) Dubletten zählen nirgends. Ein Verkaufsdatum an einer Dublette heißt, dass der falsche
+    //     Datensatz als Verkauf gepflegt wurde.
+    if (el.status2 === STATUS2_DUBLETTE && verkauftAmGueltig) {
+      probleme.push("Dublette mit Verkaufsdatum");
+    }
+    // (7) Gerechnet wird nur mit dem tatsächlichen Kaufpreis (kein Rückgriff auf den Angebotspreis).
+    //     Geprüft ab dem laufenden Jahr, ältere Verkäufe bleiben außen vor.
+    const jahresanfang = `${berlinDatumIso(new Date()).slice(0, 4)}-01-01`;
+    if (
+      verkauftAmGueltig &&
+      (el.verkauft_am ?? "") >= jahresanfang &&
+      el.status2 !== STATUS2_DUBLETTE &&
+      !(Number(el.ind_2954_Feld_ObjPreise379) > 0)
+    ) {
+      probleme.push("Tatsächlicher Kaufpreis fehlt");
+    }
+    // (8) Datumsfalle: Beim Wechsel auf Verkauft setzt onOffice "Verkauft am" auf den heutigen Tag.
+    //     Archiviert wird erst nach der Übergabe, also nach dem Notartermin — steht das
+    //     Verkaufsdatum genau auf dem Tag der letzten Änderung, ist es vermutlich überschrieben.
+    //     Erst ab VERKAUFSREGEL_AB: Januar bis Oktober 2026 sind gegen die Buchhaltung abgeglichen,
+    //     dort wurde oft am Notartag direkt archiviert (JH937, JH941, VK1099 stimmen).
+    if (
+      el.status2 === "verkauft" &&
+      verkauftAmGueltig &&
+      (el.verkauft_am ?? "") >= VERKAUFSREGEL_AB &&
+      el.verkauft_am === (el.geaendert_am ?? "").slice(0, 10)
+    ) {
+      hinweise.push("Verkaufsdatum = Tag der letzten Änderung, Notartermin prüfen");
     }
 
     if (probleme.length === 0 && hinweise.length === 0) continue;
@@ -2986,6 +3058,7 @@ export async function zaehleAuftraegeAkquiriert(
         data: ["Id"],
         filter: {
           ind_3402_Feld_ObjTech528: [{ op: "=", val: nutzerNr }],
+          status2: OHNE_DUBLETTE,
           auftragvon: [
             { op: ">=", val: von },
             { op: "<=", val: bis },
@@ -2999,7 +3072,8 @@ export async function zaehleAuftraegeAkquiriert(
 }
 
 // status2-Werte "Akquise - In Akquise" und "Akquise – Auftrag", siehe zaehleGesetzteAuftraege.
-const STATUS2_NOCH_IN_AKQUISE = ["in_akquise", "ind_Schl_5461"];
+// Plus Dubletten: Ihr "Auftrag von" ist meist eine Kopie aus dem echten Objekt und darf nicht doppelt zählen.
+const STATUS2_NOCH_IN_AKQUISE = ["in_akquise", "ind_Schl_5461", STATUS2_DUBLETTE];
 
 // Zählt Aufträge, die ein Mitarbeiter als Setter (Technische Daten, ind_3356_Feld_ObjTech505)
 // gelegt hat und die im Zeitraum [von, bis] in "Vorbereitung" gesetzt wurden — Grundlage für die
@@ -3094,6 +3168,7 @@ const NEUE_OBJEKTE_LISTLIMIT = 500;
 // (siehe Korrektur 2 bei ladeObjektkarteDaten oben), deshalb mit eigenem Label statt als
 // "Unbekannt" zu erscheinen.
 const STATUS2_LABELS: Record<string, string> = {
+  ind_Schl_5931: "Dublette",
   "": "Ohne Status 2",
   status2obj_inaktiv: "Inaktiv",
   status2obj_aktiv: "Aktiv",
@@ -3190,6 +3265,7 @@ export async function ladeNeueObjekteListe(von: string, bis?: string): Promise<N
       parameters: {
         data: NEUE_OBJEKTE_LISTE_FIELDS,
         filter: {
+          status2: OHNE_DUBLETTE,
           erstellt_am: bis
             ? [{ op: ">=", val: von }, { op: "<=", val: bis }]
             : [{ op: ">=", val: von }],

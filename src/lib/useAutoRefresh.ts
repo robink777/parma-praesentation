@@ -18,6 +18,34 @@ import { useRouter } from "next/navigation";
 // OnOffice-Fehlern/Drosselung im Dauerbetrieb diesen Wert als Ersten Verdächtigen prüfen.
 export const ADMIN_REFRESH_INTERVAL_MS = 60 * 1000;
 
+// Anlass 10.11.2026: Vercel hat das Projekt wegen zu hoher Rechenzeit („Fluid Active CPU“)
+// angehalten. Die offenen Bildschirme liefen auch nachts, am Wochenende und im Hintergrund-Tab
+// minütlich weiter. Automatisch abgerufen wird deshalb nur noch, wenn der Tab sichtbar ist UND
+// Bürozeit ist (Mo–Sa 7–20 Uhr Berlin). Ein normaler Seitenaufruf lädt weiterhin immer frisch.
+const BUEROZEIT_TAGE = new Set(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+const BUEROZEIT_VON_STUNDE = 7;
+const BUEROZEIT_BIS_STUNDE = 20;
+
+export function istBuerozeit(jetzt: Date = new Date()): boolean {
+  const teile = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Europe/Berlin",
+      weekday: "short",
+      hour: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(jetzt)
+      .map((t) => [t.type, t.value])
+  );
+  const stunde = Number(teile.hour) % 24;
+  return BUEROZEIT_TAGE.has(teile.weekday) && stunde >= BUEROZEIT_VON_STUNDE && stunde < BUEROZEIT_BIS_STUNDE;
+}
+
+export function automatischerAbrufSinnvoll(): boolean {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return false;
+  return istBuerozeit();
+}
+
 // KORREKTUR November 2026 (Nutzer-Meldung: "ich habe gerade bei kira einen testanruf gemacht.
 // Dieser wieder nicht eingetragen auch nach der aktuallisereung von 1 minute ... Vielleicht
 // brauchen wir noch ein optisches feedback wann aktuallisert wird"). Der fehlende Anruf lag am
@@ -45,13 +73,27 @@ export function useAutoRefresh(
   const [naechsteAktualisierungUm, setNaechsteAktualisierungUm] = useState<number | null>(null);
 
   useEffect(() => {
-    setNaechsteAktualisierungUm(Date.now() + intervalMs);
-    const intervall = setInterval(() => {
+    let letzterAbruf = Date.now();
+    const abrufen = () => {
+      letzterAbruf = Date.now();
       setNaechsteAktualisierungUm(Date.now() + intervalMs);
       setWirdAktualisiert(true);
       router.refresh();
+    };
+    setNaechsteAktualisierungUm(Date.now() + intervalMs);
+    const intervall = setInterval(() => {
+      if (automatischerAbrufSinnvoll()) abrufen();
+      else setNaechsteAktualisierungUm(null);
     }, intervalMs);
-    return () => clearInterval(intervall);
+    // Kommt der Tab wieder nach vorn und ist der letzte Abruf überfällig, sofort nachladen.
+    const beiSichtbarkeit = () => {
+      if (automatischerAbrufSinnvoll() && Date.now() - letzterAbruf >= intervalMs) abrufen();
+    };
+    document.addEventListener("visibilitychange", beiSichtbarkeit);
+    return () => {
+      clearInterval(intervall);
+      document.removeEventListener("visibilitychange", beiSichtbarkeit);
+    };
   }, [router, intervalMs]);
 
   // Läuft bei JEDER Änderung von aenderungsSignal — das schließt den allerersten Render mit ein

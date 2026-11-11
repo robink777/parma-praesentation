@@ -1,4 +1,5 @@
 import { ONOFFICE_MODE } from "./config";
+import { DASHBOARD_CACHE_MS, kurzzeitCache } from "@/lib/kurzzeitCache";
 import { ladeMitarbeiterKennzahlen, ladeNeuzugaengeVerlauf, ladeObjektGesamtKennzahlen } from "./mitarbeiterstatistik";
 import { ladeAlleMitarbeiter, ladeKontrollObjekte, ladeLeadquellenKennzahlen, ladeObjektkarteDaten } from "./estate";
 import {
@@ -32,8 +33,14 @@ export interface AdminDashboardDaten {
 // einzelner fehlgeschlagener Abruf (z.B. transienter OnOffice-Verbindungsfehler trotz Retry,
 // siehe onoffice/client.ts) soll nicht die ganze Seite abstürzen lassen, sondern nur den
 // betroffenen Abschnitt in seinen eigenen "nicht geladen"-Zustand versetzen.
-export async function ladeAdminDashboardDaten(): Promise<AdminDashboardDaten> {
-  if (ONOFFICE_MODE !== "live") return {};
+// Alle Bildschirme teilen sich einen Abruf pro DASHBOARD_CACHE_MS (siehe lib/kurzzeitCache.ts,
+// Anlass: Vercel-CPU-Limit November 2026).
+export function ladeAdminDashboardDaten(): Promise<AdminDashboardDaten> {
+  if (ONOFFICE_MODE !== "live") return Promise.resolve({});
+  return kurzzeitCache("admin-dashboard", DASHBOARD_CACHE_MS, ladeAdminDashboardDatenFrisch);
+}
+
+async function ladeAdminDashboardDatenFrisch(): Promise<AdminDashboardDaten> {
 
   const [
     kennzahlen,

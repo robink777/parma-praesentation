@@ -1,6 +1,7 @@
 import { TvMobil } from "@/components/tv/TvMobil";
 import { ladeAdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
 import { ermittleSaison, ladeWettkampfRangliste } from "@/lib/onoffice/wettkampf";
+import { DASHBOARD_CACHE_MS, kurzzeitCache } from "@/lib/kurzzeitCache";
 
 // Kein Caching — siehe app/tv/page.tsx, derselbe Grund (immer die aktuellen Live-Daten, nie ein
 // gecachter Snapshot).
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function TvMobilPage() {
   const [daten, rangliste] = await Promise.all([
     ladeAdminDashboardDaten(),
-    ladeWettkampfRangliste().catch((error) => {
+    kurzzeitCache("wettkampf-rangliste", DASHBOARD_CACHE_MS, ladeWettkampfRangliste).catch((error) => {
       console.error("Live-Abruf der Wettkampf-Rangliste fehlgeschlagen:", error);
       return [];
     }),

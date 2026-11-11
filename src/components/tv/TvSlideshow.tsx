@@ -7,6 +7,7 @@ import { Uebersicht } from "@/components/admin/Uebersicht";
 import { MitarbeiterLeaderboard } from "./MitarbeiterLeaderboard";
 import { AdminDashboardDaten } from "@/lib/onoffice/adminDashboard";
 import type { WettkampfEintrag } from "@/lib/onoffice/wettkampf";
+import { automatischerAbrufSinnvoll } from "@/lib/useAutoRefresh";
 
 // TV-Vorführung für die Büro-Fernseher (Oktober 2026 Chat-Vorgabe: "ich hätte gerne einen Link
 // generieren ... den ich dann auf den Fernsehern in den einzelnen Büros öffne ... zur Motivation,
@@ -114,7 +115,10 @@ export function TvSlideshow(daten: TvDaten) {
   }, [daten]);
 
   useEffect(() => {
-    const abruf = setTimeout(() => router.refresh(), SLIDE_DAUER_MS - SYNC_VORLAUF_MS);
+    // Nur bei sichtbarem Tab und zur Bürozeit (siehe useAutoRefresh.ts, Vercel-CPU-Limit 11/2026).
+    const abruf = setTimeout(() => {
+      if (automatischerAbrufSinnvoll()) router.refresh();
+    }, SLIDE_DAUER_MS - SYNC_VORLAUF_MS);
     const wechsel = setTimeout(() => {
       const naechsterIndex = (index + 1) % SLIDES.length;
       const frisch = neuesteDatenRef.current;

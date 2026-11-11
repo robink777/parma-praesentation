@@ -204,7 +204,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       icon: "house",
       akzent: "chart-2",
       href: href("aktiv"),
-      info: info(["status", "vermarktungsart"], "Anzahl Objekte mit status = 1 (Aktiv) und vermarktungsart = kauf."),
+      info: info(["status", "status2", "vermarktungsart"], "Anzahl Objekte mit status = 1 (Aktiv) und vermarktungsart = kauf, ohne status2 = in Übergabe (nach dem Notartermin; bleibt in OnOffice bis zur Übergabe Aktiv, zählt hier aber schon bei den verkauften Objekten)."),
     },
     {
       label: `Gesamtvolumen ${jahr}`,
@@ -225,7 +225,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       href: href("alle"),
       info: info(
         ["kaufpreis", "status", "status2"],
-        "Σ kaufpreis über aktive Objekte (status = 1) UND Objekte in Aufarbeitung (status = 2, status2 = vorbereitung)."
+        "Σ kaufpreis über aktive Objekte (status = 1, ohne in Übergabe) UND Objekte in Aufarbeitung (status = 2, status2 = vorbereitung)."
       ),
     },
     {
@@ -238,7 +238,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       href: href("alle"),
       info: info(
         ["kaufpreis", "prozent_aussenprovision", "prozent_innenprovision"],
-        "Je Objekt: kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19 (19% MwSt. herausgerechnet). Summiert über aktive Objekte + Aufarbeitung. Eine Seite darf 0 % haben (Provision nur von einer Seite). Haben beide Seiten keinen Satz, fließt das Objekt nicht ein (siehe \"ohne Angabe\")."
+        "Je Objekt: kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19 (19% MwSt. herausgerechnet). Summiert über aktive Objekte (ohne in Übergabe) + Aufarbeitung. Eine Seite darf 0 % haben (Provision nur von einer Seite). Haben beide Seiten keinen Satz, fließt das Objekt nicht ein (siehe \"ohne Angabe\")."
       ),
     },
     {
@@ -262,7 +262,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       href: href("verkauftJahr"),
       info: info(
         ["ind_2954_Feld_ObjPreise379", "prozent_aussenprovision", "prozent_innenprovision", "kaltmiete", "verkauft_am"],
-        'Verkäufe: tatsächlicher Kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19. Vermietungen: 2 Kaltmieten. Jeweils mit Verkauft-/Vermietet-am-Datum im laufenden Kalenderjahr. Eine Seite darf 0 % haben. Fehlen der tatsächliche Kaufpreis oder beide Prozentsätze, zählt das Objekt unter "ohne Angabe".'
+        'Verkäufe: tatsächlicher Kaufpreis × (prozent_aussenprovision + prozent_innenprovision) ÷ 100 ÷ 1,19. Vermietungen: frei eingetragen in Außen-/Innen-Provision (z. B. „2 Kaltmieten“ oder „1.530 €“, netto; mit „inkl.“ brutto). Jeweils mit Verkauft-/Vermietet-am-Datum im laufenden Kalenderjahr. Eine Seite darf 0 % haben. Fehlen der tatsächliche Kaufpreis oder beide Prozentsätze (bei Vermietungen eine auswertbare Provision), zählt das Objekt unter "ohne Angabe".'
       ),
     },
     {
@@ -273,7 +273,7 @@ export function baueUebersichtKacheln(gesamt?: ObjektGesamtKennzahlen, interakti
       href: href("alle"),
       info: info(
         ["auftragvon"],
-        "Durchschnitt der Tage zwischen auftragvon und heute, über aktive Objekte + Aufarbeitung mit gültigem Datum."
+        "Durchschnitt der Tage zwischen auftragvon und heute, über aktive Objekte (ohne in Übergabe) + Aufarbeitung mit gültigem Datum."
       ),
     },
   ];
