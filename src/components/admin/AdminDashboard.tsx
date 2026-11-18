@@ -20,6 +20,7 @@ import {
   ObjektGesamtKennzahlen,
   ObjektkarteDaten,
 } from "@/types";
+import { UrlaubsUebersicht } from "@/lib/urlaub/typen";
 
 // Wurzelkomponente des Admin-Dashboards (siehe app/admin/page.tsx) — bis Oktober 2026 kurzzeitig
 // auf zwei getrennte, vollflächige Routen aufgeteilt (Karte/Statistik, siehe Git-Historie
@@ -38,6 +39,7 @@ export function AdminDashboard({
   alleMitarbeiter,
   startAbschnitt = "uebersicht",
   startReiter,
+  urlaub,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   gesamtKennzahlen?: ObjektGesamtKennzahlen;
@@ -48,6 +50,7 @@ export function AdminDashboard({
   alleMitarbeiter?: Betreuer[];
   startAbschnitt?: string;
   startReiter?: MitarbeiterReiter;
+  urlaub?: UrlaubsUebersicht;
 }) {
   const [abschnitt, setAbschnitt] = useState(startAbschnitt);
   const [gewaehltePlz, setGewaehltePlz] = useState<{ plz: string; ort: string } | null>(null);
@@ -58,8 +61,12 @@ export function AdminDashboard({
   // Punkt will ich nicht scrollen müssen") — alle drei bekommen eine FESTE Höhe ohne Scroll und
   // keinen eigenen Seitentitel, der nur Platz kostet. Leadquellen/Kontrolle sind der Natur ihrer
   // Daten nach unbegrenzt lang (Objektliste …) — dort bleibt normales Scrollen nötig und sinnvoll.
-  const istVollflaechig =
-    abschnitt === "uebersicht" || abschnitt === "karte" || abschnitt === "mitarbeiter";
+  //
+  // November 2026: "Mitarbeiter" scrollt wieder normal (Nutzer-Vorgabe: "die kacheln ergänzen und
+  // generell vergrößern" — mit Urlaubszähler passen die größeren Kacheln nicht mehr in eine feste
+  // Bildschirmhöhe). Ohne Seitentitel, aber mit einem normalen Seiten-Scroll.
+  const istVollflaechig = abschnitt === "uebersicht" || abschnitt === "karte";
+  const ohneTitel = istVollflaechig || abschnitt === "mitarbeiter";
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-stein">
@@ -74,7 +81,11 @@ export function AdminDashboard({
       <StatistikNav navItems={ADMIN_NAV_ITEMS} activeId={abschnitt} onSelect={setAbschnitt} />
       <main
         className={`mx-auto min-h-0 w-full max-w-content flex-1 px-lg ${
-          istVollflaechig ? "flex flex-col overflow-hidden py-sm" : "overflow-y-auto py-lg"
+          istVollflaechig
+            ? "flex flex-col overflow-hidden py-sm"
+            : abschnitt === "mitarbeiter"
+              ? "overflow-y-auto py-sm"
+              : "overflow-y-auto py-lg"
         }`}
       >
         {abschnitt === "uebersicht" && (
@@ -88,9 +99,9 @@ export function AdminDashboard({
           />
         )}
         {abschnitt === "mitarbeiter" && (
-          <MitarbeiterBereich kennzahlen={kennzahlen} alleMitarbeiter={alleMitarbeiter} startReiter={startReiter} />
+          <MitarbeiterBereich kennzahlen={kennzahlen} alleMitarbeiter={alleMitarbeiter} startReiter={startReiter} urlaub={urlaub} />
         )}
-        {!istVollflaechig && (
+        {!ohneTitel && (
           <>
             <p className="label mb-xs">Admin-Bereich</p>
             <h1 className="mb-lg font-slab text-[40px] font-bold leading-[1.2] text-anthrazit md:text-[48px]">

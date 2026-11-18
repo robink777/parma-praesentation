@@ -7,6 +7,8 @@ import { AKQUISE_NAMEN, SETTING_NAMEN, TEAM, VERTRIEB_NAMEN } from "@/data/unter
 import { InfoTooltip } from "@/components/shared/InfoTooltip";
 import { fotoLookup, initialen } from "@/lib/mitarbeiterFotos";
 import { Betreuer, MitarbeiterKennzahlen, TeamMitglied } from "@/types";
+import { UrlaubsKonto, UrlaubsUebersicht } from "@/lib/urlaub/typen";
+import { UrlaubsLegende, UrlaubsWarnungen, UrlaubsZeile, urlaubsInfoText } from "./Urlaub";
 
 // "Mitarbeiter"-Baustein des Admin-Dashboards (siehe AdminDashboard.tsx) — Oktober 2026
 // Chat-Vorgabe: "ich will dass sie den ersten beiden Seiten gleicht (vom Look) ... Kacheln ...
@@ -284,6 +286,8 @@ function MitarbeiterKachel({
   modus,
   zeitraum,
   reiter,
+  urlaub,
+  urlaubsWarnungen,
 }: {
   mitglied: TeamMitglied;
   fotoUrl?: string;
@@ -291,26 +295,33 @@ function MitarbeiterKachel({
   modus: KennzahlenModus;
   zeitraum?: Zeitraum;
   reiter: MitarbeiterReiter;
+  urlaub?: UrlaubsKonto;
+  urlaubsWarnungen: number;
 }) {
   const metriken = baueMetriken(kennzahlen, modus, zeitraum);
   const balkenMetriken =
     modus === "vertrieb"
       ? OBJEKT_BALKEN_SEGMENTE.map((segment) => ({ label: segment.label, wert: "" }))
       : [];
-  const info = baueKachelInfo([...metriken, ...balkenMetriken]);
+  const kennzahlInfo = baueKachelInfo([...metriken, ...balkenMetriken]);
+  const info = urlaub ? { ...kennzahlInfo, text: `${kennzahlInfo.text}\n\n${urlaubsInfoText(urlaub)}` } : kennzahlInfo;
   // Die ganze Kachel führt zur Aktivitätenliste (Nutzer-Vorgabe November 2026: "beim Klicken auf
   // den Mitarbeiter eine liste aller aktivitäten"). Der Link liegt am Namen und spannt sich per
   // ::after über die Kachel auf, das (i) sitzt mit z-10 darüber und bleibt eigenständig bedienbar.
   // prefetch={false}, damit nicht jede sichtbare Kachel vorab Live-Daten aus onOffice abruft.
   const aktivitaetenHref = `/admin/aktivitaeten?name=${encodeURIComponent(mitglied.name)}&reiter=${reiter}`;
   return (
-    <div className="relative flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] transition-shadow hover:shadow-[0_2px_10px_rgba(80,63,61,0.16)] md:p-md">
+    <div
+      className={`relative flex h-full min-h-0 flex-col rounded-lg bg-reinweiss p-sm shadow-[0_1px_4px_rgba(80,63,61,0.08)] transition-shadow hover:shadow-[0_2px_10px_rgba(80,63,61,0.16)] md:p-md ${
+        urlaubsWarnungen > 0 ? "ring-2 ring-status-kritisch" : ""
+      }`}
+    >
       <div className="mb-sm flex shrink-0 items-center gap-sm">
-        <div className="relative h-[clamp(36px,6vh,56px)] w-[clamp(36px,6vh,56px)] shrink-0 overflow-hidden rounded-full bg-sand">
+        <div className="relative h-[clamp(44px,7.5vh,72px)] w-[clamp(44px,7.5vh,72px)] shrink-0 overflow-hidden rounded-full bg-sand">
           {fotoUrl ? (
-            <Image src={fotoUrl} alt={mitglied.name} fill className="object-cover" sizes="56px" />
+            <Image src={fotoUrl} alt={mitglied.name} fill className="object-cover" sizes="72px" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center font-slab text-sm font-bold text-walnuss">
+            <div className="flex h-full w-full items-center justify-center font-slab text-lg font-bold text-walnuss">
               {initialen(mitglied.name)}
             </div>
           )}
@@ -318,7 +329,7 @@ function MitarbeiterKachel({
         <Link
           href={aktivitaetenHref}
           prefetch={false}
-          className="min-w-0 flex-1 truncate text-lg font-medium text-anthrazit after:absolute after:inset-0 after:rounded-lg after:content-['']"
+          className="min-w-0 flex-1 truncate font-slab text-[clamp(18px,2.4vh,24px)] font-bold text-anthrazit after:absolute after:inset-0 after:rounded-lg after:content-['']"
         >
           {mitglied.name}
         </Link>
@@ -326,19 +337,20 @@ function MitarbeiterKachel({
           <InfoTooltip felder={info.felder} text={info.text} breit />
         </div>
       </div>
-      <div className="grid flex-1 grid-cols-2 content-start gap-x-sm gap-y-xs">
+      <div className="grid flex-1 grid-cols-2 content-start gap-x-md gap-y-sm">
         {metriken.map((m) => (
           <div key={m.label} className="min-w-0">
-            <p className="truncate font-mono text-[10px] font-medium uppercase tracking-[0.04em] text-anthrazit/50">
+            <p className="truncate font-mono text-[12px] font-medium uppercase tracking-[0.04em] text-anthrazit/60">
               {m.label}
             </p>
-            <p className="truncate font-slab text-[clamp(16px,2.6vh,22px)] font-bold leading-tight text-anthrazit">
+            <p className="truncate font-slab text-[clamp(20px,3.6vh,34px)] font-bold leading-tight text-anthrazit">
               {m.wert}
             </p>
           </div>
         ))}
       </div>
       {modus === "vertrieb" && <ObjektBalken k={kennzahlen} />}
+      {urlaub && <UrlaubsZeile konto={urlaub} warnungen={urlaubsWarnungen} />}
     </div>
   );
 }
@@ -353,6 +365,7 @@ function MitarbeiterRaster({
   modus,
   zeitraum,
   reiter,
+  urlaub,
 }: {
   mitglieder: TeamMitglied[];
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
@@ -360,10 +373,11 @@ function MitarbeiterRaster({
   modus: KennzahlenModus;
   zeitraum?: Zeitraum;
   reiter: MitarbeiterReiter;
+  urlaub?: UrlaubsUebersicht;
 }) {
-  const spalten = mitglieder.length >= 4 ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-2";
+  const spalten = mitglieder.length >= 4 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1 sm:grid-cols-2";
   return (
-    <div className={`grid h-full min-h-0 auto-rows-fr ${spalten} gap-sm`}>
+    <div className={`grid auto-rows-fr ${spalten} gap-sm`}>
       {mitglieder.map((mitglied) => (
         <MitarbeiterKachel
           key={mitglied.name}
@@ -373,6 +387,8 @@ function MitarbeiterRaster({
           modus={modus}
           zeitraum={zeitraum}
           reiter={reiter}
+          urlaub={urlaub?.konten[mitglied.name]}
+          urlaubsWarnungen={urlaub?.warnungen.filter((w) => w.name === mitglied.name).length ?? 0}
         />
       ))}
     </div>
@@ -460,10 +476,12 @@ export function MitarbeiterBereich({
   kennzahlen,
   alleMitarbeiter,
   startReiter = "vertrieb",
+  urlaub,
 }: {
   kennzahlen?: Record<string, MitarbeiterKennzahlen>;
   alleMitarbeiter?: Betreuer[];
   startReiter?: MitarbeiterReiter;
+  urlaub?: UrlaubsUebersicht;
 }) {
   const { vertrieb, akquise, setting, weitere } = teileTeamAuf();
   const fotos = fotoLookup(alleMitarbeiter ?? []);
@@ -472,16 +490,20 @@ export function MitarbeiterBereich({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-sm">
+      {urlaub && <UrlaubsWarnungen warnungen={urlaub.warnungen} />}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-sm">
         <MitarbeiterReiterleiste aktiv={mitarbeiterReiter} onSelect={setMitarbeiterReiter} />
         {(mitarbeiterReiter === "akquise" || mitarbeiterReiter === "setting") && (
           <ZeitraumSchalter aktiv={zeitraum} onSelect={setZeitraum} />
         )}
-        {mitarbeiterReiter === "vertrieb" && <ObjektBalkenLegende />}
+        <div className="flex flex-wrap items-center gap-md">
+          {mitarbeiterReiter === "vertrieb" && <ObjektBalkenLegende />}
+          {urlaub && <UrlaubsLegende warnungenAktiv={urlaub.warnungenAktiv} />}
+        </div>
       </div>
       <div className="min-h-0 flex-1">
         {mitarbeiterReiter === "vertrieb" && (
-          <MitarbeiterRaster mitglieder={vertrieb} kennzahlen={kennzahlen} fotos={fotos} modus="vertrieb" reiter="vertrieb" />
+          <MitarbeiterRaster mitglieder={vertrieb} kennzahlen={kennzahlen} fotos={fotos} modus="vertrieb" reiter="vertrieb" urlaub={urlaub} />
         )}
         {mitarbeiterReiter === "akquise" && (
           <MitarbeiterRaster
@@ -491,6 +513,7 @@ export function MitarbeiterBereich({
             modus="akquise"
             zeitraum={zeitraum}
             reiter="akquise"
+            urlaub={urlaub}
           />
         )}
         {mitarbeiterReiter === "setting" && (
@@ -501,10 +524,11 @@ export function MitarbeiterBereich({
             modus="standard"
             zeitraum={zeitraum}
             reiter="setting"
+            urlaub={urlaub}
           />
         )}
         {mitarbeiterReiter === "weitere" && (
-          <MitarbeiterRaster mitglieder={weitere} kennzahlen={kennzahlen} fotos={fotos} modus="standard" reiter="weitere" />
+          <MitarbeiterRaster mitglieder={weitere} kennzahlen={kennzahlen} fotos={fotos} modus="standard" reiter="weitere" urlaub={urlaub} />
         )}
       </div>
     </div>

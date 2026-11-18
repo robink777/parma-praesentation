@@ -33,3 +33,9 @@ export function kurzzeitCache<T>(schluessel: string, ttlMs: number, laden: () =>
 // 45 s: Die Bildschirme fragen im Minutentakt, aber nicht synchron. So lädt jede Instanz höchstens
 // gut einmal pro Minute aus onOffice, und die Zahlen sind nie älter als eine Dreiviertelminute.
 export const DASHBOARD_CACHE_MS = 45_000;
+
+// Nach einer Änderung (z. B. Urlaubs-Warnung als gesehen markiert) den gespeicherten Abruf
+// verwerfen, damit der nächste Aufruf frisch lädt.
+export function kurzzeitCacheVerwerfen(schluessel: string): void {
+  speicher.delete(schluessel);
+}
