@@ -9,6 +9,7 @@ import {
   type VerkaufsNachweise,
   zaehleAuftraegeAkquiriert,
   zaehleBesichtigungen,
+  zaehleFinanzierungsvermittlungen,
   zaehleGesetzteAuftraege,
   zaehleTelefonate,
   zaehleTermineNachArt,
@@ -26,6 +27,11 @@ import {
 // auf 5/6 Punkte reduziert (Nutzer: "Die Vertrieblicher sind ja auch angehalten Bewertungstermine
 // zu akquiseren, genau so wie das setting angehalten ist 'Ersttermine' zu legen"). Neu dazu
 // "Auftrag gesetzt = 5 Punkte" fürs Setting, siehe zaehleGesetzteAuftraege in estate.ts.
+//
+// ERGÄNZUNG 19.11.2026 (Nutzer: "Ich habe das Thema mit den Finanzierungen geklärt. Für die
+// Vermittlung gibt es jetzt auch punkte! ... 5 Punkte, Aktionsart = Finanzierungsvermittlung,
+// Aktionstyp = alle die es gibt"): Die früher verworfene Vermittlungs-Kategorie kommt als
+// Maklerbuch-Aktivität zurück, für alle Teilnehmer (siehe zaehleFinanzierungsvermittlungen).
 export const PUNKTE = {
   telefonat: 1,
   besichtigung: 3,
@@ -33,6 +39,7 @@ export const PUNKTE = {
   akquiseZweittermin: 6,
   finanzierungErsttermin: 6,
   finanzierungZweittermin: 7,
+  finanzierungsvermittlung: 5,
   auftragAkquiriert: 10,
   auftragGesetzt: 5,
   verkauf: 10,
@@ -79,6 +86,7 @@ export type WettkampfKategorie =
   | "besichtigungen"
   | "akquiseTermine"
   | "finanzierungTermine"
+  | "finanzierungsvermittlungen"
   | "auftraege"
   | "gesetzteAuftraege"
   | "verkaeufe";
@@ -137,6 +145,7 @@ async function berechnePunkte(
     akquiseZweit,
     finanzErst,
     finanzZweit,
+    vermittlungen,
     auftraege,
     gesetzteAuftraege,
     verkaeufe,
@@ -156,6 +165,7 @@ async function berechnePunkte(
     nutzerNr && istFinanz
       ? zaehleTermineNachArt(nutzerNr, von, bis, FINANZIERUNG_TERMINARTEN.zweittermin).catch(() => 0)
       : Promise.resolve(0),
+    nutzerNr ? zaehleFinanzierungsvermittlungen(nutzerNr, von, bis).catch(() => 0) : Promise.resolve(0),
     nutzerNr ? zaehleAuftraegeAkquiriert(nutzerNr, vonDatum, bisDatum).catch(() => 0) : Promise.resolve(0),
     nutzerNr && istSetting
       ? zaehleGesetzteAuftraege(nutzerNr, vonDatum, bisDatum).catch(() => 0)
@@ -177,6 +187,7 @@ async function berechnePunkte(
       kategorie: "finanzierungTermine",
       punkte: finanzErst * PUNKTE.finanzierungErsttermin + finanzZweit * PUNKTE.finanzierungZweittermin,
     },
+    { kategorie: "finanzierungsvermittlungen", punkte: vermittlungen * PUNKTE.finanzierungsvermittlung },
     { kategorie: "auftraege", punkte: auftraege * PUNKTE.auftragAkquiriert },
     { kategorie: "gesetzteAuftraege", punkte: gesetzteAuftraege * PUNKTE.auftragGesetzt },
     { kategorie: "verkaeufe", punkte: verkaeufe * PUNKTE.verkauf },

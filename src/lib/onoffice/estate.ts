@@ -2850,6 +2850,34 @@ export async function zaehleTelefonate(nutzerNr: string, von: string, bis: strin
   return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
 }
 
+// Zählt Finanzierungsvermittlungen eines Mitarbeiters im Zeitraum [von, bis] für den
+// Wettkampf (Nutzer-Vorgabe 19.11.2026: "Für die Finanzierungsvermittlung gibt es 5 Punkte.
+// Aktionsart = Finanzierungsvermittlung, Aktionstyp = alle die es gibt"). Gleiches Muster wie
+// zaehleTelefonate oben: Maklerbuch-Eintrag, gezählt beim Benutzer, der ihn angelegt hat. Kein
+// Filter auf Aktionstyp — live am 19.11.2026 vorhanden: "Immobiliardarlehensvermittlung" und
+// "Zwischenfinanzierung", künftige Typen zählen automatisch mit.
+export async function zaehleFinanzierungsvermittlungen(nutzerNr: string, von: string, bis: string): Promise<number> {
+  const result = await callOnOfficeApi([
+    {
+      actionid: "urn:onoffice-de-ns:smart:2.5:smartml:action:read",
+      resourcetype: "agentslog",
+      resourceid: "",
+      identifier: "",
+      cacheable: false,
+      parameters: {
+        data: ["Nr"],
+        filter: {
+          Aktionsart: [{ op: "=", val: "Finanzierungsvermittlung" }],
+          Benutzer_nr: [{ op: "=", val: nutzerNr }],
+          Datum: [{ op: ">=", val: von }, { op: "<=", val: bis }],
+        },
+        listlimit: 1,
+      },
+    },
+  ]);
+  return result?.response?.results?.[0]?.data?.meta?.cntabsolute ?? 0;
+}
+
 interface RawAktivitaetRecord {
   id: string | number;
   elements: {
